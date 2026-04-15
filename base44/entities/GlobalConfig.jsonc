@@ -1,0 +1,30 @@
+{
+  "name": "GlobalConfig",
+  "type": "object",
+  "properties": {
+    "github_repo": {
+      "type": "string",
+      "description": "Default GitHub repository (owner/repo)"
+    },
+    "github_branch": {
+      "type": "string",
+      "default": "main",
+      "description": "Default branch"
+    },
+    "github_configs_folder": {
+      "type": "string",
+      "default": ".openrel/pipelines",
+      "description": "Folder in GitHub where pipeline YAML configs are stored"
+    },
+    "github_output_folder": {
+      "type": "string",
+      "default": "data",
+      "description": "Default output folder in GitHub"
+    },
+    "namespace": {
+      "type": "string",
+      "default": "openrel"
+    }
+  },
+  "required": []
+}

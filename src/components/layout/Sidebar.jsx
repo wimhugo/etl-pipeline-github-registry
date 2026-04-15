@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, GitBranch, Play, Database, Menu, X } from 'lucide-react';
+import { LayoutDashboard, GitBranch, Play, Settings2, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -8,7 +8,7 @@ const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
   { label: 'Pipelines', icon: GitBranch, path: '/pipelines' },
   { label: 'Runs', icon: Play, path: '/runs' },
-  { label: 'Sources', icon: Database, path: '/sources' },
+  { label: 'Config', icon: Settings2, path: '/config' },
 ];
 
 export default function Sidebar() {

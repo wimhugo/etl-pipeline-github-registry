@@ -11,7 +11,7 @@ import Dashboard from './pages/Dashboard';
 import Pipelines from './pages/Pipelines';
 import PipelineDetail from './pages/PipelineDetail';
 import Runs from './pages/Runs';
-import Sources from './pages/Sources';
+import Config from './pages/Config';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -40,7 +40,7 @@ const AuthenticatedApp = () => {
         <Route path="/pipelines" element={<Pipelines />} />
         <Route path="/pipelines/:id" element={<PipelineDetail />} />
         <Route path="/runs" element={<Runs />} />
-        <Route path="/sources" element={<Sources />} />
+        <Route path="/config" element={<Config />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

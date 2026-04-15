@@ -4,23 +4,35 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import StatusBadge from '../components/shared/StatusBadge';
-import SourceIcon from '../components/shared/SourceIcon';
-import PipelineForm from '../components/pipelines/PipelineForm';
+import SourceTab from '../components/pipeline/SourceTab';
+import TemplateTab from '../components/pipeline/TemplateTab';
+import GithubSettingsTab from '../components/pipeline/GithubSettingsTab';
+import MappingEditor from '../components/mapping/MappingEditor';
 import {
-  ArrowLeft, ArrowRight, Play, Pause, Trash2, Pencil, Clock, Hash, CheckCircle2, AlertTriangle
+  ArrowLeft, Play, Pause, Trash2, Save, Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
+import { useToast } from '@/components/ui/use-toast';
+
+const SCHEDULES = ['manual', 'every_5min', 'every_15min', 'hourly', 'daily', 'weekly'];
 
 export default function PipelineDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [showEdit, setShowEdit] = useState(false);
+  const { toast } = useToast();
+  const [localChanges, setLocalChanges] = useState({});
+  const [running, setRunning] = useState(false);
 
   const { data: pipeline, isLoading } = useQuery({
     queryKey: ['pipeline', id],
@@ -30,124 +42,122 @@ export default function PipelineDetail() {
     },
   });
 
+  const { data: globalConfigs = [] } = useQuery({
+    queryKey: ['globalConfig'],
+    queryFn: () => base44.entities.GlobalConfig.list(),
+  });
+  const globalConfig = globalConfigs[0] || {};
+
   const { data: runs = [] } = useQuery({
     queryKey: ['pipeline-runs', id],
     queryFn: () => base44.entities.PipelineRun.filter({ pipeline_id: id }, '-started_at', 20),
   });
 
-  const updateMutation = useMutation({
+  const merged = { ...pipeline, ...localChanges };
+
+  const saveMutation = useMutation({
     mutationFn: (data) => base44.entities.Pipeline.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline', id] });
       queryClient.invalidateQueries({ queryKey: ['pipelines'] });
-      setShowEdit(false);
+      setLocalChanges({});
+      toast({ title: 'Saved', description: 'Pipeline updated.' });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => base44.entities.Pipeline.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pipelines'] });
-      navigate('/pipelines');
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['pipelines'] }); navigate('/pipelines'); },
   });
 
-  const runMutation = useMutation({
-    mutationFn: async () => {
-      const now = new Date().toISOString();
-      const recordsCount = Math.floor(Math.random() * 5000) + 100;
-      const duration = Math.floor(Math.random() * 120) + 5;
-      const success = Math.random() > 0.15;
+  const handleUpdate = (changes) => setLocalChanges(prev => ({ ...prev, ...changes }));
+  const handleSave = () => saveMutation.mutate(localChanges);
+  const isDirty = Object.keys(localChanges).length > 0;
 
-      await base44.entities.PipelineRun.create({
-        pipeline_id: id,
-        pipeline_name: pipeline.name,
-        status: success ? 'success' : 'failed',
-        started_at: now,
-        completed_at: new Date(Date.now() + duration * 1000).toISOString(),
-        records_extracted: recordsCount,
-        records_transformed: success ? recordsCount : Math.floor(recordsCount * 0.7),
-        records_loaded: success ? recordsCount : 0,
-        duration_seconds: duration,
-        error_message: success ? '' : 'Connection timeout after 30s',
-        logs: success
-          ? `[INFO] Extracting ${recordsCount} records\n[INFO] Transform complete\n[INFO] Load complete`
-          : `[INFO] Extracting ${recordsCount} records\n[ERROR] Connection timeout`,
-      });
-
-      const totalRuns = (pipeline.total_runs || 0) + 1;
-      const currentSuccesses = Math.round(((pipeline.success_rate || 0) / 100) * (pipeline.total_runs || 0));
-      const newSuccesses = currentSuccesses + (success ? 1 : 0);
-      const newRate = Math.round((newSuccesses / totalRuns) * 100);
-
-      await base44.entities.Pipeline.update(id, {
-        last_run_at: now,
-        last_run_status: success ? 'success' : 'failed',
-        total_runs: totalRuns,
-        success_rate: newRate,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pipeline', id] });
-      queryClient.invalidateQueries({ queryKey: ['pipeline-runs', id] });
-      queryClient.invalidateQueries({ queryKey: ['runs'] });
-    },
-  });
+  const handleRun = async () => {
+    setRunning(true);
+    const now = new Date().toISOString();
+    const records = Math.floor(Math.random() * 5000) + 100;
+    const duration = Math.floor(Math.random() * 120) + 5;
+    const success = Math.random() > 0.15;
+    await base44.entities.PipelineRun.create({
+      pipeline_id: id,
+      pipeline_name: pipeline.name,
+      status: success ? 'success' : 'failed',
+      started_at: now,
+      completed_at: new Date(Date.now() + duration * 1000).toISOString(),
+      records_extracted: records,
+      records_transformed: success ? records : Math.floor(records * 0.7),
+      records_loaded: success ? records : 0,
+      duration_seconds: duration,
+      error_message: success ? '' : 'Connection timeout after 30s',
+      logs: success
+        ? `[INFO] Extracting ${records} records\n[INFO] Transform complete\n[INFO] Load complete`
+        : `[INFO] Extracting ${records} records\n[ERROR] Connection timeout`,
+    });
+    const totalRuns = (pipeline.total_runs || 0) + 1;
+    const currentSuccesses = Math.round(((pipeline.success_rate || 0) / 100) * (pipeline.total_runs || 0));
+    const newSuccesses = currentSuccesses + (success ? 1 : 0);
+    await base44.entities.Pipeline.update(id, {
+      last_run_at: now,
+      last_run_status: success ? 'success' : 'failed',
+      total_runs: totalRuns,
+      success_rate: Math.round((newSuccesses / totalRuns) * 100),
+    });
+    queryClient.invalidateQueries({ queryKey: ['pipeline', id] });
+    queryClient.invalidateQueries({ queryKey: ['pipeline-runs', id] });
+    queryClient.invalidateQueries({ queryKey: ['runs'] });
+    setRunning(false);
+    toast({ title: success ? 'Run complete' : 'Run failed', description: success ? `${records} records processed.` : 'Check run logs for details.' });
+  };
 
   if (isLoading || !pipeline) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
   }
 
   return (
     <div className="space-y-6">
-      {/* Back + Header */}
       <button onClick={() => navigate('/pipelines')} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="w-4 h-4" /> Back to Pipelines
       </button>
 
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-semibold tracking-tight font-mono">{pipeline.name}</h1>
-            <StatusBadge status={pipeline.status} />
+            <h1 className="text-2xl font-semibold tracking-tight font-mono">{merged.name}</h1>
+            <StatusBadge status={merged.status} />
           </div>
-          {pipeline.description && <p className="text-sm text-muted-foreground">{pipeline.description}</p>}
+          {merged.description && <p className="text-sm text-muted-foreground">{merged.description}</p>}
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setShowEdit(true)} className="gap-1.5">
-            <Pencil className="w-3.5 h-3.5" /> Edit
-          </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {isDirty && (
+            <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending} className="gap-1.5 bg-primary hover:bg-primary/90">
+              <Save className="w-3.5 h-3.5" />
+              {saveMutation.isPending ? 'Saving…' : 'Save Changes'}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
-            onClick={() => updateMutation.mutate({ status: pipeline.status === 'active' ? 'paused' : 'active' })}
+            onClick={() => saveMutation.mutate({ status: merged.status === 'active' ? 'paused' : 'active' })}
             className="gap-1.5"
           >
-            {pipeline.status === 'active' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-            {pipeline.status === 'active' ? 'Pause' : 'Activate'}
+            {merged.status === 'active' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            {merged.status === 'active' ? 'Pause' : 'Activate'}
           </Button>
-          <Button
-            size="sm"
-            onClick={() => runMutation.mutate()}
-            disabled={runMutation.isPending}
-            className="bg-accent hover:bg-accent/90 text-accent-foreground gap-1.5"
-          >
-            <Play className="w-3.5 h-3.5" /> Run Now
+          <Button size="sm" onClick={handleRun} disabled={running} className="bg-accent hover:bg-accent/90 text-accent-foreground gap-1.5">
+            <Play className="w-3.5 h-3.5" />
+            {running ? 'Running…' : 'Run Now'}
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button size="sm" variant="destructive" className="gap-1.5">
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
+              <Button size="sm" variant="destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
             </AlertDialogTrigger>
             <AlertDialogContent className="bg-card border-border">
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete pipeline?</AlertDialogTitle>
-                <AlertDialogDescription>This will permanently delete "{pipeline.name}" and cannot be undone.</AlertDialogDescription>
+                <AlertDialogDescription>This will permanently delete "{pipeline.name}".</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -158,121 +168,114 @@ export default function PipelineDetail() {
         </div>
       </div>
 
-      {/* Pipeline flow + Config */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        <Card className="bg-card border-border/50 p-5">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Data Flow</p>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 font-mono text-sm">
-              <SourceIcon type={pipeline.source_type} className="w-4 h-4 text-primary" />
-              {pipeline.source_type}
-            </div>
-            <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-            <div className="px-3 py-2 rounded-lg bg-primary/10 text-primary text-xs font-medium">Transform</div>
-            <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 font-mono text-sm">
-              <SourceIcon type={pipeline.destination_type} className="w-4 h-4 text-accent" />
-              {pipeline.destination_type}
-            </div>
-          </div>
-        </Card>
+      {/* Tabs */}
+      <Tabs defaultValue="overview">
+        <TabsList className="bg-muted/50 border border-border/50">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="source">Source</TabsTrigger>
+          <TabsTrigger value="template">Template</TabsTrigger>
+          <TabsTrigger value="mapping">Mapping</TabsTrigger>
+          <TabsTrigger value="github">GitHub</TabsTrigger>
+        </TabsList>
 
-        <Card className="bg-card border-border/50 p-5">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Schedule</p>
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{(pipeline.schedule || 'manual').replace(/_/g, ' ')}</span>
-          </div>
-          {pipeline.last_run_at && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Last run: {format(new Date(pipeline.last_run_at), 'MMM d, yyyy HH:mm')}
-            </p>
-          )}
-        </Card>
-
-        <Card className="bg-card border-border/50 p-5">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Statistics</p>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <p className="text-lg font-semibold">{pipeline.total_runs || 0}</p>
-              <p className="text-[10px] text-muted-foreground">RUNS</p>
+        {/* Overview */}
+        <TabsContent value="overview" className="space-y-4 mt-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Name</Label>
+              <Input value={merged.name || ''} onChange={e => handleUpdate({ name: e.target.value })} className="font-mono text-sm bg-muted/50" />
             </div>
-            <div>
-              <p className="text-lg font-semibold text-accent">{pipeline.success_rate || 0}%</p>
-              <p className="text-[10px] text-muted-foreground">SUCCESS</p>
+            <div className="space-y-2">
+              <Label className="text-xs">Schedule</Label>
+              <Select value={merged.schedule || 'manual'} onValueChange={v => handleUpdate({ schedule: v })}>
+                <SelectTrigger className="bg-muted/50 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SCHEDULES.map(s => <SelectItem key={s} value={s} className="text-sm">{s.replace(/_/g, ' ')}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <p className="text-lg font-semibold">
-                {pipeline.last_run_status ? <StatusBadge status={pipeline.last_run_status} /> : '—'}
-              </p>
-              <p className="text-[10px] text-muted-foreground">LAST</p>
+            <div className="space-y-2 sm:col-span-2">
+              <Label className="text-xs">Description</Label>
+              <Textarea value={merged.description || ''} onChange={e => handleUpdate({ description: e.target.value })} className="bg-muted/50 text-sm h-20" />
             </div>
           </div>
-        </Card>
-      </div>
 
-      {/* Transform Logic */}
-      {pipeline.transform_logic && (
-        <Card className="bg-card border-border/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Transform Logic</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="font-mono text-xs text-foreground/80 bg-muted/50 rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">
-              {pipeline.transform_logic}
-            </pre>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Runs Table */}
-      <Card className="bg-card border-border/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-            Run History
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/50">
-                  <th className="text-left px-6 py-3 text-xs text-muted-foreground font-medium">Status</th>
-                  <th className="text-left px-6 py-3 text-xs text-muted-foreground font-medium">Extracted</th>
-                  <th className="text-left px-6 py-3 text-xs text-muted-foreground font-medium">Loaded</th>
-                  <th className="text-left px-6 py-3 text-xs text-muted-foreground font-medium">Duration</th>
-                  <th className="text-left px-6 py-3 text-xs text-muted-foreground font-medium">Started</th>
-                </tr>
-              </thead>
-              <tbody>
-                {runs.map(run => (
-                  <tr key={run.id} className="border-b border-border/30">
-                    <td className="px-6 py-3"><StatusBadge status={run.status} /></td>
-                    <td className="px-6 py-3 font-mono text-xs">{(run.records_extracted || 0).toLocaleString()}</td>
-                    <td className="px-6 py-3 font-mono text-xs">{(run.records_loaded || 0).toLocaleString()}</td>
-                    <td className="px-6 py-3 text-muted-foreground">{run.duration_seconds ? `${run.duration_seconds}s` : '—'}</td>
-                    <td className="px-6 py-3 text-muted-foreground">
-                      {run.started_at ? format(new Date(run.started_at), 'MMM d, HH:mm:ss') : '—'}
-                    </td>
-                  </tr>
-                ))}
-                {runs.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">No runs yet. Click "Run Now" to execute.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4 mt-2">
+            {[
+              { label: 'TOTAL RUNS', value: pipeline.total_runs || 0 },
+              { label: 'SUCCESS RATE', value: `${pipeline.success_rate || 0}%`, accent: true },
+              { label: 'LAST RUN', value: pipeline.last_run_at ? format(new Date(pipeline.last_run_at), 'MMM d, HH:mm') : '—' },
+            ].map(s => (
+              <Card key={s.label} className="p-4 bg-muted/30 border-border/30">
+                <p className={`text-xl font-semibold ${s.accent ? 'text-accent' : ''}`}>{s.value}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{s.label}</p>
+              </Card>
+            ))}
           </div>
-        </CardContent>
-      </Card>
 
-      <PipelineForm
-        open={showEdit}
-        onClose={() => setShowEdit(false)}
-        onSubmit={(data) => updateMutation.mutate(data)}
-        initialData={pipeline}
-      />
+          {/* Recent runs */}
+          <Card className="bg-card border-border/50 overflow-hidden">
+            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase tracking-wider">Recent Runs</CardTitle></CardHeader>
+            <CardContent className="px-0">
+              <table className="w-full text-sm">
+                <thead><tr className="border-b border-border/50">
+                  {['Status', 'Extracted', 'Loaded', 'Duration', 'Started'].map(h => (
+                    <th key={h} className="text-left px-6 py-2 text-xs text-muted-foreground font-medium">{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {runs.slice(0, 8).map(run => (
+                    <tr key={run.id} className="border-b border-border/30">
+                      <td className="px-6 py-2"><StatusBadge status={run.status} /></td>
+                      <td className="px-6 py-2 font-mono text-xs">{(run.records_extracted || 0).toLocaleString()}</td>
+                      <td className="px-6 py-2 font-mono text-xs">{(run.records_loaded || 0).toLocaleString()}</td>
+                      <td className="px-6 py-2 text-muted-foreground text-xs">{run.duration_seconds ? `${run.duration_seconds}s` : '—'}</td>
+                      <td className="px-6 py-2 text-muted-foreground text-xs">
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{run.started_at ? format(new Date(run.started_at), 'MMM d, HH:mm') : '—'}</span>
+                      </td>
+                    </tr>
+                  ))}
+                  {runs.length === 0 && <tr><td colSpan={5} className="text-center py-8 text-muted-foreground text-xs">No runs yet</td></tr>}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Source */}
+        <TabsContent value="source" className="mt-4">
+          <Card className="p-6 bg-card border-border/50">
+            <SourceTab pipeline={merged} onUpdate={handleUpdate} />
+          </Card>
+        </TabsContent>
+
+        {/* Template */}
+        <TabsContent value="template" className="mt-4">
+          <Card className="p-6 bg-card border-border/50">
+            <TemplateTab pipeline={merged} onUpdate={handleUpdate} />
+          </Card>
+        </TabsContent>
+
+        {/* Mapping */}
+        <TabsContent value="mapping" className="mt-4">
+          <Card className="p-6 bg-card border-border/50">
+            <MappingEditor
+              sourceFields={merged.source_fields || []}
+              templateFields={merged.template_fields || []}
+              mapping={merged.field_mapping || {}}
+              onChange={(mapping) => handleUpdate({ field_mapping: mapping })}
+            />
+          </Card>
+        </TabsContent>
+
+        {/* GitHub */}
+        <TabsContent value="github" className="mt-4">
+          <Card className="p-6 bg-card border-border/50">
+            <GithubSettingsTab pipeline={merged} onUpdate={handleUpdate} globalConfig={globalConfig} />
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

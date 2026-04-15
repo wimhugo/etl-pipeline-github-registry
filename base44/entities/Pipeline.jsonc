@@ -18,48 +18,78 @@
         "error",
         "draft"
       ],
-      "default": "draft",
-      "description": "Current status of the pipeline"
+      "default": "draft"
     },
     "source_type": {
       "type": "string",
       "enum": [
-        "postgresql",
-        "mysql",
-        "mongodb",
-        "s3",
-        "api",
         "csv",
-        "kafka",
-        "redis"
+        "txt",
+        "json"
       ],
-      "description": "Type of data source"
+      "default": "csv",
+      "description": "Type of input file"
     },
-    "source_config": {
+    "source_file_url": {
       "type": "string",
-      "description": "JSON configuration for the source connection"
+      "description": "URL of the uploaded source file"
     },
-    "transform_logic": {
+    "source_file_name": {
       "type": "string",
-      "description": "Transformation rules or SQL/script"
+      "description": "Original filename of the source"
     },
-    "destination_type": {
-      "type": "string",
-      "enum": [
-        "postgresql",
-        "mysql",
-        "mongodb",
-        "s3",
-        "bigquery",
-        "snowflake",
-        "elasticsearch",
-        "redis"
-      ],
-      "description": "Type of destination"
+    "source_fields": {
+      "type": "array",
+      "description": "Detected fields/columns from the source file",
+      "items": {
+        "type": "string"
+      }
     },
-    "destination_config": {
+    "template": {
       "type": "string",
-      "description": "JSON configuration for the destination"
+      "description": "JSON or JSON-LD template content"
+    },
+    "template_file_name": {
+      "type": "string",
+      "description": "Name of the template file"
+    },
+    "template_fields": {
+      "type": "array",
+      "description": "Fields detected from the template",
+      "items": {
+        "type": "string"
+      }
+    },
+    "field_mapping": {
+      "type": "object",
+      "description": "Mapping of template fields to source fields: { templateField: sourceField }",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "github_repo": {
+      "type": "string",
+      "description": "Target GitHub repository (owner/repo)"
+    },
+    "github_branch": {
+      "type": "string",
+      "default": "main",
+      "description": "Target branch"
+    },
+    "github_target_folder": {
+      "type": "string",
+      "description": "Target folder path in the GitHub repo"
+    },
+    "github_config_path": {
+      "type": "string",
+      "description": "Path where the pipeline config YAML is stored in GitHub"
+    },
+    "output_inventory": {
+      "type": "array",
+      "description": "List of files created/updated in GitHub by this pipeline",
+      "items": {
+        "type": "string"
+      }
     },
     "schedule": {
       "type": "string",
@@ -71,13 +101,11 @@
         "daily",
         "weekly"
       ],
-      "default": "manual",
-      "description": "Execution schedule"
+      "default": "manual"
     },
     "last_run_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "Last execution timestamp"
+      "format": "date-time"
     },
     "last_run_status": {
       "type": "string",
@@ -86,28 +114,22 @@
         "failed",
         "running",
         "cancelled"
-      ],
-      "description": "Status of the last run"
+      ]
     },
     "total_runs": {
       "type": "number",
-      "default": 0,
-      "description": "Total number of pipeline runs"
+      "default": 0
     },
     "success_rate": {
       "type": "number",
-      "default": 0,
-      "description": "Success rate percentage"
+      "default": 0
     },
     "namespace": {
       "type": "string",
-      "default": "openrel",
-      "description": "Namespace this pipeline belongs to"
+      "default": "openrel"
     }
   },
   "required": [
-    "name",
-    "source_type",
-    "destination_type"
+    "name"
   ]
 }
