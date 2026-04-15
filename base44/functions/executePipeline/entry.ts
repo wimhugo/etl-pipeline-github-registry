@@ -132,19 +132,50 @@ Deno.serve(async (req) => {
   if (pipeline.inventory_mode) {
     // Build array of all transformed records
     logs.push(`[INFO] Inventory mode: bundling ${rows.length} records into single file...`);
+    logs.push(`[DEBUG] field_mapping keys: ${Object.keys(pipeline.field_mapping).join(', ')}`);
+    logs.push(`[DEBUG] First row keys: ${rows.length > 0 ? Object.keys(rows[0]).join(', ') : 'N/A'}`);
+    logs.push(`[DEBUG] First row sample: ${rows.length > 0 ? JSON.stringify(rows[0]) : 'N/A'}`);
+
     let templateObj;
-    try { templateObj = JSON.parse(pipeline.template); } catch(e) { templateObj = null; }
+    try {
+      templateObj = JSON.parse(pipeline.template);
+      logs.push(`[DEBUG] Template parsed OK, keys: ${Object.keys(templateObj).join(', ')}`);
+    } catch(e) {
+      templateObj = null;
+      logs.push(`[WARN] Template is not valid JSON: ${e.message}`);
+    }
+
+    // Filter field_mapping to only entries where the sourceField actually exists in the first row
+    const validMapping = {};
+    for (const [tField, sField] of Object.entries(pipeline.field_mapping)) {
+      if (rows.length > 0 && rows[0][sField] !== undefined) {
+        validMapping[tField] = sField;
+      } else {
+        logs.push(`[WARN] Skipping stale mapping: "${tField}" -> "${sField}" (source field not found in CSV)`);
+      }
+    }
+    logs.push(`[DEBUG] Valid mapping entries: ${Object.keys(validMapping).length}`);
+
     const allRecords = rows.map(row =>
       templateObj
-        ? applyMappingToObject(templateObj, pipeline.field_mapping, row)
-        : JSON.parse(applyTemplate(pipeline.template, pipeline.field_mapping, row))
+        ? applyMappingToObject(templateObj, validMapping, row)
+        : JSON.parse(applyTemplate(pipeline.template, validMapping, row))
     );
+
+    if (allRecords.length > 0) {
+      logs.push(`[DEBUG] First transformed record: ${JSON.stringify(allRecords[0])}`);
+    }
+
     const filePath = `${targetFolder}/${pipeline.name.replace(/\s+/g, '_').toLowerCase()}.json`;
     const fileContent = JSON.stringify(allRecords, null, 2);
 
+    // Get existing file SHA from the BASE branch (not PR branch) so we always replace, not append
     let existingSha;
-    const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${prBranch}`, { headers });
-    if (checkRes.ok) { existingSha = (await checkRes.json()).sha; }
+    const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`, { headers });
+    if (checkRes.ok) {
+      existingSha = (await checkRes.json()).sha;
+      logs.push(`[INFO] Existing file found on base branch, will replace (sha: ${existingSha.slice(0,7)})`);
+    }
 
     const putBody = { message: `feat: update ${pipeline.name} inventory via openrel`, content: encodeBase64(fileContent), branch: prBranch };
     if (existingSha) putBody.sha = existingSha;
