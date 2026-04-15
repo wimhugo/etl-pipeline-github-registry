@@ -35,9 +35,19 @@ function applyTemplate(templateStr, fieldMapping, row) {
   return result;
 }
 
+// Build a case-insensitive lookup map from a row
+function buildRowLookup(row) {
+  const lookup = {};
+  for (const key of Object.keys(row)) {
+    lookup[key.toLowerCase()] = row[key];
+  }
+  return lookup;
+}
+
 // Build a record object by applying field_mapping directly (no JSON parse round-trip)
 function applyMappingToObject(templateObj, fieldMapping, row) {
   const result = JSON.parse(JSON.stringify(templateObj)); // deep clone
+  const rowLower = buildRowLookup(row);
   function fillObject(obj) {
     for (const key of Object.keys(obj)) {
       if (typeof obj[key] === 'string') {
@@ -45,7 +55,12 @@ function applyMappingToObject(templateObj, fieldMapping, row) {
         if (match) {
           const templateField = match[1];
           const sourceField = fieldMapping[templateField];
-          obj[key] = sourceField !== undefined ? (row[sourceField] || '') : obj[key];
+          if (sourceField !== undefined) {
+            // Try exact match first, then case-insensitive
+            obj[key] = row[sourceField] !== undefined
+              ? (row[sourceField] || '')
+              : (rowLower[sourceField.toLowerCase()] || '');
+          }
         }
       } else if (typeof obj[key] === 'object' && obj[key] !== null) {
         fillObject(obj[key]);
@@ -145,10 +160,11 @@ Deno.serve(async (req) => {
       logs.push(`[WARN] Template is not valid JSON: ${e.message}`);
     }
 
-    // Filter field_mapping to only entries where the sourceField actually exists in the first row
+    // Filter field_mapping to only entries where the sourceField actually exists in the CSV (case-insensitive)
+    const firstRowLower = rows.length > 0 ? buildRowLookup(rows[0]) : {};
     const validMapping = {};
     for (const [tField, sField] of Object.entries(pipeline.field_mapping)) {
-      if (rows.length > 0 && rows[0][sField] !== undefined) {
+      if (rows.length > 0 && (rows[0][sField] !== undefined || firstRowLower[sField.toLowerCase()] !== undefined)) {
         validMapping[tField] = sField;
       } else {
         logs.push(`[WARN] Skipping stale mapping: "${tField}" -> "${sField}" (source field not found in CSV)`);
