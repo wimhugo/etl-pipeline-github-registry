@@ -48,19 +48,22 @@ function buildRowLookup(row) {
 function applyMappingToObject(templateObj, fieldMapping, row) {
   const result = JSON.parse(JSON.stringify(templateObj)); // deep clone
   const rowLower = buildRowLookup(row);
+  function resolveValue(sourceField) {
+    if (row[sourceField] !== undefined) return row[sourceField];
+    return rowLower[sourceField.toLowerCase()] ?? '';
+  }
   function fillObject(obj) {
     for (const key of Object.keys(obj)) {
       if (typeof obj[key] === 'string') {
-        const match = obj[key].match(/^{{(.+)}}$/);
-        if (match) {
-          const templateField = match[1];
-          const sourceField = fieldMapping[templateField];
-          if (sourceField !== undefined) {
-            // Try exact match first, then case-insensitive
-            obj[key] = row[sourceField] !== undefined
-              ? (row[sourceField] || '')
-              : (rowLower[sourceField.toLowerCase()] || '');
-          }
+        const placeholder = obj[key].match(/^{{(.+)}}$/);
+        if (placeholder) {
+          // Explicit {{field}} placeholder
+          const sourceField = fieldMapping[placeholder[1]];
+          if (sourceField !== undefined) obj[key] = resolveValue(sourceField);
+        } else if (obj[key] === '') {
+          // Empty string: use the key itself as the template field name
+          const sourceField = fieldMapping[key];
+          if (sourceField !== undefined) obj[key] = resolveValue(sourceField);
         }
       } else if (typeof obj[key] === 'object' && obj[key] !== null) {
         fillObject(obj[key]);
