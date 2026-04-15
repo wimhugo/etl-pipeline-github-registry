@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import GitHubConnect from '../components/github/GitHubConnect';
-import { Save, Settings, Github, FolderGit2 } from 'lucide-react';
+import { Save, Github, FolderGit2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function Config() {

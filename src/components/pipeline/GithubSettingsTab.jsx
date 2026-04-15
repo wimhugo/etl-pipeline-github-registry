@@ -4,12 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import GitHubConnect from '../github/GitHubConnect';
 import { Loader2, CloudUpload, CheckCircle2, ExternalLink } from 'lucide-react';
 
 export default function GithubSettingsTab({ pipeline, onUpdate, globalConfig }) {
   const [repos, setRepos] = useState([]);
-  const [connected, setConnected] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
 
@@ -18,10 +16,7 @@ export default function GithubSettingsTab({ pipeline, onUpdate, globalConfig }) 
     if (res.data?.repos) setRepos(res.data.repos);
   };
 
-  const handleConnected = (isConnected) => {
-    setConnected(isConnected);
-    if (isConnected) fetchRepos();
-  };
+  useEffect(() => { fetchRepos(); }, []);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -38,11 +33,6 @@ export default function GithubSettingsTab({ pipeline, onUpdate, globalConfig }) 
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50">
-        <span className="text-sm font-medium">GitHub Account</span>
-        <GitHubConnect onConnected={handleConnected} />
-      </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label className="text-xs">Repository</Label>

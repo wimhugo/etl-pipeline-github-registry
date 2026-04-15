@@ -1,6 +1,13 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-const CONNECTOR_ID = "69df39dd7a73e4638d15ccef";
+const GITHUB_TOKEN = Deno.env.get('GITHUB_TOKEN');
+
+const githubHeaders = {
+  Authorization: `Bearer ${GITHUB_TOKEN}`,
+  Accept: 'application/vnd.github+json',
+  'X-GitHub-Api-Version': '2022-11-28',
+  'Content-Type': 'application/json',
+};
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -10,16 +17,8 @@ Deno.serve(async (req) => {
   const body = await req.json();
   const { action, repo, branch = 'main', path, content, message, sha } = body;
 
-  const { accessToken } = await base44.asServiceRole.connectors.getCurrentAppUserConnection(CONNECTOR_ID);
-  const headers = {
-    Authorization: `Bearer ${accessToken}`,
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-    'Content-Type': 'application/json',
-  };
-
   if (action === 'listRepos') {
-    const res = await fetch('https://api.github.com/user/repos?per_page=50&sort=updated', { headers });
+    const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', { headers: githubHeaders });
     const data = await res.json();
     if (!res.ok) return Response.json({ error: data.message }, { status: res.status });
     return Response.json({ repos: data.map(r => ({ full_name: r.full_name, default_branch: r.default_branch })) });
@@ -27,7 +26,7 @@ Deno.serve(async (req) => {
 
   if (action === 'listFolder') {
     const url = `https://api.github.com/repos/${repo}/contents/${path || ''}?ref=${branch}`;
-    const res = await fetch(url, { headers });
+    const res = await fetch(url, { headers: githubHeaders });
     const data = await res.json();
     if (!res.ok) return Response.json({ error: data.message }, { status: res.status });
     const items = Array.isArray(data) ? data : [data];
@@ -36,7 +35,7 @@ Deno.serve(async (req) => {
 
   if (action === 'getFile') {
     const url = `https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`;
-    const res = await fetch(url, { headers });
+    const res = await fetch(url, { headers: githubHeaders });
     const data = await res.json();
     if (!res.ok) return Response.json({ error: data.message }, { status: res.status });
     const decoded = atob(data.content.replace(/\n/g, ''));
@@ -44,12 +43,11 @@ Deno.serve(async (req) => {
   }
 
   if (action === 'putFile') {
-    // Create or update a file in GitHub
     const url = `https://api.github.com/repos/${repo}/contents/${path}`;
     const encoded = btoa(unescape(encodeURIComponent(content)));
-    const body2 = { message: message || `chore: update ${path}`, content: encoded, branch };
-    if (sha) body2.sha = sha; // needed for updates
-    const res = await fetch(url, { method: 'PUT', headers, body: JSON.stringify(body2) });
+    const putBody = { message: message || `chore: update ${path}`, content: encoded, branch };
+    if (sha) putBody.sha = sha;
+    const res = await fetch(url, { method: 'PUT', headers: githubHeaders, body: JSON.stringify(putBody) });
     const data = await res.json();
     if (!res.ok) return Response.json({ error: data.message }, { status: res.status });
     return Response.json({ sha: data.content?.sha, url: data.content?.html_url });

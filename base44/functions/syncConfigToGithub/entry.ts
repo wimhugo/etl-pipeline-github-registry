@@ -1,8 +1,14 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-const CONNECTOR_ID = "69df39dd7a73e4638d15ccef";
+const GITHUB_TOKEN = Deno.env.get('GITHUB_TOKEN');
 
-// Convert a pipeline config object to YAML string
+const githubHeaders = {
+  Authorization: `Bearer ${GITHUB_TOKEN}`,
+  Accept: 'application/vnd.github+json',
+  'X-GitHub-Api-Version': '2022-11-28',
+  'Content-Type': 'application/json',
+};
+
 function toYaml(obj, indent = 0) {
   const pad = ' '.repeat(indent);
   let out = '';
@@ -32,16 +38,9 @@ Deno.serve(async (req) => {
 
   const { pipeline_id, repo, branch = 'main', configs_folder = '.openrel/pipelines' } = await req.json();
 
-  const pipeline = (await base44.entities.Pipeline.filter({ id: pipeline_id }))[0];
+  const pipelines = await base44.entities.Pipeline.filter({ id: pipeline_id });
+  const pipeline = pipelines[0];
   if (!pipeline) return Response.json({ error: 'Pipeline not found' }, { status: 404 });
-
-  const { accessToken } = await base44.asServiceRole.connectors.getCurrentAppUserConnection(CONNECTOR_ID);
-  const headers = {
-    Authorization: `Bearer ${accessToken}`,
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-    'Content-Type': 'application/json',
-  };
 
   const configObj = {
     name: pipeline.name,
@@ -65,34 +64,28 @@ Deno.serve(async (req) => {
     schedule: pipeline.schedule || 'manual',
   };
 
-  const yamlContent = `# OpenREL Pipeline Config\n# Auto-generated — do not edit manually\n\n${toYaml(configObj)}`;
+  const yamlContent = `# OpenREL Pipeline Config\n# Auto-generated\n\n${toYaml(configObj)}`;
   const filePath = `${configs_folder}/${pipeline.name.replace(/\s+/g, '-').toLowerCase()}.yaml`;
   const encoded = btoa(unescape(encodeURIComponent(yamlContent)));
 
-  // Check if file exists (to get sha for update)
   let sha;
-  const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`, { headers });
+  const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`, { headers: githubHeaders });
   if (checkRes.ok) {
     const existing = await checkRes.json();
     sha = existing.sha;
   }
 
-  const putBody = {
-    message: `chore: sync openrel pipeline config for ${pipeline.name}`,
-    content: encoded,
-    branch,
-  };
+  const putBody = { message: `chore: sync openrel pipeline config for ${pipeline.name}`, content: encoded, branch };
   if (sha) putBody.sha = sha;
 
   const putRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
     method: 'PUT',
-    headers,
+    headers: githubHeaders,
     body: JSON.stringify(putBody),
   });
   const putData = await putRes.json();
   if (!putRes.ok) return Response.json({ error: putData.message }, { status: putRes.status });
 
-  // Update the pipeline with config path
   await base44.asServiceRole.entities.Pipeline.update(pipeline_id, {
     github_config_path: filePath,
     github_repo: repo,
