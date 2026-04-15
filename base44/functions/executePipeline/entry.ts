@@ -26,10 +26,33 @@ function parseCsv(text) {
 function applyTemplate(templateStr, fieldMapping, row) {
   let result = templateStr;
   for (const [templateField, sourceField] of Object.entries(fieldMapping)) {
-    const value = row[sourceField] || '';
-    result = result.replace(new RegExp(`"{{${templateField}}}"`, 'g'), JSON.stringify(value));
-    result = result.replace(new RegExp(`{{${templateField}}}`, 'g'), value);
+    const value = row[sourceField] !== undefined ? row[sourceField] : '';
+    // Escape templateField for use in regex (handles colons, dots, slashes etc.)
+    const escapedKey = templateField.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    result = result.replace(new RegExp(`"{{${escapedKey}}}"`, 'g'), JSON.stringify(value));
+    result = result.replace(new RegExp(`{{${escapedKey}}}`, 'g'), value);
   }
+  return result;
+}
+
+// Build a record object by applying field_mapping directly (no JSON parse round-trip)
+function applyMappingToObject(templateObj, fieldMapping, row) {
+  const result = JSON.parse(JSON.stringify(templateObj)); // deep clone
+  function fillObject(obj) {
+    for (const key of Object.keys(obj)) {
+      if (typeof obj[key] === 'string') {
+        const match = obj[key].match(/^{{(.+)}}$/);
+        if (match) {
+          const templateField = match[1];
+          const sourceField = fieldMapping[templateField];
+          obj[key] = sourceField !== undefined ? (row[sourceField] || '') : obj[key];
+        }
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        fillObject(obj[key]);
+      }
+    }
+  }
+  fillObject(result);
   return result;
 }
 
@@ -109,7 +132,13 @@ Deno.serve(async (req) => {
   if (pipeline.inventory_mode) {
     // Build array of all transformed records
     logs.push(`[INFO] Inventory mode: bundling ${rows.length} records into single file...`);
-    const allRecords = rows.map(row => JSON.parse(applyTemplate(pipeline.template, pipeline.field_mapping, row)));
+    let templateObj;
+    try { templateObj = JSON.parse(pipeline.template); } catch(e) { templateObj = null; }
+    const allRecords = rows.map(row =>
+      templateObj
+        ? applyMappingToObject(templateObj, pipeline.field_mapping, row)
+        : JSON.parse(applyTemplate(pipeline.template, pipeline.field_mapping, row))
+    );
     const filePath = `${targetFolder}/${pipeline.name.replace(/\s+/g, '_').toLowerCase()}.json`;
     const fileContent = JSON.stringify(allRecords, null, 2);
 
@@ -135,7 +164,11 @@ Deno.serve(async (req) => {
       const iriValue = row[iriField] || `record-${written}`;
       const safeName = iriValue.replace(/^.*[/#]/, '').replace(/[^a-zA-Z0-9_\-\.]/g, '_') || `record-${written}`;
       const filePath = `${targetFolder}/${safeName}.json`;
-      const fileContent = applyTemplate(pipeline.template, pipeline.field_mapping, row);
+      let templateObj2;
+      try { templateObj2 = JSON.parse(pipeline.template); } catch(e) { templateObj2 = null; }
+      const fileContent = templateObj2
+        ? JSON.stringify(applyMappingToObject(templateObj2, pipeline.field_mapping, row), null, 2)
+        : applyTemplate(pipeline.template, pipeline.field_mapping, row);
 
       let existingSha;
       const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${prBranch}`, { headers });
