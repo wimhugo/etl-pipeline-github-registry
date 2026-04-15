@@ -14,6 +14,7 @@ import SourceTab from '../components/pipeline/SourceTab';
 import TemplateTab from '../components/pipeline/TemplateTab';
 import GithubSettingsTab from '../components/pipeline/GithubSettingsTab';
 import MappingEditor from '../components/mapping/MappingEditor';
+import { Switch } from '@/components/ui/switch';
 import {
   ArrowLeft, Play, Pause, Trash2, Save, Clock
 } from 'lucide-react';
@@ -182,6 +183,16 @@ export default function PipelineDetail() {
             <div className="space-y-2 sm:col-span-2">
               <Label className="text-xs">Description</Label>
               <Textarea value={merged.description || ''} onChange={e => handleUpdate({ description: e.target.value })} className="bg-muted/50 text-sm h-20" />
+            </div>
+            <div className="flex items-center justify-between sm:col-span-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">Inventory Mode</p>
+                <p className="text-xs text-muted-foreground">Bundle all transformed records into a single JSON file instead of one file per record</p>
+              </div>
+              <Switch
+                checked={!!merged.inventory_mode}
+                onCheckedChange={v => handleUpdate({ inventory_mode: v })}
+              />
             </div>
           </div>
 

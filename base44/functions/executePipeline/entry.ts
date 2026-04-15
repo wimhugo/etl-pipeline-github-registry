@@ -102,50 +102,56 @@ Deno.serve(async (req) => {
   const branchData = await branchRes.json();
   if (!branchRes.ok) return Response.json({ error: `Failed to create branch: ${branchData.message}` }, { status: branchRes.status });
 
-  // 4. Write one JSON file per row
-  logs.push(`[INFO] Writing ${rows.length} files to ${targetFolder}/...`);
+  // 4. Write files — inventory mode: one bundled file; default: one file per row
   const outputFiles = [];
   let written = 0;
 
-  for (const row of rows) {
-    // Use the IRI field or first field as filename base
-    const iriField = pipeline.field_mapping['openrel:IRI'] || Object.values(pipeline.field_mapping)[0];
-    const iriValue = row[iriField] || `record-${written}`;
-    // Create a safe filename from the IRI (take last path segment or sanitize)
-    const safeName = iriValue.replace(/^.*[/#]/, '').replace(/[^a-zA-Z0-9_\-\.]/g, '_') || `record-${written}`;
-    const filePath = `${targetFolder}/${safeName}.json`;
-    const fileContent = applyTemplate(pipeline.template, pipeline.field_mapping, row);
+  if (pipeline.inventory_mode) {
+    // Build array of all transformed records
+    logs.push(`[INFO] Inventory mode: bundling ${rows.length} records into single file...`);
+    const allRecords = rows.map(row => JSON.parse(applyTemplate(pipeline.template, pipeline.field_mapping, row)));
+    const filePath = `${targetFolder}/${pipeline.name.replace(/\s+/g, '_').toLowerCase()}.json`;
+    const fileContent = JSON.stringify(allRecords, null, 2);
 
-    // Check if file exists for SHA
     let existingSha;
     const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${prBranch}`, { headers });
-    if (checkRes.ok) {
-      const existing = await checkRes.json();
-      existingSha = existing.sha;
-    }
+    if (checkRes.ok) { existingSha = (await checkRes.json()).sha; }
 
-    const putBody = {
-      message: `feat: add ${safeName} via openrel pipeline`,
-      content: encodeBase64(fileContent),
-      branch: prBranch,
-    };
+    const putBody = { message: `feat: update ${pipeline.name} inventory via openrel`, content: encodeBase64(fileContent), branch: prBranch };
     if (existingSha) putBody.sha = existingSha;
 
     const putRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(putBody),
+      method: 'PUT', headers, body: JSON.stringify(putBody),
     });
-    if (putRes.ok) {
-      outputFiles.push(filePath);
-      written++;
-    } else {
-      const err = await putRes.json();
-      logs.push(`[WARN] Failed to write ${filePath}: ${err.message}`);
-    }
-  }
+    if (putRes.ok) { outputFiles.push(filePath); written = rows.length; }
+    else { const err = await putRes.json(); logs.push(`[WARN] Failed to write inventory file: ${err.message}`); }
 
-  logs.push(`[INFO] Written ${written} files`);
+    logs.push(`[INFO] Written inventory file: ${filePath}`);
+  } else {
+    // One file per row
+    logs.push(`[INFO] Writing ${rows.length} files to ${targetFolder}/...`);
+    for (const row of rows) {
+      const iriField = pipeline.field_mapping['openrel:IRI'] || Object.values(pipeline.field_mapping)[0];
+      const iriValue = row[iriField] || `record-${written}`;
+      const safeName = iriValue.replace(/^.*[/#]/, '').replace(/[^a-zA-Z0-9_\-\.]/g, '_') || `record-${written}`;
+      const filePath = `${targetFolder}/${safeName}.json`;
+      const fileContent = applyTemplate(pipeline.template, pipeline.field_mapping, row);
+
+      let existingSha;
+      const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${prBranch}`, { headers });
+      if (checkRes.ok) { existingSha = (await checkRes.json()).sha; }
+
+      const putBody = { message: `feat: add ${safeName} via openrel pipeline`, content: encodeBase64(fileContent), branch: prBranch };
+      if (existingSha) putBody.sha = existingSha;
+
+      const putRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
+        method: 'PUT', headers, body: JSON.stringify(putBody),
+      });
+      if (putRes.ok) { outputFiles.push(filePath); written++; }
+      else { const err = await putRes.json(); logs.push(`[WARN] Failed to write ${filePath}: ${err.message}`); }
+    }
+    logs.push(`[INFO] Written ${written} files`);
+  }
 
   // 5. Create Pull Request
   logs.push(`[INFO] Creating pull request...`);

@@ -20,6 +20,11 @@
       ],
       "default": "draft"
     },
+    "inventory_mode": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, all transformed records are bundled into a single inventory JSON file instead of individual files"
+    },
     "source_type": {
       "type": "string",
       "enum": [
