@@ -76,39 +76,24 @@ export default function PipelineDetail() {
 
   const handleRun = async () => {
     setRunning(true);
-    const now = new Date().toISOString();
-    const records = Math.floor(Math.random() * 5000) + 100;
-    const duration = Math.floor(Math.random() * 120) + 5;
-    const success = Math.random() > 0.15;
-    await base44.entities.PipelineRun.create({
-      pipeline_id: id,
-      pipeline_name: pipeline.name,
-      status: success ? 'success' : 'failed',
-      started_at: now,
-      completed_at: new Date(Date.now() + duration * 1000).toISOString(),
-      records_extracted: records,
-      records_transformed: success ? records : Math.floor(records * 0.7),
-      records_loaded: success ? records : 0,
-      duration_seconds: duration,
-      error_message: success ? '' : 'Connection timeout after 30s',
-      logs: success
-        ? `[INFO] Extracting ${records} records\n[INFO] Transform complete\n[INFO] Load complete`
-        : `[INFO] Extracting ${records} records\n[ERROR] Connection timeout`,
-    });
-    const totalRuns = (pipeline.total_runs || 0) + 1;
-    const currentSuccesses = Math.round(((pipeline.success_rate || 0) / 100) * (pipeline.total_runs || 0));
-    const newSuccesses = currentSuccesses + (success ? 1 : 0);
-    await base44.entities.Pipeline.update(id, {
-      last_run_at: now,
-      last_run_status: success ? 'success' : 'failed',
-      total_runs: totalRuns,
-      success_rate: Math.round((newSuccesses / totalRuns) * 100),
-    });
-    queryClient.invalidateQueries({ queryKey: ['pipeline', id] });
-    queryClient.invalidateQueries({ queryKey: ['pipeline-runs', id] });
-    queryClient.invalidateQueries({ queryKey: ['runs'] });
+    try {
+      const res = await base44.functions.invoke('executePipeline', {
+        pipeline_id: id,
+        github_token: globalConfig?.github_token,
+      });
+      queryClient.invalidateQueries({ queryKey: ['pipeline', id] });
+      queryClient.invalidateQueries({ queryKey: ['pipeline-runs', id] });
+      queryClient.invalidateQueries({ queryKey: ['runs'] });
+      toast({
+        title: 'Run complete',
+        description: res.data?.pr_url
+          ? `${res.data.records} records written. PR: ${res.data.pr_url}`
+          : `${res.data?.records || 0} records processed.`,
+      });
+    } catch (err) {
+      toast({ title: 'Run failed', description: err.message || 'Check pipeline configuration.', variant: 'destructive' });
+    }
     setRunning(false);
-    toast({ title: success ? 'Run complete' : 'Run failed', description: success ? `${records} records processed.` : 'Check run logs for details.' });
   };
 
   if (isLoading || !pipeline) {
