@@ -2,6 +2,14 @@
   "name": "GlobalConfig",
   "type": "object",
   "properties": {
+    "github_token": {
+      "type": "string",
+      "description": "GitHub Personal Access Token (PAT)"
+    },
+    "github_username": {
+      "type": "string",
+      "description": "GitHub username (optional, for display/context)"
+    },
     "github_repo": {
       "type": "string",
       "description": "Default GitHub repository (owner/repo)"

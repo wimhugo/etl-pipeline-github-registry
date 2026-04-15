@@ -12,7 +12,10 @@ export default function GithubSettingsTab({ pipeline, onUpdate, globalConfig }) 
   const [syncResult, setSyncResult] = useState(null);
 
   const fetchRepos = async () => {
-    const res = await base44.functions.invoke('githubFiles', { action: 'listRepos' });
+    const res = await base44.functions.invoke('githubFiles', {
+      action: 'listRepos',
+      github_token: globalConfig?.github_token,
+    });
     if (res.data?.repos) setRepos(res.data.repos);
   };
 
@@ -26,6 +29,7 @@ export default function GithubSettingsTab({ pipeline, onUpdate, globalConfig }) 
       repo: pipeline.github_repo || globalConfig?.github_repo,
       branch: pipeline.github_branch || globalConfig?.github_branch || 'main',
       configs_folder: globalConfig?.github_configs_folder || '.openrel/pipelines',
+      github_token: globalConfig?.github_token,
     });
     setSyncing(false);
     setSyncResult(res.data);

@@ -1,14 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-const GITHUB_TOKEN = Deno.env.get('GITHUB_TOKEN');
-
-const githubHeaders = {
-  Authorization: `Bearer ${GITHUB_TOKEN}`,
-  Accept: 'application/vnd.github+json',
-  'X-GitHub-Api-Version': '2022-11-28',
-  'Content-Type': 'application/json',
-};
-
 function toYaml(obj, indent = 0) {
   const pad = ' '.repeat(indent);
   let out = '';
@@ -36,7 +27,18 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { pipeline_id, repo, branch = 'main', configs_folder = '.openrel/pipelines' } = await req.json();
+  const { pipeline_id, repo, branch = 'main', configs_folder = '.openrel/pipelines', github_token } = await req.json();
+
+  const token = github_token || Deno.env.get('GITHUB_TOKEN');
+  if (!token) return Response.json({ error: 'No GitHub token configured' }, { status: 400 });
+
+  const headers = {
+    Authorization: `token ${token}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'Content-Type': 'application/json',
+    'User-Agent': 'OpenREL-App',
+  };
 
   const pipelines = await base44.entities.Pipeline.filter({ id: pipeline_id });
   const pipeline = pipelines[0];
@@ -69,7 +71,7 @@ Deno.serve(async (req) => {
   const encoded = btoa(unescape(encodeURIComponent(yamlContent)));
 
   let sha;
-  const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`, { headers: githubHeaders });
+  const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`, { headers });
   if (checkRes.ok) {
     const existing = await checkRes.json();
     sha = existing.sha;
@@ -80,7 +82,7 @@ Deno.serve(async (req) => {
 
   const putRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
     method: 'PUT',
-    headers: githubHeaders,
+    headers,
     body: JSON.stringify(putBody),
   });
   const putData = await putRes.json();

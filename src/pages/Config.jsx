@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import GitHubConnect from '../components/github/GitHubConnect';
-import { Save, Github, FolderGit2 } from 'lucide-react';
+import { Save, Github, FolderGit2, Key, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function Config() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null); // null | 'ok' | 'fail'
 
   const { data: configs = [] } = useQuery({
     queryKey: ['globalConfig'],
@@ -21,6 +22,8 @@ export default function Config() {
   const config = configs[0] || {};
 
   const [form, setForm] = useState({
+    github_token: '',
+    github_username: '',
     github_repo: '',
     github_branch: 'main',
     github_configs_folder: '.openrel/pipelines',
@@ -29,7 +32,7 @@ export default function Config() {
   });
 
   useEffect(() => {
-    if (config.id) setForm({ ...form, ...config });
+    if (config.id) setForm(prev => ({ ...prev, ...config }));
   }, [configs.length]);
 
   const saveMutation = useMutation({
@@ -45,6 +48,21 @@ export default function Config() {
 
   const update = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
+  const testConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await base44.functions.invoke('githubFiles', {
+        action: 'listRepos',
+        github_token: form.github_token,
+      });
+      setTestResult(res.data?.repos ? 'ok' : 'fail');
+    } catch {
+      setTestResult('fail');
+    }
+    setTesting(false);
+  };
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
@@ -52,18 +70,65 @@ export default function Config() {
         <p className="text-sm text-muted-foreground mt-1">Global settings for the OpenREL namespace</p>
       </div>
 
-      {/* GitHub Connection */}
+      {/* GitHub Token */}
       <Card className="p-5 bg-card border-border/50 space-y-4">
-        <div className="flex items-center gap-3 mb-2">
-          <Github className="w-4 h-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">GitHub Account</h2>
+        <div className="flex items-center gap-3">
+          <Key className="w-4 h-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold">GitHub Authentication</h2>
         </div>
-        <GitHubConnect />
+        <p className="text-xs text-muted-foreground">
+          Create a Personal Access Token at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">github.com/settings/tokens</a> with <code className="bg-muted px-1 rounded">repo</code> scope.
+        </p>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="space-y-2 sm:col-span-2">
+            <Label className="text-xs">Personal Access Token</Label>
+            <Input
+              type="text"
+              value={form.github_token}
+              onChange={e => { update('github_token', e.target.value); setTestResult(null); }}
+              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+              className="font-mono text-sm bg-muted/50"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs">GitHub Username (optional)</Label>
+            <Input
+              value={form.github_username}
+              onChange={e => update('github_username', e.target.value)}
+              placeholder="your-github-username"
+              className="font-mono text-sm bg-muted/50"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={testConnection}
+            disabled={testing || !form.github_token}
+            className="gap-1.5"
+          >
+            {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Github className="w-3.5 h-3.5" />}
+            Test Connection
+          </Button>
+          {testResult === 'ok' && (
+            <span className="flex items-center gap-1.5 text-sm text-accent">
+              <CheckCircle2 className="w-4 h-4" /> Connected successfully
+            </span>
+          )}
+          {testResult === 'fail' && (
+            <span className="flex items-center gap-1.5 text-sm text-destructive">
+              <XCircle className="w-4 h-4" /> Connection failed — check your token
+            </span>
+          )}
+        </div>
       </Card>
 
       {/* GitHub repo defaults */}
       <Card className="p-5 bg-card border-border/50 space-y-4">
-        <div className="flex items-center gap-3 mb-1">
+        <div className="flex items-center gap-3">
           <FolderGit2 className="w-4 h-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Default GitHub Target</h2>
         </div>
@@ -107,7 +172,6 @@ export default function Config() {
               placeholder="data"
               className="font-mono text-sm bg-muted/50"
             />
-            <p className="text-[10px] text-muted-foreground">Default folder for pipeline output files</p>
           </div>
           <div className="space-y-2">
             <Label className="text-xs">Namespace</Label>
