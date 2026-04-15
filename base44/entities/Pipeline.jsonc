@@ -1,0 +1,113 @@
+{
+  "name": "Pipeline",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the ETL pipeline"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of what the pipeline does"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "error",
+        "draft"
+      ],
+      "default": "draft",
+      "description": "Current status of the pipeline"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "postgresql",
+        "mysql",
+        "mongodb",
+        "s3",
+        "api",
+        "csv",
+        "kafka",
+        "redis"
+      ],
+      "description": "Type of data source"
+    },
+    "source_config": {
+      "type": "string",
+      "description": "JSON configuration for the source connection"
+    },
+    "transform_logic": {
+      "type": "string",
+      "description": "Transformation rules or SQL/script"
+    },
+    "destination_type": {
+      "type": "string",
+      "enum": [
+        "postgresql",
+        "mysql",
+        "mongodb",
+        "s3",
+        "bigquery",
+        "snowflake",
+        "elasticsearch",
+        "redis"
+      ],
+      "description": "Type of destination"
+    },
+    "destination_config": {
+      "type": "string",
+      "description": "JSON configuration for the destination"
+    },
+    "schedule": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "every_5min",
+        "every_15min",
+        "hourly",
+        "daily",
+        "weekly"
+      ],
+      "default": "manual",
+      "description": "Execution schedule"
+    },
+    "last_run_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last execution timestamp"
+    },
+    "last_run_status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failed",
+        "running",
+        "cancelled"
+      ],
+      "description": "Status of the last run"
+    },
+    "total_runs": {
+      "type": "number",
+      "default": 0,
+      "description": "Total number of pipeline runs"
+    },
+    "success_rate": {
+      "type": "number",
+      "default": 0,
+      "description": "Success rate percentage"
+    },
+    "namespace": {
+      "type": "string",
+      "default": "openrel",
+      "description": "Namespace this pipeline belongs to"
+    }
+  },
+  "required": [
+    "name",
+    "source_type",
+    "destination_type"
+  ]
+}

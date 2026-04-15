@@ -1,0 +1,67 @@
+{
+  "name": "PipelineRun",
+  "type": "object",
+  "properties": {
+    "pipeline_id": {
+      "type": "string",
+      "description": "Reference to the pipeline"
+    },
+    "pipeline_name": {
+      "type": "string",
+      "description": "Name of the pipeline (denormalized)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "running",
+        "success",
+        "failed",
+        "cancelled"
+      ],
+      "default": "running",
+      "description": "Status of this run"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the run started"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the run completed"
+    },
+    "records_extracted": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of records extracted"
+    },
+    "records_transformed": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of records transformed"
+    },
+    "records_loaded": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of records loaded"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Error message if run failed"
+    },
+    "duration_seconds": {
+      "type": "number",
+      "description": "Duration of the run in seconds"
+    },
+    "logs": {
+      "type": "string",
+      "description": "Execution logs"
+    }
+  },
+  "required": [
+    "pipeline_id",
+    "pipeline_name",
+    "status"
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "name": "DataSource",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Friendly name for the data source"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "postgresql",
+        "mysql",
+        "mongodb",
+        "s3",
+        "api",
+        "csv",
+        "kafka",
+        "redis",
+        "bigquery",
+        "snowflake",
+        "elasticsearch"
+      ],
+      "description": "Type of data source"
+    },
+    "connection_string": {
+      "type": "string",
+      "description": "Connection string or endpoint URL"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "connected",
+        "disconnected",
+        "error"
+      ],
+      "default": "disconnected",
+      "description": "Connection status"
+    },
+    "namespace": {
+      "type": "string",
+      "default": "openrel",
+      "description": "Namespace"
+    },
+    "last_tested_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last time connection was tested"
+    }
+  },
+  "required": [
+    "name",
+    "type"
+  ]
+}
