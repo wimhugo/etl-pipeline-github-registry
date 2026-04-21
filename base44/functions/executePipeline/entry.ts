@@ -68,9 +68,16 @@ function flattenJsonRecord(obj) {
 function parseSource(text, sourceType) {
   if (sourceType === 'json') {
     const json = JSON.parse(text);
-    const root = Array.isArray(json) ? json : [json];
-    // Flatten each top-level record
-    return root.flatMap(r => flattenJsonRecord(r));
+    // Unwrap common wrapper patterns: { content: [...] } or { policy: [...] }
+    let entries;
+    if (!Array.isArray(json) && typeof json === 'object') {
+      const wrapperKey = Object.keys(json).find(k => Array.isArray(json[k]));
+      entries = wrapperKey ? json[wrapperKey] : [json];
+    } else {
+      entries = json;
+    }
+    // Flatten each entry (e.g. each policy object)
+    return entries.flatMap(r => flattenJsonRecord(r));
   }
   return parseCsv(text);
 }
