@@ -24,34 +24,33 @@ Deno.serve(async (req) => {
     // Deduplicate
     fields = [...new Set(fields)];
   } else if (ext === 'json') {
-    // Handle standard JSON, JSON Lines (one object per line), and concatenated JSON objects
-    let json;
+    // Handle standard JSON and JSON Lines (newline-delimited)
+    let json = null;
     try {
       json = JSON.parse(text);
     } catch (_) {
-      // Try JSON Lines format (newline-delimited JSON)
       const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
       const parsed = [];
       for (const line of lines) {
-        try { parsed.push(JSON.parse(line)); } catch (_) { /* skip */ }
+        try { parsed.push(JSON.parse(line)); } catch (_2) { /* skip */ }
       }
-      json = parsed.length > 0 ? parsed : null;
+      if (parsed.length > 0) json = parsed;
     }
     if (json) {
       const sample = Array.isArray(json) ? json[0] : json;
-      // Collect top-level keys; for nested objects also include dot-notation paths
+      const collected = [];
       function collectKeys(obj, prefix, depth) {
         if (!obj || typeof obj !== 'object' || depth > 3) return;
         for (const [k, v] of Object.entries(obj)) {
           const full = prefix ? `${prefix}.${k}` : k;
-          fields.push(full);
+          collected.push(full);
           if (v && typeof v === 'object' && !Array.isArray(v) && depth < 2) {
             collectKeys(v, full, depth + 1);
           }
         }
       }
       collectKeys(sample, '', 0);
-      fields = [...new Set(fields)];
+      fields = [...new Set(collected)];
     }
   }
 
