@@ -162,12 +162,18 @@ function encodeBase64(str) {
 }
 
 Deno.serve(async (req) => {
+  try {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { pipeline_id, github_token } = await req.json();
-  const token = github_token || Deno.env.get('GITHUB_TOKEN');
+  // Prefer: explicit param > env secret > GlobalConfig token
+  let token = github_token || Deno.env.get('GITHUB_TOKEN');
+  if (!token) {
+    const configs = await base44.asServiceRole.entities.GlobalConfig.list();
+    token = configs[0]?.github_token;
+  }
   if (!token) return Response.json({ error: 'No GitHub token configured' }, { status: 400 });
 
   const pipelines = await base44.entities.Pipeline.filter({ id: pipeline_id });
@@ -177,6 +183,9 @@ Deno.serve(async (req) => {
   const startedAt = new Date().toISOString();
   const logs = [];
 
+  const sourceType = pipeline.source_type || 'csv';
+  const outputType = pipeline.output_type || 'json';
+
   const headers = {
     Authorization: `token ${token}`,
     Accept: 'application/vnd.github+json',
@@ -185,19 +194,18 @@ Deno.serve(async (req) => {
     'User-Agent': 'OpenREL-App',
   };
 
-  const repo = pipeline.github_repo;
+  // Normalize repo: strip any leading URL so we always have "owner/repo"
+  const rawRepo = pipeline.github_repo || '';
+  const repo = rawRepo.replace(/^https?:\/\/github\.com\//, '').replace(/\/$/, '');
   const branch = pipeline.github_branch || 'main';
   const targetFolder = (pipeline.github_target_folder || 'data').replace(/\/$/, '');
 
   if (!repo) return Response.json({ error: 'No GitHub repo configured on pipeline' }, { status: 400 });
   if (!pipeline.source_file_url) return Response.json({ error: 'No source file configured' }, { status: 400 });
-  if (!pipeline.template) return Response.json({ error: 'No template configured' }, { status: 400 });
+  if (!pipeline.template && outputType === 'json') return Response.json({ error: 'No template configured' }, { status: 400 });
   if (!pipeline.field_mapping || Object.keys(pipeline.field_mapping).length === 0) {
     return Response.json({ error: 'No field mappings configured' }, { status: 400 });
   }
-
-  const sourceType = pipeline.source_type || 'csv';
-  const outputType = pipeline.output_type || 'json';
 
   // 1. Fetch and parse the source file
   logs.push(`[INFO] Fetching source file (type: ${sourceType})...`);
@@ -380,4 +388,7 @@ Deno.serve(async (req) => {
     branch: prBranch,
     logs: logs.join('\n'),
   });
+  } catch(err) {
+    return Response.json({ error: err.message, stack: err.stack }, { status: 500 });
+  }
 });
