@@ -37,7 +37,14 @@ Deno.serve(async (req) => {
       if (parsed.length > 0) json = parsed;
     }
     if (json) {
-      const sample = Array.isArray(json) ? json[0] : json;
+      // Unwrap wrapper objects like { content: [...policy] } — use first element of first array value
+      let sample;
+      if (!Array.isArray(json) && typeof json === 'object') {
+        const wrapperKey = Object.keys(json).find(k => Array.isArray(json[k]));
+        sample = wrapperKey ? json[wrapperKey][0] : json;
+      } else {
+        sample = Array.isArray(json) ? json[0] : json;
+      }
       const collected = [];
       function collectKeys(obj, prefix, depth) {
         if (!obj || typeof obj !== 'object' || depth > 3) return;
