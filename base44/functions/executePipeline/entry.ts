@@ -21,22 +21,27 @@ function parseCsv(text) {
   });
 }
 
-// Flatten a single array item into a row object using dot-notation for nested objects
+// Flatten a nested object into a row using dot-notation keys.
+// Arrays of primitives are joined with '; '; arrays of objects are JSON-stringified per item and joined.
 function flattenItem(obj, prefix, row) {
-  if (obj === null || typeof obj !== 'object') {
+  if (obj === null || obj === undefined) {
+    if (prefix) row[prefix] = '';
+    return;
+  }
+  if (typeof obj !== 'object') {
     if (prefix) row[prefix] = obj;
     return;
   }
   if (Array.isArray(obj)) {
-    row[prefix] = obj.map(i => (typeof i === 'object' ? JSON.stringify(i) : i)).join('; ');
+    if (prefix) row[prefix] = obj.map(i => (typeof i === 'object' ? JSON.stringify(i) : String(i))).join('; ');
     return;
   }
   for (const [key, val] of Object.entries(obj)) {
     const full = prefix ? `${prefix}.${key}` : key;
-    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+    if (val !== null && val !== undefined && typeof val === 'object' && !Array.isArray(val)) {
       flattenItem(val, full, row);
     } else if (Array.isArray(val)) {
-      row[full] = val.map(i => (typeof i === 'object' ? JSON.stringify(i) : i)).join('; ');
+      row[full] = val.map(i => (typeof i === 'object' ? JSON.stringify(i) : String(i))).join('; ');
     } else {
       row[full] = val ?? '';
     }
@@ -78,20 +83,37 @@ function flattenJsonRecord(obj) {
   return rows;
 }
 
-// Parse source file into array of row objects based on type
+// Given a raw entry from the top-level array, unwrap any single-key object wrapper
+// (e.g. { policy: { IRI, permissions, ... } } → { IRI, permissions, ... })
+function unwrapEntry(entry) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+  const keys = Object.keys(entry);
+  // If the entry is a single-key object whose value is a plain object (not array), unwrap it
+  if (keys.length === 1 && entry[keys[0]] !== null && typeof entry[keys[0]] === 'object' && !Array.isArray(entry[keys[0]])) {
+    return entry[keys[0]];
+  }
+  return entry;
+}
+
+// Parse source file into array of row objects based on type.
+// For JSON with structure { content: [ { policy: { IRI, permissions: [...], ... } }, ... ] }:
+// - Unwrap the outer array key (e.g. "content")
+// - Unwrap each entry's single-key wrapper (e.g. "policy")
+// - For each policy, emit one row per item in each named array (permissions, prohibitions, duties, sources)
+//   with type = array name and scalar fields (IRI, label, etc.) hoisted onto every row
 function parseSource(text, sourceType) {
   if (sourceType === 'json') {
     const json = JSON.parse(text);
-    // Unwrap common wrapper patterns: { content: [...] } or { policy: [...] }
+    // Step 1: unwrap outer wrapper { content: [...] } or { policy: [...] }
     let entries;
     if (!Array.isArray(json) && typeof json === 'object') {
       const wrapperKey = Object.keys(json).find(k => Array.isArray(json[k]));
       entries = wrapperKey ? json[wrapperKey] : [json];
     } else {
-      entries = json;
+      entries = Array.isArray(json) ? json : [json];
     }
-    // Flatten each entry (e.g. each policy object)
-    return entries.flatMap(r => flattenJsonRecord(r));
+    // Step 2: unwrap each entry (e.g. { policy: {...} } → {...}) then flatten into typed rows
+    return entries.flatMap(entry => flattenJsonRecord(unwrapEntry(entry)));
   }
   return parseCsv(text);
 }
@@ -255,25 +277,13 @@ Deno.serve(async (req) => {
   const branchData = await branchRes.json();
   if (!branchRes.ok) return Response.json({ error: `Failed to create branch: ${branchData.message}` }, { status: branchRes.status });
 
-  // 4. Write files — inventory mode: one bundled file; default: one file per row
+  // 4. Write files — inventory mode: one bundled file; default: one file per group/type
   const outputFiles = [];
   let written = 0;
 
-  // Build a set of all field keys present across ALL rows (case-insensitive)
-  const allFieldKeys = new Set();
-  for (const row of rows) {
-    for (const key of Object.keys(row)) allFieldKeys.add(key.toLowerCase());
-  }
-  // Keep a mapping entry if its source field appears in ANY row
-  const validMapping = {};
-  for (const [tField, sField] of Object.entries(pipeline.field_mapping)) {
-    if (allFieldKeys.has(sField.toLowerCase())) {
-      validMapping[tField] = sField;
-    } else {
-      logs.push(`[WARN] Skipping stale mapping: "${tField}" -> "${sField}" (source field not found in any row)`);
-    }
-  }
-  logs.push(`[DEBUG] Valid mapping entries: ${Object.keys(validMapping).length}`);
+  // Use the full field_mapping as-is. Missing fields will produce empty strings per row.
+  const validMapping = pipeline.field_mapping;
+  logs.push(`[DEBUG] Field mapping entries: ${Object.keys(validMapping).length}`);
 
   if (pipeline.inventory_mode) {
     logs.push(`[INFO] Inventory mode: bundling ${rows.length} records into single file (output: ${outputType})...`);

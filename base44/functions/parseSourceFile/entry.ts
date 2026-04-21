@@ -37,35 +37,52 @@ Deno.serve(async (req) => {
       if (parsed.length > 0) json = parsed;
     }
     if (json) {
-      // Unwrap wrapper objects like { content: [...policy] } — use first element of first array value
-      let sample;
+      // Step 1: unwrap outer array wrapper { content: [...] }
+      let entries;
       let recordCount = null;
       if (!Array.isArray(json) && typeof json === 'object') {
         const wrapperKey = Object.keys(json).find(k => Array.isArray(json[k]));
         if (wrapperKey) {
-          recordCount = json[wrapperKey].length;
-          sample = json[wrapperKey][0];
+          entries = json[wrapperKey];
+          recordCount = entries.length;
         } else {
-          sample = json;
+          entries = [json];
         }
       } else {
-        const arr = Array.isArray(json) ? json : [json];
-        recordCount = arr.length;
-        sample = arr[0];
+        entries = Array.isArray(json) ? json : [json];
+        recordCount = entries.length;
       }
-      const collected = [];
+
+      // Step 2: unwrap each entry's single-key object wrapper (e.g. { policy: {...} } → {...})
+      const unwrap = (entry) => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+        const keys = Object.keys(entry);
+        if (keys.length === 1 && entry[keys[0]] !== null && typeof entry[keys[0]] === 'object' && !Array.isArray(entry[keys[0]])) {
+          return entry[keys[0]];
+        }
+        return entry;
+      };
+      const sample = unwrap(entries[0]);
+
+      // Step 3: collect fields from the unwrapped sample, including nested keys in array items
+      const collected = new Set();
       function collectKeys(obj, prefix, depth) {
-        if (!obj || typeof obj !== 'object' || depth > 3) return;
+        if (!obj || typeof obj !== 'object' || depth > 4) return;
         for (const [k, v] of Object.entries(obj)) {
           const full = prefix ? `${prefix}.${k}` : k;
-          collected.push(full);
-          if (v && typeof v === 'object' && !Array.isArray(v) && depth < 2) {
+          if (Array.isArray(v)) {
+            collected.add(full); // the array key itself (= "type" discriminator)
+            // also collect keys from first item of the array
+            if (v.length > 0 && typeof v[0] === 'object') collectKeys(v[0], '', depth + 1);
+          } else if (v && typeof v === 'object') {
             collectKeys(v, full, depth + 1);
+          } else {
+            collected.add(full);
           }
         }
       }
       collectKeys(sample, '', 0);
-      fields = [...new Set(collected)];
+      fields = [...collected];
       return Response.json({ fields, record_count: recordCount, preview: text.slice(0, 2000) });
     }
   }
