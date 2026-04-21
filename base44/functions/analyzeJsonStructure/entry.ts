@@ -88,6 +88,16 @@ function flattenItem(obj, prefix, row) {
   }
 }
 
+// Unwrap a single-key object wrapper (e.g. { policy: {...} } → {...})
+function unwrapEntry(entry) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+  const keys = Object.keys(entry);
+  if (keys.length === 1 && entry[keys[0]] !== null && typeof entry[keys[0]] === 'object' && !Array.isArray(entry[keys[0]])) {
+    return entry[keys[0]];
+  }
+  return entry;
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const user = await base44.auth.me();
@@ -100,24 +110,38 @@ Deno.serve(async (req) => {
   if (!res.ok) return Response.json({ error: 'Failed to fetch source file' }, { status: 500 });
 
   const json = await res.json();
-  const root = Array.isArray(json) ? json[0] : json;
 
-  // Flatten sample rows to derive column schema
-  const sampleRows = flattenRecord(root);
-  const allColumns = [];
-  const seen = new Set();
-  for (const row of sampleRows) {
-    for (const col of Object.keys(row)) {
-      if (!seen.has(col)) { seen.add(col); allColumns.push(col); }
-    }
+  // Step 1: unwrap outer wrapper { content: [...] }
+  let entries;
+  if (!Array.isArray(json) && typeof json === 'object') {
+    const wrapperKey = Object.keys(json).find(k => Array.isArray(json[k]));
+    entries = wrapperKey ? json[wrapperKey] : [json];
+  } else {
+    entries = Array.isArray(json) ? json : [json];
   }
 
-  // field_mapping: { csvColumn -> jsonPath } — identity mapping (column name == source path)
+  // Step 2: unwrap each entry's single-key wrapper (e.g. { policy: {...} } → {...})
+  // then flatten — scan across multiple entries to get the full union of columns
+  const allColumns = [];
+  const seen = new Set();
+  let previewRows = [];
+
+  for (const entry of entries) {
+    const unwrapped = unwrapEntry(entry);
+    const rows = flattenRecord(unwrapped);
+    for (const row of rows) {
+      for (const col of Object.keys(row)) {
+        if (!seen.has(col)) { seen.add(col); allColumns.push(col); }
+      }
+    }
+    if (previewRows.length < 3) previewRows = previewRows.concat(rows).slice(0, 3);
+    // Once we've seen all 4 array types, we have enough columns
+    if (seen.has('permissions') || (seen.has('type') && allColumns.length > 8)) break;
+  }
+
+  // field_mapping: { csvColumn -> csvColumn } — identity mapping (column name == source path)
   const field_mapping = {};
   for (const col of allColumns) field_mapping[col] = col;
 
-  // Sample flattened rows (up to 3 for preview)
-  const preview = sampleRows.slice(0, 3);
-
-  return Response.json({ columns: allColumns, field_mapping, preview });
+  return Response.json({ columns: allColumns, field_mapping, preview: previewRows });
 });
