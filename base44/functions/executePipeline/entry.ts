@@ -21,11 +21,56 @@ function parseCsv(text) {
   });
 }
 
+// Flatten a single array item into a row object using dot-notation for nested objects
+function flattenItem(obj, prefix, row) {
+  if (obj === null || typeof obj !== 'object') {
+    if (prefix) row[prefix] = obj;
+    return;
+  }
+  if (Array.isArray(obj)) {
+    row[prefix] = obj.map(i => (typeof i === 'object' ? JSON.stringify(i) : i)).join('; ');
+    return;
+  }
+  for (const [key, val] of Object.entries(obj)) {
+    const full = prefix ? `${prefix}.${key}` : key;
+    if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      flattenItem(val, full, row);
+    } else if (Array.isArray(val)) {
+      row[full] = val.map(i => (typeof i === 'object' ? JSON.stringify(i) : i)).join('; ');
+    } else {
+      row[full] = val ?? '';
+    }
+  }
+}
+
+// Option B flatten: all arrays merged with a 'type' discriminator
+function flattenJsonRecord(obj) {
+  const scalars = {};
+  const arrays = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (Array.isArray(val)) arrays[key] = val;
+    else if (val !== null && typeof val === 'object') return flattenJsonRecord(val);
+    else scalars[key] = val;
+  }
+  if (Object.keys(arrays).length === 0) return [{ ...scalars }];
+  const rows = [];
+  for (const [arrayKey, items] of Object.entries(arrays)) {
+    for (const item of items) {
+      const row = { type: arrayKey, ...scalars };
+      flattenItem(item, '', row);
+      rows.push(row);
+    }
+  }
+  return rows;
+}
+
 // Parse source file into array of row objects based on type
 function parseSource(text, sourceType) {
   if (sourceType === 'json') {
     const json = JSON.parse(text);
-    return Array.isArray(json) ? json : [json];
+    const root = Array.isArray(json) ? json : [json];
+    // Flatten each top-level record
+    return root.flatMap(r => flattenJsonRecord(r));
   }
   return parseCsv(text);
 }
@@ -50,8 +95,8 @@ function applyMappingToCsvRow(fieldMapping, row) {
   const rowLower = buildRowLookup(row);
   const result = {};
   for (const [outCol, srcField] of Object.entries(fieldMapping)) {
-    if (row[srcField] !== undefined) result[outCol] = row[srcField];
-    else result[outCol] = rowLower[srcField.toLowerCase()] ?? '';
+    if (row[srcField] !== undefined) result[outCol] = String(row[srcField]);
+    else result[outCol] = String(rowLower[srcField.toLowerCase()] ?? '');
   }
   return result;
 }

@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileCode, Loader2, RefreshCw } from 'lucide-react';
+import { Upload, FileCode, Loader2, RefreshCw, Wand2 } from 'lucide-react';
 
 export default function TemplateTab({ pipeline, onUpdate }) {
   const [parsing, setParsing] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestPreview, setSuggestPreview] = useState(null);
 
   const parseFields = async (content) => {
     setParsing(true);
@@ -34,8 +36,64 @@ export default function TemplateTab({ pipeline, onUpdate }) {
     onUpdate({ template_fields: fields });
   };
 
+  const handleSuggestFromJson = async () => {
+    if (!pipeline.source_file_url) return;
+    setSuggesting(true);
+    setSuggestPreview(null);
+    const res = await base44.functions.invoke('analyzeJsonStructure', { file_url: pipeline.source_file_url });
+    setSuggesting(false);
+    const { columns, field_mapping, preview } = res.data || {};
+    if (!columns?.length) return;
+    setSuggestPreview({ columns, preview });
+    // Auto-fill: set template_fields and field_mapping
+    onUpdate({ template_fields: columns, field_mapping });
+  };
+
+  const isJsonToCsv = (pipeline.source_type || 'csv') === 'json' && (pipeline.output_type || 'json') === 'csv';
+
   return (
     <div className="space-y-6">
+      {isJsonToCsv && (
+        <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 flex items-start gap-3">
+          <Wand2 className="w-4 h-4 text-accent mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-accent mb-1">JSON → CSV Auto-flatten</p>
+            <p className="text-xs text-muted-foreground mb-2">
+              Analyse the source JSON structure and automatically suggest columns and mappings for CSV output (Option B: all arrays merged with a <code className="bg-muted px-1 rounded">type</code> column).
+            </p>
+            <Button size="sm" variant="outline" onClick={handleSuggestFromJson} disabled={suggesting || !pipeline.source_file_url} className="h-7 text-xs gap-1.5 border-accent/40 text-accent hover:text-accent">
+              {suggesting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+              Suggest Mapping from JSON
+            </Button>
+            {!pipeline.source_file_url && <p className="text-[10px] text-muted-foreground mt-1">Upload a source JSON file first.</p>}
+            {suggestPreview && (
+              <div className="mt-3 overflow-x-auto">
+                <p className="text-[10px] text-muted-foreground mb-1">Preview (up to 3 rows):</p>
+                <table className="text-[10px] border-collapse w-full">
+                  <thead>
+                    <tr>
+                      {suggestPreview.columns.map(c => (
+                        <th key={c} className="border border-border px-2 py-1 text-left font-mono bg-muted/50 whitespace-nowrap">{c}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {suggestPreview.preview.map((row, i) => (
+                      <tr key={i}>
+                        {suggestPreview.columns.map(c => (
+                          <td key={c} className="border border-border px-2 py-1 font-mono whitespace-nowrap max-w-[160px] overflow-hidden text-ellipsis" title={String(row[c] ?? '')}>
+                            {String(row[c] ?? '')}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <div>
         <Label className="text-xs">Output Type</Label>
         <Select
