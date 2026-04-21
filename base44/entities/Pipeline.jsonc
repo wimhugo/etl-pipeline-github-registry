@@ -35,6 +35,15 @@
       "default": "csv",
       "description": "Type of input file"
     },
+    "output_type": {
+      "type": "string",
+      "enum": [
+        "json",
+        "csv"
+      ],
+      "default": "json",
+      "description": "Type of output file"
+    },
     "source_file_url": {
       "type": "string",
       "description": "URL of the uploaded source file"

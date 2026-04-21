@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Upload, FileText, Loader2, CheckCircle2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Upload, FileText, Loader2 } from 'lucide-react';
 
 export default function SourceTab({ pipeline, onUpdate }) {
   const [uploading, setUploading] = useState(false);
@@ -32,7 +33,23 @@ export default function SourceTab({ pipeline, onUpdate }) {
   return (
     <div className="space-y-6">
       <div>
-        <Label className="text-xs">Input File (CSV or plain text with labelled fields)</Label>
+        <Label className="text-xs">Source Type</Label>
+        <Select
+          value={pipeline.source_type || 'csv'}
+          onValueChange={val => onUpdate({ source_type: val })}
+        >
+          <SelectTrigger className="mt-1.5 h-8 text-xs w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="csv">CSV</SelectItem>
+            <SelectItem value="json">JSON</SelectItem>
+            <SelectItem value="txt">TXT</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label className="text-xs">Input File</Label>
         <div className="mt-2">
           {pipeline.source_file_name ? (
             <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border/50">

@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, FileCode, Loader2, RefreshCw } from 'lucide-react';
 
 export default function TemplateTab({ pipeline, onUpdate }) {
@@ -36,8 +37,23 @@ export default function TemplateTab({ pipeline, onUpdate }) {
   return (
     <div className="space-y-6">
       <div>
+        <Label className="text-xs">Output Type</Label>
+        <Select
+          value={pipeline.output_type || 'json'}
+          onValueChange={val => onUpdate({ output_type: val })}
+        >
+          <SelectTrigger className="mt-1.5 h-8 text-xs w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="json">JSON</SelectItem>
+            <SelectItem value="csv">CSV</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
         <div className="flex items-center justify-between mb-2">
-          <Label className="text-xs">JSON / JSON-LD Template</Label>
+          <Label className="text-xs">{(pipeline.output_type || 'json') === 'csv' ? 'CSV Template (use {{fieldName}} for columns)' : 'JSON / JSON-LD Template'}</Label>
           <div className="flex items-center gap-2">
             {pipeline.template && (
               <Button size="sm" variant="ghost" onClick={handleParseManual} disabled={parsing} className="h-7 text-xs gap-1.5">
@@ -64,7 +80,9 @@ export default function TemplateTab({ pipeline, onUpdate }) {
         <Textarea
           value={pipeline.template || ''}
           onChange={e => handleEditorChange(e.target.value)}
-          placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "Dataset",\n  "name": "{{name}}",\n  "description": "{{description}}"\n}'}
+          placeholder={(pipeline.output_type || 'json') === 'csv'
+            ? '{{field1}},{{field2}},{{field3}}'
+            : '{\n  "@context": "https://schema.org",\n  "@type": "Dataset",\n  "name": "{{name}}",\n  "description": "{{description}}"\n}'}
           className="font-mono text-xs bg-muted/50 h-72 resize-none"
         />
         <p className="text-[10px] text-muted-foreground mt-1">
