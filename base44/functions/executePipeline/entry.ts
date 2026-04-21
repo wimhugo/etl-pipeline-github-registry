@@ -299,41 +299,52 @@ Deno.serve(async (req) => {
 
     logs.push(`[INFO] Written inventory file: ${filePath}`);
   } else {
-    // One file per row (JSON output only for now)
-    logs.push(`[INFO] Writing ${rows.length} files to ${targetFolder}/...`);
+    // Group rows by their 'type' field and write one file per type
+    logs.push(`[INFO] Grouping ${rows.length} records by type into ${targetFolder}/...`);
     let templateObj;
-    try { templateObj = JSON.parse(pipeline.template); } catch(e) { templateObj = null; }
+    try { templateObj = pipeline.template ? JSON.parse(pipeline.template) : null; } catch(e) { templateObj = null; }
 
+    // Group rows by type
+    const groups = {};
     for (const row of rows) {
-      const iriField = validMapping['openrel:IRI'] || Object.values(validMapping)[0];
-      const iriValue = row[iriField] || `record-${written}`;
-      const safeName = iriValue.replace(/^.*[/#]/, '').replace(/[^a-zA-Z0-9_\-\.]/g, '_') || `record-${written}`;
-      const filePath = `${targetFolder}/${safeName}.${outputType === 'csv' ? 'csv' : 'json'}`;
+      const typeKey = (row.type || 'records').replace(/[^a-zA-Z0-9_\-]/g, '_').toLowerCase();
+      if (!groups[typeKey]) groups[typeKey] = [];
+      groups[typeKey].push(row);
+    }
+    logs.push(`[DEBUG] Groups found: ${Object.keys(groups).join(', ')}`);
+
+    for (const [groupName, groupRows] of Object.entries(groups)) {
+      const ext = outputType === 'csv' ? 'csv' : 'json';
+      const filePath = `${targetFolder}/${groupName}.${ext}`;
 
       let fileContent;
       if (outputType === 'csv') {
-        const csvRow = applyMappingToCsvRow(validMapping, row);
-        fileContent = buildCsv([csvRow], validMapping);
+        const csvRows = groupRows.map(row => applyMappingToCsvRow(validMapping, row));
+        fileContent = buildCsv(csvRows, validMapping);
       } else {
-        fileContent = templateObj
-          ? JSON.stringify(applyMappingToObject(templateObj, validMapping, row), null, 2)
-          : applyTemplate(pipeline.template, validMapping, row);
+        const records = groupRows.map(row =>
+          templateObj
+            ? applyMappingToObject(templateObj, validMapping, row)
+            : JSON.parse(applyTemplate(pipeline.template, validMapping, row))
+        );
+        fileContent = JSON.stringify(records, null, 2);
       }
 
+      // Get existing SHA from base branch to allow overwrite
       let existingSha;
-      const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${prBranch}`, { headers });
+      const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`, { headers });
       if (checkRes.ok) { existingSha = (await checkRes.json()).sha; }
 
-      const putBody = { message: `feat: add ${safeName} via openrel pipeline`, content: encodeBase64(fileContent), branch: prBranch };
+      const putBody = { message: `feat: update ${groupName} via openrel pipeline`, content: encodeBase64(fileContent), branch: prBranch };
       if (existingSha) putBody.sha = existingSha;
 
       const putRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
         method: 'PUT', headers, body: JSON.stringify(putBody),
       });
-      if (putRes.ok) { outputFiles.push(filePath); written++; }
+      if (putRes.ok) { outputFiles.push(filePath); written += groupRows.length; }
       else { const err = await putRes.json(); logs.push(`[WARN] Failed to write ${filePath}: ${err.message}`); }
     }
-    logs.push(`[INFO] Written ${written} files`);
+    logs.push(`[INFO] Written ${Object.keys(groups).length} files (${written} total records)`);
   }
 
   // 5. Create Pull Request
