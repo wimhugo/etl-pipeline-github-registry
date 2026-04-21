@@ -168,12 +168,13 @@ Deno.serve(async (req) => {
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { pipeline_id, github_token } = await req.json();
-  // Prefer: explicit param > env secret > GlobalConfig token
-  let token = github_token || Deno.env.get('GITHUB_TOKEN');
+  // Prefer: explicit param > GlobalConfig token > env secret
+  let token = github_token;
   if (!token) {
     const configs = await base44.asServiceRole.entities.GlobalConfig.list();
     token = configs[0]?.github_token;
   }
+  if (!token) token = Deno.env.get('GITHUB_TOKEN');
   if (!token) return Response.json({ error: 'No GitHub token configured' }, { status: 400 });
 
   const pipelines = await base44.entities.Pipeline.filter({ id: pipeline_id });
