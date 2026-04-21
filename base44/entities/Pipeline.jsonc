@@ -59,6 +59,10 @@
         "type": "string"
       }
     },
+    "source_record_count": {
+      "type": "number",
+      "description": "Number of top-level records detected in the source file"
+    },
     "template": {
       "type": "string",
       "description": "JSON or JSON-LD template content"

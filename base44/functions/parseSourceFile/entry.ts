@@ -39,11 +39,19 @@ Deno.serve(async (req) => {
     if (json) {
       // Unwrap wrapper objects like { content: [...policy] } — use first element of first array value
       let sample;
+      let recordCount = null;
       if (!Array.isArray(json) && typeof json === 'object') {
         const wrapperKey = Object.keys(json).find(k => Array.isArray(json[k]));
-        sample = wrapperKey ? json[wrapperKey][0] : json;
+        if (wrapperKey) {
+          recordCount = json[wrapperKey].length;
+          sample = json[wrapperKey][0];
+        } else {
+          sample = json;
+        }
       } else {
-        sample = Array.isArray(json) ? json[0] : json;
+        const arr = Array.isArray(json) ? json : [json];
+        recordCount = arr.length;
+        sample = arr[0];
       }
       const collected = [];
       function collectKeys(obj, prefix, depth) {
@@ -58,8 +66,9 @@ Deno.serve(async (req) => {
       }
       collectKeys(sample, '', 0);
       fields = [...new Set(collected)];
+      return Response.json({ fields, record_count: recordCount, preview: text.slice(0, 2000) });
     }
   }
 
-  return Response.json({ fields, preview: text.slice(0, 2000) });
+  return Response.json({ fields, record_count: null, preview: text.slice(0, 2000) });
 });

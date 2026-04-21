@@ -44,19 +44,33 @@ function flattenItem(obj, prefix, row) {
 }
 
 // Option B flatten: all arrays merged with a 'type' discriminator
+// Each policy object may have scalar fields (IRI, etc.) and array fields (permissions, prohibitions, duties, sources)
 function flattenJsonRecord(obj) {
   const scalars = {};
   const arrays = {};
+  const nestedObjects = {};
   for (const [key, val] of Object.entries(obj)) {
     if (Array.isArray(val)) arrays[key] = val;
-    else if (val !== null && typeof val === 'object') return flattenJsonRecord(val);
+    else if (val !== null && typeof val === 'object') nestedObjects[key] = val;
     else scalars[key] = val;
   }
-  if (Object.keys(arrays).length === 0) return [{ ...scalars }];
+  // If no arrays found, flatten nested objects into scalars and return as single row
+  if (Object.keys(arrays).length === 0) {
+    const row = { ...scalars };
+    for (const [key, nested] of Object.entries(nestedObjects)) {
+      flattenItem(nested, key, row);
+    }
+    return [row];
+  }
+  // Hoist scalar nested objects into each row
+  const hoistedScalars = { ...scalars };
+  for (const [key, nested] of Object.entries(nestedObjects)) {
+    flattenItem(nested, key, hoistedScalars);
+  }
   const rows = [];
   for (const [arrayKey, items] of Object.entries(arrays)) {
     for (const item of items) {
-      const row = { type: arrayKey, ...scalars };
+      const row = { type: arrayKey, ...hoistedScalars };
       flattenItem(item, '', row);
       rows.push(row);
     }

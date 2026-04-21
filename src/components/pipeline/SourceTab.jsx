@@ -27,6 +27,7 @@ export default function SourceTab({ pipeline, onUpdate }) {
       source_file_name: file.name,
       source_type: ext,
       source_fields: res.data?.fields || [],
+      source_record_count: res.data?.record_count ?? null,
     });
   };
 
@@ -58,6 +59,7 @@ export default function SourceTab({ pipeline, onUpdate }) {
                 <p className="text-sm font-medium truncate">{pipeline.source_file_name}</p>
                 <p className="text-xs text-muted-foreground">
                   {pipeline.source_fields?.length || 0} fields detected
+                  {pipeline.source_record_count != null && ` · ${pipeline.source_record_count} records`}
                 </p>
               </div>
               <label className="cursor-pointer">
