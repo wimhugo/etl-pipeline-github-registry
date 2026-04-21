@@ -6,7 +6,6 @@ function parseCsv(text) {
   if (lines.length < 2) return [];
   const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
   return lines.slice(1).map(line => {
-    // Handle quoted fields
     const values = [];
     let cur = '', inQuote = false;
     for (let i = 0; i < line.length; i++) {
@@ -20,6 +19,41 @@ function parseCsv(text) {
     headers.forEach((h, i) => { row[h] = (values[i] || '').replace(/^"|"$/g, ''); });
     return row;
   });
+}
+
+// Parse source file into array of row objects based on type
+function parseSource(text, sourceType) {
+  if (sourceType === 'json') {
+    const json = JSON.parse(text);
+    return Array.isArray(json) ? json : [json];
+  }
+  return parseCsv(text);
+}
+
+// Build CSV string from array of record objects using field_mapping
+// fieldMapping: { csvColumn: sourceField }
+function buildCsv(records, fieldMapping) {
+  const columns = Object.keys(fieldMapping);
+  const header = columns.map(c => `"${c}"`).join(',');
+  const dataRows = records.map(rec => {
+    return columns.map(col => {
+      const val = String(rec[col] ?? '').replace(/"/g, '""');
+      return `"${val}"`;
+    }).join(',');
+  });
+  return [header, ...dataRows].join('\n');
+}
+
+// Apply field_mapping to produce a flat CSV row object from a source record
+// fieldMapping: { outputColumn: sourceField }
+function applyMappingToCsvRow(fieldMapping, row) {
+  const rowLower = buildRowLookup(row);
+  const result = {};
+  for (const [outCol, srcField] of Object.entries(fieldMapping)) {
+    if (row[srcField] !== undefined) result[outCol] = row[srcField];
+    else result[outCol] = rowLower[srcField.toLowerCase()] ?? '';
+  }
+  return result;
 }
 
 // Apply field_mapping to fill a template string for a single row
@@ -117,12 +151,15 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'No field mappings configured' }, { status: 400 });
   }
 
-  // 1. Fetch the source CSV
-  logs.push('[INFO] Fetching source file...');
+  const sourceType = pipeline.source_type || 'csv';
+  const outputType = pipeline.output_type || 'json';
+
+  // 1. Fetch and parse the source file
+  logs.push(`[INFO] Fetching source file (type: ${sourceType})...`);
   const csvRes = await fetch(pipeline.source_file_url);
   if (!csvRes.ok) return Response.json({ error: 'Failed to fetch source file' }, { status: 500 });
-  const csvText = await csvRes.text();
-  const rows = parseCsv(csvText);
+  const sourceText = await csvRes.text();
+  const rows = parseSource(sourceText, sourceType);
   logs.push(`[INFO] Parsed ${rows.length} records from source`);
 
   // 2. Get the default branch SHA to base PR branch off
@@ -147,48 +184,49 @@ Deno.serve(async (req) => {
   const outputFiles = [];
   let written = 0;
 
+  // Filter field_mapping to only entries where the sourceField exists in the data (case-insensitive)
+  const firstRowLower = rows.length > 0 ? buildRowLookup(rows[0]) : {};
+  const validMapping = {};
+  for (const [tField, sField] of Object.entries(pipeline.field_mapping)) {
+    if (rows.length > 0 && (rows[0][sField] !== undefined || firstRowLower[sField.toLowerCase()] !== undefined)) {
+      validMapping[tField] = sField;
+    } else {
+      logs.push(`[WARN] Skipping stale mapping: "${tField}" -> "${sField}" (source field not found)`);
+    }
+  }
+  logs.push(`[DEBUG] Valid mapping entries: ${Object.keys(validMapping).length}`);
+
   if (pipeline.inventory_mode) {
-    // Build array of all transformed records
-    logs.push(`[INFO] Inventory mode: bundling ${rows.length} records into single file...`);
-    logs.push(`[DEBUG] field_mapping keys: ${Object.keys(pipeline.field_mapping).join(', ')}`);
-    logs.push(`[DEBUG] First row keys: ${rows.length > 0 ? Object.keys(rows[0]).join(', ') : 'N/A'}`);
-    logs.push(`[DEBUG] First row sample: ${rows.length > 0 ? JSON.stringify(rows[0]) : 'N/A'}`);
+    logs.push(`[INFO] Inventory mode: bundling ${rows.length} records into single file (output: ${outputType})...`);
 
-    let templateObj;
-    try {
-      templateObj = JSON.parse(pipeline.template);
-      logs.push(`[DEBUG] Template parsed OK, keys: ${Object.keys(templateObj).join(', ')}`);
-    } catch(e) {
-      templateObj = null;
-      logs.push(`[WARN] Template is not valid JSON: ${e.message}`);
-    }
+    let fileContent, filePath;
 
-    // Filter field_mapping to only entries where the sourceField actually exists in the CSV (case-insensitive)
-    const firstRowLower = rows.length > 0 ? buildRowLookup(rows[0]) : {};
-    const validMapping = {};
-    for (const [tField, sField] of Object.entries(pipeline.field_mapping)) {
-      if (rows.length > 0 && (rows[0][sField] !== undefined || firstRowLower[sField.toLowerCase()] !== undefined)) {
-        validMapping[tField] = sField;
-      } else {
-        logs.push(`[WARN] Skipping stale mapping: "${tField}" -> "${sField}" (source field not found in CSV)`);
+    if (outputType === 'csv') {
+      // Map each source row to a CSV row using field_mapping { csvColumn: sourceField }
+      const csvRows = rows.map(row => applyMappingToCsvRow(validMapping, row));
+      fileContent = buildCsv(csvRows, validMapping);
+      filePath = `${targetFolder}/${pipeline.name.replace(/\s+/g, '_').toLowerCase()}.csv`;
+    } else {
+      // JSON output
+      let templateObj;
+      try {
+        templateObj = JSON.parse(pipeline.template);
+        logs.push(`[DEBUG] Template parsed OK, keys: ${Object.keys(templateObj).join(', ')}`);
+      } catch(e) {
+        templateObj = null;
+        logs.push(`[WARN] Template is not valid JSON: ${e.message}`);
       }
-    }
-    logs.push(`[DEBUG] Valid mapping entries: ${Object.keys(validMapping).length}`);
-
-    const allRecords = rows.map(row =>
-      templateObj
-        ? applyMappingToObject(templateObj, validMapping, row)
-        : JSON.parse(applyTemplate(pipeline.template, validMapping, row))
-    );
-
-    if (allRecords.length > 0) {
-      logs.push(`[DEBUG] First transformed record: ${JSON.stringify(allRecords[0])}`);
+      const allRecords = rows.map(row =>
+        templateObj
+          ? applyMappingToObject(templateObj, validMapping, row)
+          : JSON.parse(applyTemplate(pipeline.template, validMapping, row))
+      );
+      if (allRecords.length > 0) logs.push(`[DEBUG] First transformed record: ${JSON.stringify(allRecords[0])}`);
+      fileContent = JSON.stringify(allRecords, null, 2);
+      filePath = `${targetFolder}/${pipeline.name.replace(/\s+/g, '_').toLowerCase()}.json`;
     }
 
-    const filePath = `${targetFolder}/${pipeline.name.replace(/\s+/g, '_').toLowerCase()}.json`;
-    const fileContent = JSON.stringify(allRecords, null, 2);
-
-    // Get existing file SHA from the BASE branch (not PR branch) so we always replace, not append
+    // Get existing file SHA from the BASE branch so we always replace, not append
     let existingSha;
     const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`, { headers });
     if (checkRes.ok) {
@@ -207,18 +245,26 @@ Deno.serve(async (req) => {
 
     logs.push(`[INFO] Written inventory file: ${filePath}`);
   } else {
-    // One file per row
+    // One file per row (JSON output only for now)
     logs.push(`[INFO] Writing ${rows.length} files to ${targetFolder}/...`);
+    let templateObj;
+    try { templateObj = JSON.parse(pipeline.template); } catch(e) { templateObj = null; }
+
     for (const row of rows) {
-      const iriField = pipeline.field_mapping['openrel:IRI'] || Object.values(pipeline.field_mapping)[0];
+      const iriField = validMapping['openrel:IRI'] || Object.values(validMapping)[0];
       const iriValue = row[iriField] || `record-${written}`;
       const safeName = iriValue.replace(/^.*[/#]/, '').replace(/[^a-zA-Z0-9_\-\.]/g, '_') || `record-${written}`;
-      const filePath = `${targetFolder}/${safeName}.json`;
-      let templateObj2;
-      try { templateObj2 = JSON.parse(pipeline.template); } catch(e) { templateObj2 = null; }
-      const fileContent = templateObj2
-        ? JSON.stringify(applyMappingToObject(templateObj2, pipeline.field_mapping, row), null, 2)
-        : applyTemplate(pipeline.template, pipeline.field_mapping, row);
+      const filePath = `${targetFolder}/${safeName}.${outputType === 'csv' ? 'csv' : 'json'}`;
+
+      let fileContent;
+      if (outputType === 'csv') {
+        const csvRow = applyMappingToCsvRow(validMapping, row);
+        fileContent = buildCsv([csvRow], validMapping);
+      } else {
+        fileContent = templateObj
+          ? JSON.stringify(applyMappingToObject(templateObj, validMapping, row), null, 2)
+          : applyTemplate(pipeline.template, validMapping, row);
+      }
 
       let existingSha;
       const checkRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}?ref=${prBranch}`, { headers });
