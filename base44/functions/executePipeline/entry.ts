@@ -238,14 +238,18 @@ Deno.serve(async (req) => {
   const outputFiles = [];
   let written = 0;
 
-  // Filter field_mapping to only entries where the sourceField exists in the data (case-insensitive)
-  const firstRowLower = rows.length > 0 ? buildRowLookup(rows[0]) : {};
+  // Build a set of all field keys present across ALL rows (case-insensitive)
+  const allFieldKeys = new Set();
+  for (const row of rows) {
+    for (const key of Object.keys(row)) allFieldKeys.add(key.toLowerCase());
+  }
+  // Keep a mapping entry if its source field appears in ANY row
   const validMapping = {};
   for (const [tField, sField] of Object.entries(pipeline.field_mapping)) {
-    if (rows.length > 0 && (rows[0][sField] !== undefined || firstRowLower[sField.toLowerCase()] !== undefined)) {
+    if (allFieldKeys.has(sField.toLowerCase())) {
       validMapping[tField] = sField;
     } else {
-      logs.push(`[WARN] Skipping stale mapping: "${tField}" -> "${sField}" (source field not found)`);
+      logs.push(`[WARN] Skipping stale mapping: "${tField}" -> "${sField}" (source field not found in any row)`);
     }
   }
   logs.push(`[DEBUG] Valid mapping entries: ${Object.keys(validMapping).length}`);
