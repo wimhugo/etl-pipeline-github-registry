@@ -29,6 +29,8 @@ export default function Config() {
       setForm({ ...activeProject });
     } else if (globalConfig) {
       setForm({ ...globalConfig });
+    } else {
+      setForm({});
     }
   }, [activeProject?.id, globalConfig?.id]);
 
@@ -157,7 +159,7 @@ export default function Config() {
               variant="outline"
               size="sm"
               onClick={handleTestConnection}
-              disabled={testingConnection || !form.github_token}
+              disabled={testingConnection || !form.github_token?.trim()}
               className="gap-1.5"
             >
               {testingConnection ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}

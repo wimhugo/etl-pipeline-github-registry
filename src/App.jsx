@@ -12,7 +12,7 @@ import Dashboard from './pages/Dashboard';
 import Pipelines from './pages/Pipelines';
 import PipelineDetail from './pages/PipelineDetail';
 import Runs from './pages/Runs';
-import Config from './pages/Config.jsx';
+import Config from './pages/Config';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
