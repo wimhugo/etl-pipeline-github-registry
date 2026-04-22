@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, FolderOpen } from 'lucide-react';
+import { Save, FolderOpen, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function Config() {
@@ -72,6 +72,28 @@ export default function Config() {
 
   const isPending = updateProjectMutation.isPending || updateGlobalMutation.isPending || createProjectMutation.isPending;
 
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionResult, setConnectionResult] = useState(null);
+
+  const handleTestConnection = async () => {
+    setTestingConnection(true);
+    setConnectionResult(null);
+    try {
+      const res = await base44.functions.invoke('githubFiles', {
+        action: 'listRepos',
+        github_token: form.github_token,
+      });
+      if (res.data?.repos) {
+        setConnectionResult({ ok: true, message: `Connected! Found ${res.data.repos.length} repositories.` });
+      } else {
+        setConnectionResult({ ok: false, message: res.data?.error || 'No repos returned.' });
+      }
+    } catch (err) {
+      setConnectionResult({ ok: false, message: err.message });
+    }
+    setTestingConnection(false);
+  };
+
   const field = (key, label, placeholder, type = 'input') => (
     <div className="space-y-1.5" key={key}>
       <Label className="text-xs text-muted-foreground">{label}</Label>
@@ -130,6 +152,26 @@ export default function Config() {
         </CardHeader>
         <CardContent className="space-y-4">
           {field('github_token', 'Personal Access Token', 'ghp_...')}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleTestConnection}
+              disabled={testingConnection || !form.github_token}
+              className="gap-1.5"
+            >
+              {testingConnection ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+              Test Connection
+            </Button>
+            {connectionResult && (
+              <span className={`flex items-center gap-1.5 text-sm ${connectionResult.ok ? 'text-accent' : 'text-destructive'}`}>
+                {connectionResult.ok
+                  ? <CheckCircle2 className="w-4 h-4" />
+                  : <XCircle className="w-4 h-4" />}
+                {connectionResult.message}
+              </span>
+            )}
+          </div>
           {field('github_username', 'GitHub Username', 'my-username')}
           {field('github_repo', 'Default Repository', 'owner/repo')}
           {field('github_branch', 'Default Branch', 'main')}
