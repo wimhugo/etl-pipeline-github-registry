@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Save, FolderOpen, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -76,16 +77,19 @@ export default function Config() {
 
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionResult, setConnectionResult] = useState(null);
+  const [availableRepos, setAvailableRepos] = useState([]);
 
   const handleTestConnection = async () => {
     setTestingConnection(true);
     setConnectionResult(null);
+    setAvailableRepos([]);
     try {
       const res = await base44.functions.invoke('githubFiles', {
         action: 'listRepos',
         github_token: form.github_token,
       });
       if (res.data?.repos) {
+        setAvailableRepos(res.data.repos);
         setConnectionResult({ ok: true, message: `Connected! Found ${res.data.repos.length} repositories.` });
       } else {
         setConnectionResult({ ok: false, message: res.data?.error || 'No repos returned.' });
@@ -175,7 +179,33 @@ export default function Config() {
             )}
           </div>
           {field('github_username', 'GitHub Username', 'my-username')}
-          {field('github_repo', 'Default Repository', 'owner/repo')}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Default Repository</Label>
+            {availableRepos.length > 0 ? (
+              <Select
+                value={form.github_repo || ''}
+                onValueChange={(val) => setForm(f => ({ ...f, github_repo: val }))}
+              >
+                <SelectTrigger className="bg-muted/50 text-sm font-mono">
+                  <SelectValue placeholder="Select a repository…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRepos.map(r => (
+                    <SelectItem key={r.full_name} value={r.full_name}>
+                      {r.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                className="bg-muted/50 text-sm font-mono"
+                placeholder="owner/repo — or test connection to pick from a list"
+                value={form.github_repo || ''}
+                onChange={e => setForm(f => ({ ...f, github_repo: e.target.value }))}
+              />
+            )}
+          </div>
           {field('github_branch', 'Default Branch', 'main')}
           {field('github_configs_folder', 'Configs Folder', '.openrel/pipelines')}
           {field('github_output_folder', 'Output Folder', 'data')}
