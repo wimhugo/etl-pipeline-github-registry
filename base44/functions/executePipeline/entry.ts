@@ -230,10 +230,42 @@ Deno.serve(async (req) => {
     token = configs[0]?.github_token;
   }
   if (!token) token = Deno.env.get('GITHUB_TOKEN');
-  if (!token) return Response.json({ error: 'No GitHub token configured' }, { status: 400 });
+  if (!token) return failRun('No GitHub token configured', 400);
 
   const startedAt = new Date().toISOString();
   const logs = [];
+
+  // Helper: record a failed run and return an error response
+  async function failRun(errorMsg, httpStatus = 500) {
+    const completedAt = new Date().toISOString();
+    const durationSeconds = Math.round((new Date(completedAt) - new Date(startedAt)) / 1000);
+    logs.push(`[ERROR] ${errorMsg}`);
+    try {
+      await base44.asServiceRole.entities.PipelineRun.create({
+        pipeline_id,
+        pipeline_name: pipeline?.name || pipeline_id,
+        status: 'failed',
+        started_at: startedAt,
+        completed_at: completedAt,
+        records_extracted: 0,
+        records_transformed: 0,
+        records_loaded: 0,
+        duration_seconds: durationSeconds,
+        error_message: errorMsg,
+        logs: logs.join('\n'),
+      });
+      // Update pipeline stats
+      const totalRuns = (pipeline?.total_runs || 0) + 1;
+      const prevSuccesses = Math.round(((pipeline?.success_rate || 0) / 100) * (pipeline?.total_runs || 0));
+      await base44.asServiceRole.entities.Pipeline.update(pipeline_id, {
+        last_run_at: startedAt,
+        last_run_status: 'failed',
+        total_runs: totalRuns,
+        success_rate: Math.round((prevSuccesses / totalRuns) * 100),
+      });
+    } catch (_) { /* best-effort */ }
+    return Response.json({ error: errorMsg }, { status: httpStatus });
+  }
 
   const sourceType = pipeline.source_type || 'csv';
   const outputType = pipeline.output_type || 'json';
@@ -252,17 +284,17 @@ Deno.serve(async (req) => {
   const branch = pipeline.github_branch || fallback_branch || 'main';
   const targetFolder = (pipeline.github_target_folder || fallback_target_folder || 'data').replace(/\/$/, '');
 
-  if (!repo) return Response.json({ error: 'No GitHub repo configured on pipeline' }, { status: 400 });
-  if (!pipeline.source_file_url) return Response.json({ error: 'No source file configured' }, { status: 400 });
-  if (!pipeline.template && outputType === 'json') return Response.json({ error: 'No template configured' }, { status: 400 });
+  if (!repo) return failRun('No GitHub repo configured on pipeline', 400);
+  if (!pipeline.source_file_url) return failRun('No source file configured', 400);
+  if (!pipeline.template && outputType === 'json') return failRun('No template configured', 400);
   if (!pipeline.field_mapping || Object.keys(pipeline.field_mapping).length === 0) {
-    return Response.json({ error: 'No field mappings configured' }, { status: 400 });
+    return failRun('No field mappings configured', 400);
   }
 
   // 1. Fetch and parse the source file
   logs.push(`[INFO] Fetching source file (type: ${sourceType})...`);
   const csvRes = await fetch(pipeline.source_file_url);
-  if (!csvRes.ok) return Response.json({ error: 'Failed to fetch source file' }, { status: 500 });
+  if (!csvRes.ok) return failRun('Failed to fetch source file', 500);
   const sourceText = await csvRes.text();
   const rows = parseSource(sourceText, sourceType);
   logs.push(`[INFO] Parsed ${rows.length} records from source`);
@@ -271,7 +303,7 @@ Deno.serve(async (req) => {
   logs.push(`[INFO] Getting base branch ref for ${branch}...`);
   const refRes = await fetch(`https://api.github.com/repos/${repo}/git/ref/heads/${branch}`, { headers });
   const refData = await refRes.json();
-  if (!refRes.ok) return Response.json({ error: `GitHub ref error: ${refData.message}` }, { status: refRes.status });
+  if (!refRes.ok) return failRun(`GitHub ref error: ${refData.message}`, refRes.status);
   const baseSha = refData.object.sha;
 
   // 3. Create a new PR branch
@@ -283,7 +315,7 @@ Deno.serve(async (req) => {
     body: JSON.stringify({ ref: `refs/heads/${prBranch}`, sha: baseSha }),
   });
   const branchData = await branchRes.json();
-  if (!branchRes.ok) return Response.json({ error: `Failed to create branch: ${branchData.message}` }, { status: branchRes.status });
+  if (!branchRes.ok) return failRun(`Failed to create branch: ${branchData.message}`, branchRes.status);
 
   // 4. Write files — inventory mode: one bundled file; default: one file per group/type
   const outputFiles = [];
@@ -403,7 +435,7 @@ Deno.serve(async (req) => {
     }),
   });
   const prData = await prRes.json();
-  if (!prRes.ok) return Response.json({ error: `Failed to create PR: ${prData.message}` }, { status: prRes.status });
+  if (!prRes.ok) return failRun(`Failed to create PR: ${prData.message}`, prRes.status);
 
   logs.push(`[INFO] PR created: ${prData.html_url}`);
 
@@ -444,6 +476,22 @@ Deno.serve(async (req) => {
     logs: logs.join('\n'),
   });
   } catch(err) {
+    const completedAt = new Date().toISOString();
+    try {
+      await base44.asServiceRole.entities.PipelineRun.create({
+        pipeline_id,
+        pipeline_name: pipeline?.name || pipeline_id,
+        status: 'failed',
+        started_at: startedAt,
+        completed_at: completedAt,
+        records_extracted: 0,
+        records_transformed: 0,
+        records_loaded: 0,
+        duration_seconds: Math.round((new Date(completedAt) - new Date(startedAt)) / 1000),
+        error_message: err.message,
+        logs: logs.join('\n'),
+      });
+    } catch (_) { /* best-effort */ }
     return Response.json({ error: err.message, stack: err.stack }, { status: 500 });
   }
 });
