@@ -210,19 +210,24 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { pipeline_id, github_token } = await req.json();
-  // Prefer: explicit param > GlobalConfig token > env secret
+  const { pipeline_id, github_token, github_repo: fallback_repo, github_branch: fallback_branch, github_target_folder: fallback_target_folder } = await req.json();
+
+  const pipelines = await base44.entities.Pipeline.filter({ id: pipeline_id });
+  const pipeline = pipelines[0];
+  if (!pipeline) return Response.json({ error: 'Pipeline not found' }, { status: 404 });
+
+  // Prefer: explicit param > project token > GlobalConfig token > env secret
   let token = github_token;
+  if (!token && pipeline.project_id) {
+    const projects = await base44.asServiceRole.entities.Project.filter({ id: pipeline.project_id });
+    token = projects[0]?.github_token;
+  }
   if (!token) {
     const configs = await base44.asServiceRole.entities.GlobalConfig.list();
     token = configs[0]?.github_token;
   }
   if (!token) token = Deno.env.get('GITHUB_TOKEN');
   if (!token) return Response.json({ error: 'No GitHub token configured' }, { status: 400 });
-
-  const pipelines = await base44.entities.Pipeline.filter({ id: pipeline_id });
-  const pipeline = pipelines[0];
-  if (!pipeline) return Response.json({ error: 'Pipeline not found' }, { status: 404 });
 
   const startedAt = new Date().toISOString();
   const logs = [];
@@ -238,11 +243,11 @@ Deno.serve(async (req) => {
     'User-Agent': 'OpenREL-App',
   };
 
-  // Normalize repo: strip any leading URL so we always have "owner/repo"
-  const rawRepo = pipeline.github_repo || '';
+  // Normalize repo: pipeline settings take priority, fall back to project/global config passed from frontend
+  const rawRepo = pipeline.github_repo || fallback_repo || '';
   const repo = rawRepo.replace(/^https?:\/\/github\.com\//, '').replace(/\/$/, '');
-  const branch = pipeline.github_branch || 'main';
-  const targetFolder = (pipeline.github_target_folder || 'data').replace(/\/$/, '');
+  const branch = pipeline.github_branch || fallback_branch || 'main';
+  const targetFolder = (pipeline.github_target_folder || fallback_target_folder || 'data').replace(/\/$/, '');
 
   if (!repo) return Response.json({ error: 'No GitHub repo configured on pipeline' }, { status: 400 });
   if (!pipeline.source_file_url) return Response.json({ error: 'No source file configured' }, { status: 400 });
