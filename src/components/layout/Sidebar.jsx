@@ -31,8 +31,7 @@ export default function Sidebar() {
             <GitBranch className="w-4 h-4 text-primary" />
           </div>
           <div>
-            <h1 className="text-sm font-semibold tracking-tight">OpenREL</h1>
-            <p className="text-[10px] font-mono text-muted-foreground tracking-wider uppercase">ETL Pipeline</p>
+            <h1 className="text-sm font-semibold tracking-tight font-mono uppercase tracking-wider">ETL Pipeline</h1>
           </div>
         </div>
       </div>
