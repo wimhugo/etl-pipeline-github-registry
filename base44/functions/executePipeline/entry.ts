@@ -218,9 +218,12 @@ Deno.serve(async (req) => {
 
   // Prefer: explicit param > project token > GlobalConfig token > env secret
   let token = github_token;
-  if (!token && pipeline.project_id) {
+  let projectName = 'OpenREL';
+  if (pipeline.project_id) {
     const projects = await base44.asServiceRole.entities.Project.filter({ id: pipeline.project_id });
-    token = projects[0]?.github_token;
+    const project = projects[0];
+    if (project?.github_token) token = project.github_token;
+    if (project?.name) projectName = project.name;
   }
   if (!token) {
     const configs = await base44.asServiceRole.entities.GlobalConfig.list();
@@ -393,10 +396,10 @@ Deno.serve(async (req) => {
     method: 'POST',
     headers,
     body: JSON.stringify({
-      title: `OpenREL: ${pipeline.name} — ${written} records (${new Date().toLocaleDateString()})`,
+      title: `${projectName}: ${pipeline.name} — ${written} records (${new Date().toLocaleDateString()})`,
       head: prBranch,
       base: branch,
-      body: `Automated output from OpenREL pipeline \`${pipeline.name}\`.\n\n- **Records processed:** ${written}\n- **Target folder:** \`${targetFolder}\`\n- **Mapping:** ${Object.entries(pipeline.field_mapping).map(([t, s]) => `\`${t}\` ← \`${s}\``).join(', ')}`,
+      body: `Automated output from ${projectName} pipeline \`${pipeline.name}\`.\n\n- **Records processed:** ${written}\n- **Target folder:** \`${targetFolder}\`\n- **Mapping:** ${Object.entries(pipeline.field_mapping).map(([t, s]) => `\`${t}\` ← \`${s}\``).join(', ')}`,
     }),
   });
   const prData = await prRes.json();

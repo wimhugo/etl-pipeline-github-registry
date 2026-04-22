@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, GitBranch, Play, Settings2, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { useProject } from '@/lib/ProjectContext';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
@@ -14,6 +15,7 @@ const navItems = [
 export default function Sidebar() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { activeProject } = useProject();
 
   const isActive = (path) => {
     if (path === '/') return location.pathname === '/';
@@ -58,11 +60,13 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Namespace badge */}
+      {/* Active project badge */}
       <div className="px-5 py-4 border-t border-border/50">
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50">
           <div className="w-2 h-2 rounded-full bg-accent animate-pulse-glow" />
-          <span className="text-xs font-mono text-muted-foreground">ns:openrel</span>
+          <span className="text-xs font-mono text-muted-foreground truncate">
+            {activeProject ? activeProject.name : 'no project'}
+          </span>
         </div>
       </div>
     </div>
