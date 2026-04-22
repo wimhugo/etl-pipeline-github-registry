@@ -1,0 +1,142 @@
+import React, { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useProject } from '@/lib/ProjectContext';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Save, FolderOpen } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+
+export default function Config() {
+  const { activeProject, projects } = useProject();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [form, setForm] = useState({});
+
+  // Load globalConfig as fallback when no project
+  const { data: globalConfigs = [] } = useQuery({
+    queryKey: ['globalConfig'],
+    queryFn: () => base44.entities.GlobalConfig.list(),
+  });
+  const globalConfig = globalConfigs[0];
+
+  // Populate form from active project or globalConfig
+  useEffect(() => {
+    if (activeProject) {
+      setForm({ ...activeProject });
+    } else if (globalConfig) {
+      setForm({ ...globalConfig });
+    }
+  }, [activeProject?.id, globalConfig?.id]);
+
+  const updateProjectMutation = useMutation({
+    mutationFn: (data) => base44.entities.Project.update(activeProject.id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast({ title: 'Saved', description: 'Project settings updated.' });
+    },
+  });
+
+  const createProjectMutation = useMutation({
+    mutationFn: (data) => base44.entities.Project.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast({ title: 'Project created', description: 'Your first project has been created.' });
+    },
+  });
+
+  const updateGlobalMutation = useMutation({
+    mutationFn: (data) =>
+      globalConfig
+        ? base44.entities.GlobalConfig.update(globalConfig.id, data)
+        : base44.entities.GlobalConfig.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['globalConfig'] });
+      toast({ title: 'Saved', description: 'Global config updated.' });
+    },
+  });
+
+  const handleSave = () => {
+    if (activeProject) {
+      updateProjectMutation.mutate(form);
+    } else if (projects.length === 0) {
+      // No projects at all — save as global config
+      updateGlobalMutation.mutate(form);
+    } else {
+      updateGlobalMutation.mutate(form);
+    }
+  };
+
+  const isPending = updateProjectMutation.isPending || updateGlobalMutation.isPending || createProjectMutation.isPending;
+
+  const field = (key, label, placeholder, type = 'input') => (
+    <div className="space-y-1.5" key={key}>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      {type === 'textarea' ? (
+        <Textarea
+          className="bg-muted/50 text-sm font-mono h-20"
+          placeholder={placeholder}
+          value={form[key] || ''}
+          onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+        />
+      ) : (
+        <Input
+          className="bg-muted/50 text-sm font-mono"
+          placeholder={placeholder}
+          value={form[key] || ''}
+          onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+        />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {activeProject ? `Project: ${activeProject.name}` : 'Global Settings'}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {activeProject
+              ? 'Configure GitHub credentials and defaults for this project.'
+              : 'No project selected — editing global fallback config.'}
+          </p>
+        </div>
+        <Button onClick={handleSave} disabled={isPending} className="gap-1.5">
+          <Save className="w-4 h-4" />
+          {isPending ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+
+      <Card className="bg-card border-border/50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <FolderOpen className="w-4 h-4" /> Project Info
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {field('name', 'Project Name', 'My Project')}
+          {field('description', 'Description', 'What this project is for…', 'textarea')}
+        </CardContent>
+      </Card>
+
+      <Card className="bg-card border-border/50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider">GitHub Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {field('github_token', 'Personal Access Token', 'ghp_...')}
+          {field('github_username', 'GitHub Username', 'my-username')}
+          {field('github_repo', 'Default Repository', 'owner/repo')}
+          {field('github_branch', 'Default Branch', 'main')}
+          {field('github_configs_folder', 'Configs Folder', '.openrel/pipelines')}
+          {field('github_output_folder', 'Output Folder', 'data')}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
