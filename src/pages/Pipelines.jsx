@@ -7,24 +7,33 @@ import { Plus, Search, GitBranch } from 'lucide-react';
 import PipelineCard from '../components/pipelines/PipelineCard';
 import PipelineForm from '../components/pipelines/PipelineForm';
 import EmptyState from '../components/shared/EmptyState';
+import { useProject } from '@/lib/ProjectContext';
 
 export default function Pipelines() {
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
+  const { activeProject } = useProject();
 
-  const { data: pipelines = [], isLoading } = useQuery({
+  const { data: allPipelines = [], isLoading } = useQuery({
     queryKey: ['pipelines'],
     queryFn: () => base44.entities.Pipeline.list('-created_date'),
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Pipeline.create(data),
+    mutationFn: (data) => base44.entities.Pipeline.create({
+      ...data,
+      project_id: activeProject?.id || null,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipelines'] });
       setShowForm(false);
     },
   });
+
+  const pipelines = activeProject
+    ? allPipelines.filter(p => p.project_id === activeProject.id)
+    : allPipelines.filter(p => !p.project_id);
 
   const filtered = pipelines.filter(p =>
     p.name?.toLowerCase().includes(search.toLowerCase()) ||

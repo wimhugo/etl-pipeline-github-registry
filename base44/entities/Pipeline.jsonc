@@ -10,6 +10,10 @@
       "type": "string",
       "description": "Description of what the pipeline does"
     },
+    "project_id": {
+      "type": "string",
+      "description": "Reference to the parent Project (null = legacy/global)"
+    },
     "status": {
       "type": "string",
       "enum": [

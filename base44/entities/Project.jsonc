@@ -1,0 +1,49 @@
+{
+  "name": "Project",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Project name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of this project"
+    },
+    "github_token": {
+      "type": "string",
+      "description": "GitHub Personal Access Token for this project"
+    },
+    "github_username": {
+      "type": "string",
+      "description": "GitHub username (optional)"
+    },
+    "github_repo": {
+      "type": "string",
+      "description": "Default GitHub repository (owner/repo)"
+    },
+    "github_branch": {
+      "type": "string",
+      "default": "main",
+      "description": "Default branch"
+    },
+    "github_configs_folder": {
+      "type": "string",
+      "default": ".openrel/pipelines",
+      "description": "Folder in GitHub where pipeline YAML configs are stored"
+    },
+    "github_output_folder": {
+      "type": "string",
+      "default": "data",
+      "description": "Default output folder in GitHub"
+    },
+    "namespace": {
+      "type": "string",
+      "default": "openrel",
+      "description": "Namespace prefix"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

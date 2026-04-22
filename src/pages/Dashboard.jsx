@@ -4,10 +4,14 @@ import { useQuery } from '@tanstack/react-query';
 import StatCard from '../components/shared/StatCard';
 import RunsChart from '../components/dashboard/RunsChart';
 import RecentRunsTable from '../components/dashboard/RecentRunsTable';
+import ProjectSelector from '../components/project/ProjectSelector';
+import { useProject } from '@/lib/ProjectContext';
 import { GitBranch, Play, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 export default function Dashboard() {
-  const { data: pipelines = [] } = useQuery({
+  const { activeProject } = useProject();
+
+  const { data: allPipelines = [] } = useQuery({
     queryKey: ['pipelines'],
     queryFn: () => base44.entities.Pipeline.list('-created_date'),
   });
@@ -16,6 +20,11 @@ export default function Dashboard() {
     queryKey: ['runs'],
     queryFn: () => base44.entities.PipelineRun.list('-started_at', 50),
   });
+
+  // Filter by active project; pipelines without project_id are "legacy" shown when no project selected
+  const pipelines = activeProject
+    ? allPipelines.filter(p => p.project_id === activeProject.id)
+    : allPipelines.filter(p => !p.project_id);
 
   const activePipelines = pipelines.filter(p => p.status === 'active').length;
   const totalRuns = runs.length;
@@ -26,11 +35,14 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          OpenREL namespace overview
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {activeProject ? activeProject.name : 'Legacy pipelines'} — overview
+          </p>
+        </div>
+        <ProjectSelector />
       </div>
 
       {/* Stats Grid */}

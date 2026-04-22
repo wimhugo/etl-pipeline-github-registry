@@ -24,6 +24,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
+import { useProject } from '@/lib/ProjectContext';
 
 const SCHEDULES = ['manual', 'every_5min', 'every_15min', 'hourly', 'daily', 'weekly'];
 
@@ -43,11 +44,23 @@ export default function PipelineDetail() {
     },
   });
 
+  const { activeProject } = useProject();
+
   const { data: globalConfigs = [] } = useQuery({
     queryKey: ['globalConfig'],
     queryFn: () => base44.entities.GlobalConfig.list(),
   });
   const globalConfig = globalConfigs[0] || {};
+
+  // Use project config if pipeline belongs to a project, else fall back to globalConfig
+  const { data: projects = [] } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => base44.entities.Project.list(),
+  });
+  const pipelineProject = pipeline
+    ? projects.find(p => p.id === pipeline.project_id) || activeProject
+    : activeProject;
+  const effectiveConfig = pipelineProject || globalConfig;
 
   const { data: runs = [] } = useQuery({
     queryKey: ['pipeline-runs', id],
@@ -80,7 +93,7 @@ export default function PipelineDetail() {
     try {
       const res = await base44.functions.invoke('executePipeline', {
         pipeline_id: id,
-        github_token: globalConfig?.github_token,
+        github_token: effectiveConfig?.github_token,
       });
       queryClient.invalidateQueries({ queryKey: ['pipeline', id] });
       queryClient.invalidateQueries({ queryKey: ['pipeline-runs', id] });
@@ -268,7 +281,7 @@ export default function PipelineDetail() {
         {/* GitHub */}
         <TabsContent value="github" className="mt-4">
           <Card className="p-6 bg-card border-border/50">
-            <GithubSettingsTab pipeline={merged} onUpdate={handleUpdate} globalConfig={globalConfig} />
+            <GithubSettingsTab pipeline={merged} onUpdate={handleUpdate} globalConfig={effectiveConfig} />
           </Card>
         </TabsContent>
       </Tabs>

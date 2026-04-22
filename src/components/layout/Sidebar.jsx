@@ -8,7 +8,7 @@ const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
   { label: 'Pipelines', icon: GitBranch, path: '/pipelines' },
   { label: 'Runs', icon: Play, path: '/runs' },
-  { label: 'Config', icon: Settings2, path: '/config' },
+  { label: 'Project Settings', icon: Settings2, path: '/config' },
 ];
 
 export default function Sidebar() {
