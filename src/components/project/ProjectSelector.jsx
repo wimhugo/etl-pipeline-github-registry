@@ -11,7 +11,11 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import { Plus, Copy, FolderKanban } from 'lucide-react';
+import { Plus, Copy, FolderKanban, Trash2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function ProjectSelector() {
   const { projects, activeProject, selectProject } = useProject();
@@ -20,6 +24,18 @@ export default function ProjectSelector() {
   const [cloning, setCloning] = useState(false);
   const [form, setForm] = useState({ name: '', description: '' });
   const [saving, setSaving] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!activeProject) return;
+    setDeleting(true);
+    await base44.entities.Project.delete(activeProject.id);
+    await queryClient.invalidateQueries({ queryKey: ['projects'] });
+    selectProject(null);
+    setDeleting(false);
+    setShowDelete(false);
+  };
 
   const openNew = () => {
     setCloning(false);
@@ -79,6 +95,28 @@ export default function ProjectSelector() {
           <Copy className="w-4 h-4" />
         </Button>
       )}
+      {activeProject && (
+        <Button size="sm" variant="ghost" onClick={() => setShowDelete(true)} className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10" title="Delete project">
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      )}
+
+      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{activeProject?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the project. Pipelines assigned to it will not be deleted but will become unassigned.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive hover:bg-destructive/90">
+              {deleting ? 'Deleting…' : 'Delete Project'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={showNew} onOpenChange={setShowNew}>
         <DialogContent className="max-w-sm">
