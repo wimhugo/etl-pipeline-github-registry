@@ -26,10 +26,13 @@ export default function Dashboard() {
     ? allPipelines.filter(p => p.project_id === activeProject.id)
     : allPipelines.filter(p => !p.project_id);
 
+  const pipelineIds = new Set(pipelines.map(p => p.id));
+  const filteredRuns = runs.filter(r => pipelineIds.has(r.pipeline_id));
+
   const activePipelines = pipelines.filter(p => p.status === 'active').length;
-  const totalRuns = runs.length;
-  const successRuns = runs.filter(r => r.status === 'success').length;
-  const failedRuns = runs.filter(r => r.status === 'failed').length;
+  const totalRuns = filteredRuns.length;
+  const successRuns = filteredRuns.filter(r => r.status === 'success').length;
+  const failedRuns = filteredRuns.filter(r => r.status === 'failed').length;
   const successRate = totalRuns > 0 ? Math.round((successRuns / totalRuns) * 100) : 0;
 
   return (
@@ -77,8 +80,8 @@ export default function Dashboard() {
 
       {/* Charts & Table */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <RunsChart runs={runs} />
-        <RecentRunsTable runs={runs} />
+        <RunsChart runs={filteredRuns} />
+        <RecentRunsTable runs={filteredRuns} />
       </div>
     </div>
   );
