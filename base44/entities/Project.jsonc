@@ -10,6 +10,14 @@
       "type": "string",
       "description": "Short description of this project"
     },
+    "trl": {
+      "type": "number",
+      "description": "Technology Readiness Level (1\u20139)"
+    },
+    "github_code_repo": {
+      "type": "string",
+      "description": "URL to the source code repository (e.g. https://github.com/org/openrel)"
+    },
     "github_token": {
       "type": "string",
       "description": "GitHub Personal Access Token for this project"
@@ -20,7 +28,7 @@
     },
     "github_repo": {
       "type": "string",
-      "description": "Default GitHub repository (owner/repo)"
+      "description": "Default GitHub repository (owner/repo) \u2014 target data repo"
     },
     "github_branch": {
       "type": "string",

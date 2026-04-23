@@ -7,6 +7,7 @@ import RecentRunsTable from '../components/dashboard/RecentRunsTable';
 import ProjectSelector from '../components/project/ProjectSelector';
 import { useProject } from '@/lib/ProjectContext';
 import { GitBranch, Play, CheckCircle2, AlertTriangle } from 'lucide-react';
+import ProjectInfoPanel from '../components/dashboard/ProjectInfoPanel';
 
 export default function Dashboard() {
   const { activeProject } = useProject();
@@ -83,6 +84,9 @@ export default function Dashboard() {
         <RunsChart runs={filteredRuns} />
         <RecentRunsTable runs={filteredRuns} />
       </div>
+
+      {/* Project Info */}
+      <ProjectInfoPanel project={activeProject} />
     </div>
   );
 }

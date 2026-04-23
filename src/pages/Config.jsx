@@ -149,6 +149,23 @@ export default function Config() {
         <CardContent className="space-y-4">
           {field('name', 'Project Name', 'My Project')}
           {field('description', 'Description', 'What this project is for…', 'textarea')}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Technology Readiness Level (TRL 1–9)</Label>
+            <Select
+              value={form.trl ? String(form.trl) : ''}
+              onValueChange={(val) => setForm(f => ({ ...f, trl: Number(val) }))}
+            >
+              <SelectTrigger className="bg-muted/50 text-sm font-mono">
+                <SelectValue placeholder="Select TRL…" />
+              </SelectTrigger>
+              <SelectContent>
+                {[1,2,3,4,5,6,7,8,9].map(n => (
+                  <SelectItem key={n} value={String(n)}>TRL {n}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {field('github_code_repo', 'Code Repository URL', 'https://github.com/org/openrel')}
         </CardContent>
       </Card>
 
