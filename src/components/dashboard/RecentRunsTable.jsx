@@ -6,16 +6,16 @@ import { format } from 'date-fns';
 import { Clock } from 'lucide-react';
 
 export default function RecentRunsTable({ runs }) {
-  const recent = runs.slice(0, 8);
+  const recent = runs;
 
   return (
-    <Card className="bg-card border-border/50">
-      <CardHeader className="pb-2">
+    <Card className="bg-card border-border/50 flex flex-col h-80">
+      <CardHeader className="pb-2 shrink-0">
         <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
           Recent Runs
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-0">
+      <CardContent className="px-0 flex-1 min-h-0 overflow-y-auto">
         <Table>
           <TableHeader>
             <TableRow className="border-border/50 hover:bg-transparent">

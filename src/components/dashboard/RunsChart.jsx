@@ -34,14 +34,14 @@ export default function RunsChart({ runs }) {
   });
 
   return (
-    <Card className="bg-card border-border/50">
-      <CardHeader className="pb-2">
+    <Card className="bg-card border-border/50 flex flex-col h-80">
+      <CardHeader className="pb-2 shrink-0">
         <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
           Pipeline Runs — Last 7 Days
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="h-56">
+      <CardContent className="flex-1 min-h-0">
+        <div className="h-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} barGap={2}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(217 33% 25%)" vertical={false} />
