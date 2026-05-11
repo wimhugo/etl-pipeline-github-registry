@@ -1,0 +1,17 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "Administrator",
+        "Curator",
+        "Contributor",
+        "End User"
+      ],
+      "default": "Contributor",
+      "description": "User role determining feature access"
+    }
+  }
+}

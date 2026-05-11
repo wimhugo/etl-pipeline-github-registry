@@ -2,17 +2,40 @@ import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { ProjectProvider } from '@/lib/ProjectContext'
+import { RoleProvider } from '@/lib/RoleContext'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 
 import AppLayout from './components/layout/AppLayout';
+
+// KB Manager pages
 import Dashboard from './pages/Dashboard';
+import Projects from './pages/Projects';
 import Pipelines from './pages/Pipelines';
 import PipelineDetail from './pages/PipelineDetail';
 import Runs from './pages/Runs';
 import Config from './pages/Config';
+import KnowledgeBases from './pages/KnowledgeBases';
+import SchemaValidator from './pages/SchemaValidator';
+import TemplateManager from './pages/TemplateManager';
+import SchemaExtraction from './pages/SchemaExtraction';
+import DataSync from './pages/DataSync';
+import VocabLinker from './pages/VocabLinker';
+import VocabMaker from './pages/VocabMaker';
+import VocabLinks from './pages/VocabLinks';
+import AnnotationNotes from './pages/AnnotationNotes';
+import PopulateSubObjects from './pages/PopulateSubObjects';
+import ProvenanceViewer from './pages/ProvenanceViewer';
+
+// KB User pages
+import KBUserDashboard from './pages/kbuser/KBUserDashboard';
+import KBSearch from './pages/kbuser/KBSearch';
+import KBAnnotate from './pages/kbuser/KBAnnotate';
+import KBMatch from './pages/kbuser/KBMatch';
+import KBCompose from './pages/kbuser/KBCompose';
+import KBPreferences from './pages/kbuser/KBPreferences';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -37,11 +60,32 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route element={<AppLayout />}>
+        {/* KB Manager */}
         <Route path="/" element={<Dashboard />} />
+        <Route path="/projects" element={<Projects />} />
         <Route path="/pipelines" element={<Pipelines />} />
         <Route path="/pipelines/:id" element={<PipelineDetail />} />
         <Route path="/runs" element={<Runs />} />
         <Route path="/config" element={<Config />} />
+        <Route path="/knowledge-bases" element={<KnowledgeBases />} />
+        <Route path="/schema-validator" element={<SchemaValidator />} />
+        <Route path="/template-manager" element={<TemplateManager />} />
+        <Route path="/schema-extraction" element={<SchemaExtraction />} />
+        <Route path="/data-sync" element={<DataSync />} />
+        <Route path="/vocab-linker" element={<VocabLinker />} />
+        <Route path="/vocab-maker" element={<VocabMaker />} />
+        <Route path="/vocab-links" element={<VocabLinks />} />
+        <Route path="/annotation-notes" element={<AnnotationNotes />} />
+        <Route path="/populate-subobjects" element={<PopulateSubObjects />} />
+        <Route path="/provenance" element={<ProvenanceViewer />} />
+
+        {/* KB User */}
+        <Route path="/kb-user/dashboard" element={<KBUserDashboard />} />
+        <Route path="/kb-user/search" element={<KBSearch />} />
+        <Route path="/kb-user/annotate" element={<KBAnnotate />} />
+        <Route path="/kb-user/match" element={<KBMatch />} />
+        <Route path="/kb-user/compose" element={<KBCompose />} />
+        <Route path="/kb-user/preferences" element={<KBPreferences />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
@@ -53,10 +97,12 @@ function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <ProjectProvider>
-          <Router>
-            <AuthenticatedApp />
-          </Router>
-          <Toaster />
+          <RoleProvider>
+            <Router>
+              <AuthenticatedApp />
+            </Router>
+            <Toaster />
+          </RoleProvider>
         </ProjectProvider>
       </QueryClientProvider>
     </AuthProvider>
