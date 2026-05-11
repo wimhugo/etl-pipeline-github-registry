@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useRole } from '@/lib/RoleContext';
+import RolePermissionsEditor from '@/components/settings/RolePermissionsEditor';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useProject } from '@/lib/ProjectContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -12,6 +14,7 @@ import { Save, FolderOpen, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function Config() {
+  const { activeRole } = useRole();
   const { activeProject, projects } = useProject();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -168,6 +171,8 @@ export default function Config() {
           {field('github_code_repo', 'Code Repository URL', 'https://github.com/org/openrel')}
         </CardContent>
       </Card>
+
+      {activeRole === 'Administrator' && <RolePermissionsEditor />}
 
       <Card className="bg-card border-border/50">
         <CardHeader className="pb-2">
