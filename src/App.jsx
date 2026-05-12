@@ -36,6 +36,7 @@ import KBAnnotate from './pages/kbuser/KBAnnotate';
 import KBMatch from './pages/kbuser/KBMatch';
 import KBCompose from './pages/kbuser/KBCompose';
 import KBPreferences from './pages/kbuser/KBPreferences';
+import KBUserConfig from './pages/kbuser/KBUserConfig';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -86,6 +87,7 @@ const AuthenticatedApp = () => {
         <Route path="/kb-user/match" element={<KBMatch />} />
         <Route path="/kb-user/compose" element={<KBCompose />} />
         <Route path="/kb-user/preferences" element={<KBPreferences />} />
+        <Route path="/kb-user/configuration" element={<KBUserConfig />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

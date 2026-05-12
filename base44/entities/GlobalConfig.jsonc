@@ -8,7 +8,7 @@
     },
     "github_username": {
       "type": "string",
-      "description": "GitHub username (optional, for display/context)"
+      "description": "GitHub username (optional)"
     },
     "github_repo": {
       "type": "string",
@@ -21,13 +21,11 @@
     },
     "github_configs_folder": {
       "type": "string",
-      "default": ".openrel/pipelines",
-      "description": "Folder in GitHub where pipeline YAML configs are stored"
+      "default": ".openrel/pipelines"
     },
     "github_output_folder": {
       "type": "string",
-      "default": "data",
-      "description": "Default output folder in GitHub"
+      "default": "data"
     },
     "namespace": {
       "type": "string",
@@ -42,6 +40,17 @@
       "type": "string",
       "default": "https://api.github.com/repos/wimhugo/openrel/contents/data/input/v0.3",
       "description": "GitHub API URL for listing files in the KB Search data folder"
+    },
+    "kb_policy_file": {
+      "type": "string",
+      "description": "Selected policy file name for KB Search"
+    },
+    "kb_sub_entity_files": {
+      "type": "object",
+      "description": "Map of sub-entity type -> selected filename, e.g. { actions: 'actions.json' }",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
   "required": []

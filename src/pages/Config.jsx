@@ -176,19 +176,6 @@ export default function Config() {
 
       <Card className="bg-card border-border/50">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider">KB Search Data Source</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-xs text-muted-foreground">
-            Configure the GitHub folder used by KB User Search to browse policy files.
-          </p>
-          {field('kb_search_data_api_url', 'GitHub API URL (for file listing)', 'https://api.github.com/repos/owner/repo/contents/path')}
-          {field('kb_search_data_url', 'Raw Content Base URL (for file reading)', 'https://raw.githubusercontent.com/owner/repo/branch/path')}
-        </CardContent>
-      </Card>
-
-      <Card className="bg-card border-border/50">
-        <CardHeader className="pb-2">
           <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider">GitHub Settings</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
