@@ -17,7 +17,7 @@ export default function KBMatch() {
   const apiUrl = config.kb_search_data_api_url || '';
 
   const { data: fileList = [] } = useQuery({
-    queryKey: ['kbSearchFiles', apiUrl],
+    queryKey: ['kbMatchFiles', apiUrl],
     queryFn: async () => {
       const res = await fetch(apiUrl);
       if (!res.ok) throw new Error('Failed to fetch file list');
