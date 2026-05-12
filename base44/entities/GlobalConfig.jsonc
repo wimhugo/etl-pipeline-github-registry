@@ -32,6 +32,16 @@
     "namespace": {
       "type": "string",
       "default": "openrel"
+    },
+    "kb_search_data_url": {
+      "type": "string",
+      "default": "https://raw.githubusercontent.com/wimhugo/openrel/main/data/input/v0.3",
+      "description": "Base URL for the KB Search data folder (raw GitHub content URL)"
+    },
+    "kb_search_data_api_url": {
+      "type": "string",
+      "default": "https://api.github.com/repos/wimhugo/openrel/contents/data/input/v0.3",
+      "description": "GitHub API URL for listing files in the KB Search data folder"
     }
   },
   "required": []
