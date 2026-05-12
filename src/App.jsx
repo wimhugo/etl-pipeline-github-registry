@@ -39,6 +39,7 @@ import KBPreferences from './pages/kbuser/KBPreferences';
 import KBUserConfig from './pages/kbuser/KBUserConfig';
 import KBDetailPolicies from './pages/kbuser/KBDetailPolicies';
 import KBDetailActions from './pages/kbuser/KBDetailActions';
+import KBDetailConstraints from './pages/kbuser/KBDetailConstraints';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -92,6 +93,7 @@ const AuthenticatedApp = () => {
         <Route path="/kb-user/configuration" element={<KBUserConfig />} />
         <Route path="/kb-user/detail/policies" element={<KBDetailPolicies />} />
         <Route path="/kb-user/detail/actions" element={<KBDetailActions />} />
+        <Route path="/kb-user/detail/constraints" element={<KBDetailConstraints />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
