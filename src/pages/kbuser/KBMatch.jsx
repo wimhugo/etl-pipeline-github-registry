@@ -42,7 +42,7 @@ function useKBMatchData() {
   // Constraints
   const autoConstraintsFile = jsonFiles.find(f => f.name.toLowerCase().includes('constraint'))?.name || '';
   const constraintsFile = config.kb_sub_entity_files?.constraints || autoConstraintsFile;
-  const { data: constraintsData } = useQuery({
+  const { data: constraintsData, isLoading: constraintsLoading } = useQuery({
     queryKey: ['kbConstraintsContent', rawBaseUrl, constraintsFile],
     queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${constraintsFile}`); if (!r.ok) throw new Error(); return r.json(); },
     enabled: !!constraintsFile && !!rawBaseUrl,
@@ -52,20 +52,22 @@ function useKBMatchData() {
   // Policies
   const autoPolicyFile = jsonFiles.find(f => f.name.toLowerCase().includes('polic'))?.name || '';
   const policyFile = config.kb_policy_file || autoPolicyFile;
-  const { data: policyData } = useQuery({
+  const { data: policyData, isLoading: policiesLoading } = useQuery({
     queryKey: ['kbFileContent', rawBaseUrl, policyFile],
     queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${policyFile}`); if (!r.ok) throw new Error(); return r.json(); },
     enabled: !!policyFile && !!rawBaseUrl,
   });
   const policies = policyData?.policies || (Array.isArray(policyData) ? policyData : []);
 
-  return { labelMap, constraintsArray, policies };
+  const dataReady = !constraintsLoading && !policiesLoading && constraintsArray.length > 0 && policies.length > 0;
+
+  return { labelMap, constraintsArray, policies, dataReady };
 }
 
 export default function KBMatch() {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState(null);
-  const { labelMap: scenarioLabelMap, constraintsArray, policies } = useKBMatchData(); // null = list, 'new' = new, id = edit
+  const { labelMap: scenarioLabelMap, constraintsArray, policies, dataReady } = useKBMatchData();
 
   const { data: scenarios = [], isLoading } = useQuery({
     queryKey: ['userScenarios'],
@@ -142,6 +144,7 @@ export default function KBMatch() {
             scenarioLabelMap={scenarioLabelMap}
             constraintsArray={constraintsArray}
             policies={policies}
+            dataReady={dataReady}
             onEdit={() => setEditingId(s.id)}
             onClone={() => cloneMutation.mutate(s)}
             onDelete={() => deleteMutation.mutate(s.id)}

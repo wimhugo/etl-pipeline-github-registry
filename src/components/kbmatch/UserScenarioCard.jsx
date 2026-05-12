@@ -48,24 +48,18 @@ function runMatch(scenario, scenarioLabelMap, constraintsArray, policies) {
   return { matches, requiredConstraintIds: [...requiredConstraintIds] };
 }
 
-export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, constraintsArray = [], policies = [], onEdit, onClone, onDelete }) {
+export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, constraintsArray = [], policies = [], dataReady = false, onEdit, onClone, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const [matchResult, setMatchResult] = useState(null);
-  const [matching, setMatching] = useState(false);
 
   const ids = scenario.selected_scenario_ids || [];
   const count = ids.length;
 
   const handleFindMatches = (e) => {
     e.stopPropagation();
-    setMatching(true);
-    // Small timeout to show loading state
-    setTimeout(() => {
-      const result = runMatch(scenario, scenarioLabelMap, constraintsArray, policies);
-      setMatchResult(result);
-      setMatching(false);
-      setExpanded(true);
-    }, 50);
+    const result = runMatch(scenario, scenarioLabelMap, constraintsArray, policies);
+    setMatchResult(result);
+    setExpanded(true);
   };
 
   return (
@@ -105,11 +99,11 @@ export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, cons
             variant="outline"
             className="h-7 px-2 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
             onClick={handleFindMatches}
-            disabled={matching || count === 0}
-            title="Find matching policies"
+            disabled={!dataReady || count === 0}
+            title={!dataReady ? 'Loading KB data…' : 'Find matching policies'}
           >
-            {matching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
-            Match
+            {!dataReady ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+            {!dataReady ? 'Loading…' : 'Match'}
           </Button>
           <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit} title="Edit">
             <Pencil className="w-3.5 h-3.5" />
