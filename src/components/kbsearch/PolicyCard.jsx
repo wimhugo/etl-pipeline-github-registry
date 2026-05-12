@@ -1,27 +1,57 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Gavel } from 'lucide-react';
+import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Gavel, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-function RuleSection({ icon: Icon, label, color, items }) {
+function ActionDetail({ actionId, actionsMap }) {
+  const action = actionsMap?.[actionId];
+  if (!action) {
+    return (
+      <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
+        {actionId}
+      </Badge>
+    );
+  }
+  return (
+    <div className="rounded-md border border-border/40 bg-muted/20 px-2.5 py-2 space-y-1.5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-medium text-foreground">{action.label}</span>
+        {action.id && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 text-primary font-mono text-[10px] px-2 py-0 cursor-pointer hover:bg-primary/20 transition-colors">
+            {action.id}
+          </span>
+        )}
+        {action.odrl_mapping && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 text-accent font-mono text-[10px] px-2 py-0 cursor-pointer hover:bg-accent/20 transition-colors">
+            <ExternalLink className="w-2.5 h-2.5" />
+            {action.odrl_mapping}
+          </span>
+        )}
+      </div>
+      {action.description && (
+        <p className="text-[11px] text-muted-foreground leading-relaxed">{action.description}</p>
+      )}
+    </div>
+  );
+}
+
+function RuleSection({ icon: Icon, label, color, items, actionsMap }) {
   if (!items || items.length === 0) return null;
   return (
     <div className="mt-3">
-      <div className={`flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-1.5 ${color}`}>
+      <div className={`flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-2 ${color}`}>
         <Icon className="w-3.5 h-3.5" />
         {label}
       </div>
-      <div className="space-y-1.5 pl-2 border-l border-border/50">
+      <div className="space-y-2 pl-2 border-l border-border/50">
         {items.map((item, i) => (
-          <div key={i} className="text-xs space-y-0.5">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-muted-foreground">action:</span>
-              <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
-                {item.action}
-              </Badge>
+          <div key={i} className="text-xs space-y-1">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-muted-foreground text-[10px] uppercase tracking-wider">action</span>
             </div>
+            <ActionDetail actionId={item.action} actionsMap={actionsMap} />
             {item.constraint && (
-              <div className="flex items-center gap-1.5 flex-wrap pl-2">
-                <span className="text-muted-foreground">constraint:</span>
+              <div className="flex items-center gap-1.5 flex-wrap pl-1 mt-1">
+                <span className="text-muted-foreground text-[10px] uppercase tracking-wider">constraint:</span>
                 <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 border-dashed">
                   {item.constraint.id || `${item.constraint.leftOperand} ${item.constraint.operator} ${String(item.constraint.rightOperand)}`}
                 </Badge>
@@ -34,12 +64,11 @@ function RuleSection({ icon: Icon, label, color, items }) {
   );
 }
 
-export default function PolicyCard({ policy }) {
+export default function PolicyCard({ policy, actionsMap }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-      {/* Header — always visible */}
       <button
         className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
         onClick={() => setExpanded(e => !e)}
@@ -60,27 +89,11 @@ export default function PolicyCard({ policy }) {
         </div>
       </button>
 
-      {/* Expanded body */}
       {expanded && (
         <div className="px-4 pb-4 pt-1 border-t border-border/40 bg-muted/10">
-          <RuleSection
-            icon={ShieldCheck}
-            label="Permissions"
-            color="text-accent"
-            items={policy.permissions}
-          />
-          <RuleSection
-            icon={ShieldOff}
-            label="Prohibitions"
-            color="text-destructive"
-            items={policy.prohibitions}
-          />
-          <RuleSection
-            icon={Gavel}
-            label="Duties"
-            color="text-yellow-400"
-            items={policy.duties}
-          />
+          <RuleSection icon={ShieldCheck} label="Permissions"  color="text-accent"       items={policy.permissions}  actionsMap={actionsMap} />
+          <RuleSection icon={ShieldOff}  label="Prohibitions" color="text-destructive"  items={policy.prohibitions} actionsMap={actionsMap} />
+          <RuleSection icon={Gavel}      label="Duties"       color="text-yellow-400"   items={policy.duties}       actionsMap={actionsMap} />
         </div>
       )}
     </div>

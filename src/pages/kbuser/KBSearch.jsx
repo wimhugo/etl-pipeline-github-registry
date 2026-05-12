@@ -32,6 +32,23 @@ export default function KBSearch() {
   const autoPolicy = jsonFiles.find(f => f.name.toLowerCase().includes('polic'))?.name || jsonFiles[0]?.name || '';
   const selectedFile = config.kb_policy_file || autoPolicy;
 
+  const autoActionsFile = jsonFiles.find(f => f.name.toLowerCase().includes('action'))?.name || '';
+  const actionsFile = (config.kb_sub_entity_files?.actions) || autoActionsFile;
+
+  const { data: actionsData } = useQuery({
+    queryKey: ['kbActionsContent', rawBaseUrl, actionsFile],
+    queryFn: async () => {
+      const res = await fetch(`${rawBaseUrl}/${actionsFile}`);
+      if (!res.ok) throw new Error('Failed to fetch actions');
+      return res.json();
+    },
+    enabled: !!actionsFile && !!rawBaseUrl,
+  });
+
+  // Build a map from action IRI -> action object
+  const actionsArray = Array.isArray(actionsData) ? actionsData : (actionsData?.actions || []);
+  const actionsMap = Object.fromEntries(actionsArray.map(a => [a.id, a]));
+
   // Fetch selected file content
   const { data: fileData, isLoading: fileLoading, error: fileError } = useQuery({
     queryKey: ['kbFileContent', rawBaseUrl, selectedFile],
@@ -108,7 +125,7 @@ export default function KBSearch() {
 
       <div className="space-y-2">
         {filtered.map((policy) => (
-          <PolicyCard key={policy.id} policy={policy} />
+          <PolicyCard key={policy.id} policy={policy} actionsMap={actionsMap} />
         ))}
       </div>
 
