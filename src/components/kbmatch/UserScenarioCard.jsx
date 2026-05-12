@@ -50,9 +50,6 @@ export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, onEd
       {/* Expanded content */}
       {expanded && (
         <div className="border-t border-border/40 bg-muted/10 px-4 py-3 space-y-2">
-          {scenario.description && (
-            <p className="text-xs text-muted-foreground mb-2">{scenario.description}</p>
-          )}
           {ids.length === 0 ? (
             <p className="text-xs text-muted-foreground/60 italic">No scenarios selected.</p>
           ) : (
