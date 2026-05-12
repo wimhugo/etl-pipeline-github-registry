@@ -1,0 +1,24 @@
+{
+  "name": "UserScenario",
+  "type": "object",
+  "properties": {
+    "label": {
+      "type": "string",
+      "description": "Name of this user scenario"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of what this scenario covers"
+    },
+    "selected_scenario_ids": {
+      "type": "array",
+      "description": "IDs of selected scenarios",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "label"
+  ]
+}

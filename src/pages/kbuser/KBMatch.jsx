@@ -1,104 +1,90 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import ScenarioGroupCard from '@/components/kbsearch/ScenarioGroupCard';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import UserScenarioCard from '@/components/kbmatch/UserScenarioCard';
+import UserScenarioEditor from '@/components/kbmatch/UserScenarioEditor';
 
 export default function KBMatch() {
-  const [selectedIds, setSelectedIds] = useState({});
+  const queryClient = useQueryClient();
+  const [editingId, setEditingId] = useState(null); // null = list, 'new' = new, id = edit
 
-  const { data: globalConfigs = [] } = useQuery({
-    queryKey: ['globalConfig'],
-    queryFn: () => base44.entities.GlobalConfig.list(),
+  const { data: scenarios = [], isLoading } = useQuery({
+    queryKey: ['userScenarios'],
+    queryFn: () => base44.entities.UserScenario.list('-created_date'),
   });
-  const config = globalConfigs[0] || {};
-  const rawBaseUrl = config.kb_search_data_url || 'https://raw.githubusercontent.com/wimhugo/openrel/main/data/input/v0.3';
-  const apiUrl = config.kb_search_data_api_url || '';
 
-  const { data: fileList = [] } = useQuery({
-    queryKey: ['kbMatchFiles', apiUrl],
-    queryFn: async () => {
-      const res = await fetch(apiUrl);
-      if (!res.ok) throw new Error('Failed to fetch file list');
-      return res.json();
+  const createMutation = useMutation({
+    mutationFn: (data) => base44.entities.UserScenario.create(data),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ['userScenarios'] });
+      setEditingId(created.id);
     },
-    enabled: !!apiUrl,
   });
 
-  const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
-  const autoScenariosFile = jsonFiles.find(f => f.name.toLowerCase().includes('scenario'))?.name || '';
-  const scenariosFile = config.kb_sub_entity_files?.scenarios || autoScenariosFile;
-
-  const { data: scenariosData, isLoading, error } = useQuery({
-    queryKey: ['kbScenariosContent', rawBaseUrl, scenariosFile],
-    queryFn: async () => {
-      const res = await fetch(`${rawBaseUrl}/${scenariosFile}`);
-      if (!res.ok) throw new Error('Failed to fetch scenarios file');
-      return res.json();
-    },
-    enabled: !!scenariosFile && !!rawBaseUrl && globalConfigs.length > 0,
+  const cloneMutation = useMutation({
+    mutationFn: ({ label, description, selected_scenario_ids }) =>
+      base44.entities.UserScenario.create({
+        label: `${label} (copy)`,
+        description,
+        selected_scenario_ids: selected_scenario_ids || [],
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['userScenarios'] }),
   });
 
-  // The JSON key may have trailing spaces, so find it by trimming
-  const scenarioGroupsKey = scenariosData ? Object.keys(scenariosData).find(k => k.trim() === 'scenarioGroups') : null;
-  const scenarioGroups = (scenarioGroupsKey ? scenariosData[scenarioGroupsKey] : null) || (Array.isArray(scenariosData) ? scenariosData : []);
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.UserScenario.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['userScenarios'] }),
+  });
 
-  const handleToggle = (id) => {
-    setSelectedIds(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const selectedCount = Object.values(selectedIds).filter(Boolean).length;
+  if (editingId) {
+    const scenario = editingId === 'new' ? null : scenarios.find(s => s.id === editingId);
+    return (
+      <UserScenarioEditor
+        scenario={scenario}
+        onClose={() => setEditingId(null)}
+      />
+    );
+  }
 
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className="space-y-5 max-w-2xl">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Match</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Browse scenario groups and select scenarios to match against the knowledge base.
+            Manage user-defined scenario sets to match against the knowledge base.
           </p>
         </div>
-        {selectedCount > 0 && (
-          <span className="text-xs text-muted-foreground bg-muted/50 border border-border/50 rounded-full px-3 py-1 shrink-0 mt-1">
-            {selectedCount} selected
-          </span>
-        )}
+        <Button
+          size="sm"
+          className="gap-1.5 shrink-0 mt-1"
+          onClick={() => createMutation.mutate({ label: 'New Scenario', description: '', selected_scenario_ids: [] })}
+          disabled={createMutation.isPending}
+        >
+          <Plus className="w-4 h-4" /> New
+        </Button>
       </div>
 
-      {!scenariosFile && (
-        <div className="rounded-lg border border-border/50 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-          No scenarios file configured. Go to{' '}
-          <Link to="/kb-user/configuration" className="text-primary underline underline-offset-2">Configuration</Link>{' '}
-          to assign a scenarios file.
-        </div>
-      )}
-
       {isLoading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading scenarios…
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      )}
+
+      {!isLoading && scenarios.length === 0 && (
+        <div className="rounded-lg border border-border/50 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
+          No user scenarios yet. Click <strong>New</strong> to create one.
         </div>
       )}
 
-      {error && (
-        <div className="text-sm text-destructive py-4">
-          Failed to load scenarios: {error.message}
-        </div>
-      )}
-
-      {!isLoading && !error && scenarioGroups.length === 0 && scenariosFile && (
-        <div className="text-sm text-muted-foreground py-8 text-center">
-          No scenario groups found in this file.
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {scenarioGroups.map((group, i) => (
-          <ScenarioGroupCard
-            key={group.id || i}
-            group={group}
-            selectedIds={selectedIds}
-            onToggle={handleToggle}
+      <div className="space-y-3">
+        {scenarios.map(s => (
+          <UserScenarioCard
+            key={s.id}
+            scenario={s}
+            onEdit={() => setEditingId(s.id)}
+            onClone={() => cloneMutation.mutate(s)}
+            onDelete={() => deleteMutation.mutate(s.id)}
           />
         ))}
       </div>
