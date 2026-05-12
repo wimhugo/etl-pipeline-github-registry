@@ -20,26 +20,26 @@ function fileHint(filename) {
 }
 
 // Parse a standard GitHub browser folder URL into API + raw URLs
+// Always targets the default branch (main) — ignores whatever segment follows /tree/
 function parseGithubFolderUrl(url) {
   try {
-    const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/]+)\/(.+)/);
+    const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/tree\/[^/]+\/(.+)/);
     if (!match) return null;
-    const [, owner, repo, branch, path] = match;
+    const [, owner, repo, path] = match;
     return {
-      apiUrl: `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`,
-      rawUrl: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`,
+      apiUrl: `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+      rawUrl: `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}`,
     };
   } catch {
     return null;
   }
 }
 
-// Reconstruct a browser URL from a stored API URL + raw URL
-function reconstructBrowserUrl(apiUrl, rawUrl) {
+// Reconstruct a browser URL from a stored API URL
+function reconstructBrowserUrl(apiUrl) {
   const m = apiUrl?.match(/api\.github\.com\/repos\/([^/]+)\/([^/]+)\/contents\/([^?]+)/);
   if (!m) return '';
-  const branch = rawUrl?.split('/')[5] || 'main';
-  return `https://github.com/${m[1]}/${m[2]}/tree/${branch}/${m[3]}`;
+  return `https://github.com/${m[1]}/${m[2]}/tree/main/${m[3]}`;
 }
 
 export default function KBUserConfig() {
@@ -57,17 +57,14 @@ export default function KBUserConfig() {
   useEffect(() => {
     if (globalConfig) {
       setForm({ ...globalConfig });
-      setFolderUrl(reconstructBrowserUrl(
-        globalConfig.kb_search_data_api_url,
-        globalConfig.kb_search_data_url,
-      ));
+      setFolderUrl(reconstructBrowserUrl(globalConfig.kb_search_data_api_url));
     }
   }, [globalConfig?.id]);
 
   const parsed = parseGithubFolderUrl(folderUrl);
 
-  // Use parsed or existing stored API URL to list files
-  const apiUrl = parsed?.apiUrl || form.kb_search_data_api_url || '';
+  // Use parsed or existing stored API URL to list files (strip any stale ?ref= param)
+  const apiUrl = (parsed?.apiUrl || form.kb_search_data_api_url || '').replace(/\?ref=[^&]*/, '');
 
   const { data: fileList = [], isLoading: filesLoading } = useQuery({
     queryKey: ['kbSearchFiles', apiUrl],
