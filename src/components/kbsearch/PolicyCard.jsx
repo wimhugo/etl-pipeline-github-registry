@@ -36,12 +36,14 @@ function ActionDetail({ actionId, actionsMap }) {
   );
 }
 
-function ConstraintDetail({ constraint }) {
+function ConstraintDetail({ constraint, constraintsMap }) {
   if (!constraint) return null;
-  const label = constraint.label;
-  const description = constraint.description || constraint.definition || constraint.comment;
+  // Merge inline constraint with looked-up definition from constraintsMap
+  const looked = constraintsMap?.[constraint.id] || {};
+  const label = looked.label || constraint.label;
+  const description = looked.description || looked.definition || looked.comment || constraint.description || constraint.definition || constraint.comment;
   const id = constraint.id;
-  const fallback = `${constraint.leftOperand} ${constraint.operator} ${String(constraint.rightOperand)}`;
+  const fallback = constraint.leftOperand ? `${constraint.leftOperand} ${constraint.operator} ${String(constraint.rightOperand)}` : null;
 
   if (!label && !description) {
     return (
@@ -71,7 +73,7 @@ function ConstraintDetail({ constraint }) {
   );
 }
 
-function RuleSection({ icon: Icon, label, color, items, actionsMap }) {
+function RuleSection({ icon: Icon, label, color, items, actionsMap, constraintsMap }) {
   if (!items || items.length === 0) return null;
   return (
     <div className="mt-3">
@@ -89,7 +91,7 @@ function RuleSection({ icon: Icon, label, color, items, actionsMap }) {
             {item.constraint && (
               <div className="pl-1 mt-1 space-y-1">
                 <span className="text-muted-foreground text-[10px] uppercase tracking-wider">constraint</span>
-                <ConstraintDetail constraint={item.constraint} />
+                <ConstraintDetail constraint={item.constraint} constraintsMap={constraintsMap} />
               </div>
             )}
           </div>
@@ -99,7 +101,7 @@ function RuleSection({ icon: Icon, label, color, items, actionsMap }) {
   );
 }
 
-export default function PolicyCard({ policy, actionsMap }) {
+export default function PolicyCard({ policy, actionsMap, constraintsMap }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -126,9 +128,9 @@ export default function PolicyCard({ policy, actionsMap }) {
 
       {expanded && (
         <div className="px-4 pb-4 pt-1 border-t border-border/40 bg-muted/10">
-          <RuleSection icon={ShieldCheck} label="Permissions"  color="text-accent"       items={policy.permissions}  actionsMap={actionsMap} />
-          <RuleSection icon={ShieldOff}  label="Prohibitions" color="text-destructive"  items={policy.prohibitions} actionsMap={actionsMap} />
-          <RuleSection icon={Gavel}      label="Duties"       color="text-yellow-400"   items={policy.duties}       actionsMap={actionsMap} />
+          <RuleSection icon={ShieldCheck} label="Permissions"  color="text-accent"       items={policy.permissions}  actionsMap={actionsMap} constraintsMap={constraintsMap} />
+          <RuleSection icon={ShieldOff}  label="Prohibitions" color="text-destructive"  items={policy.prohibitions} actionsMap={actionsMap} constraintsMap={constraintsMap} />
+          <RuleSection icon={Gavel}      label="Duties"       color="text-yellow-400"   items={policy.duties}       actionsMap={actionsMap} constraintsMap={constraintsMap} />
         </div>
       )}
     </div>

@@ -49,6 +49,22 @@ export default function KBSearch() {
   const actionsArray = Array.isArray(actionsData) ? actionsData : (actionsData?.actions || []);
   const actionsMap = Object.fromEntries(actionsArray.map(a => [a.id, a]));
 
+  const autoConstraintsFile = jsonFiles.find(f => f.name.toLowerCase().includes('constraint'))?.name || '';
+  const constraintsFile = (config.kb_sub_entity_files?.constraints) || autoConstraintsFile;
+
+  const { data: constraintsData } = useQuery({
+    queryKey: ['kbConstraintsContent', rawBaseUrl, constraintsFile],
+    queryFn: async () => {
+      const res = await fetch(`${rawBaseUrl}/${constraintsFile}`);
+      if (!res.ok) throw new Error('Failed to fetch constraints');
+      return res.json();
+    },
+    enabled: !!constraintsFile && !!rawBaseUrl,
+  });
+
+  const constraintsArray = Array.isArray(constraintsData) ? constraintsData : (constraintsData?.constraints || []);
+  const constraintsMap = Object.fromEntries(constraintsArray.map(c => [c.id, c]));
+
   // Fetch selected file content
   const { data: fileData, isLoading: fileLoading, error: fileError } = useQuery({
     queryKey: ['kbFileContent', rawBaseUrl, selectedFile],
@@ -125,7 +141,7 @@ export default function KBSearch() {
 
       <div className="space-y-2">
         {filtered.map((policy) => (
-          <PolicyCard key={policy.id} policy={policy} actionsMap={actionsMap} />
+          <PolicyCard key={policy.id} policy={policy} actionsMap={actionsMap} constraintsMap={constraintsMap} />
         ))}
       </div>
 
