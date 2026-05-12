@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import UserScenarioCard from '@/components/kbmatch/UserScenarioCard';
 import UserScenarioEditor from '@/components/kbmatch/UserScenarioEditor';
 
-function useScenarioLabelMap() {
+function useKBMatchData() {
   const { data: globalConfigs = [] } = useQuery({
     queryKey: ['globalConfig'],
     queryFn: () => base44.entities.GlobalConfig.list(),
@@ -21,31 +21,51 @@ function useScenarioLabelMap() {
     enabled: !!apiUrl,
   });
   const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
-  const autoFile = jsonFiles.find(f => f.name.toLowerCase().includes('scenario'))?.name || '';
-  const scenariosFile = config.kb_sub_entity_files?.scenarios || autoFile;
 
+  // Scenarios
+  const autoScenariosFile = jsonFiles.find(f => f.name.toLowerCase().includes('scenario'))?.name || '';
+  const scenariosFile = config.kb_sub_entity_files?.scenarios || autoScenariosFile;
   const { data: scenariosData } = useQuery({
     queryKey: ['kbScenariosContent', rawBaseUrl, scenariosFile],
     queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${scenariosFile}`); if (!r.ok) throw new Error(); return r.json(); },
     enabled: !!scenariosFile && !!rawBaseUrl && globalConfigs.length > 0,
   });
-
-  const key = scenariosData ? Object.keys(scenariosData).find(k => k.trim() === 'scenarioGroups') : null;
-  const groups = (key ? scenariosData[key] : null) || (Array.isArray(scenariosData) ? scenariosData : []);
-
+  const sgKey = scenariosData ? Object.keys(scenariosData).find(k => k.trim() === 'scenarioGroups') : null;
+  const groups = (sgKey ? scenariosData[sgKey] : null) || (Array.isArray(scenariosData) ? scenariosData : []);
   const labelMap = {};
   for (const group of groups) {
     for (const s of group.scenarios || []) {
       if (s.id) labelMap[s.id] = s.label || s.id;
     }
   }
-  return labelMap;
+
+  // Constraints
+  const autoConstraintsFile = jsonFiles.find(f => f.name.toLowerCase().includes('constraint'))?.name || '';
+  const constraintsFile = config.kb_sub_entity_files?.constraints || autoConstraintsFile;
+  const { data: constraintsData } = useQuery({
+    queryKey: ['kbConstraintsContent', rawBaseUrl, constraintsFile],
+    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${constraintsFile}`); if (!r.ok) throw new Error(); return r.json(); },
+    enabled: !!constraintsFile && !!rawBaseUrl,
+  });
+  const constraintsArray = Array.isArray(constraintsData) ? constraintsData : (constraintsData?.constraints || []);
+
+  // Policies
+  const autoPolicyFile = jsonFiles.find(f => f.name.toLowerCase().includes('polic'))?.name || '';
+  const policyFile = config.kb_policy_file || autoPolicyFile;
+  const { data: policyData } = useQuery({
+    queryKey: ['kbFileContent', rawBaseUrl, policyFile],
+    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${policyFile}`); if (!r.ok) throw new Error(); return r.json(); },
+    enabled: !!policyFile && !!rawBaseUrl,
+  });
+  const policies = policyData?.policies || (Array.isArray(policyData) ? policyData : []);
+
+  return { labelMap, constraintsArray, policies };
 }
 
 export default function KBMatch() {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState(null);
-  const scenarioLabelMap = useScenarioLabelMap(); // null = list, 'new' = new, id = edit
+  const { labelMap: scenarioLabelMap, constraintsArray, policies } = useKBMatchData(); // null = list, 'new' = new, id = edit
 
   const { data: scenarios = [], isLoading } = useQuery({
     queryKey: ['userScenarios'],
@@ -120,6 +140,8 @@ export default function KBMatch() {
             key={s.id}
             scenario={s}
             scenarioLabelMap={scenarioLabelMap}
+            constraintsArray={constraintsArray}
+            policies={policies}
             onEdit={() => setEditingId(s.id)}
             onClone={() => cloneMutation.mutate(s)}
             onDelete={() => deleteMutation.mutate(s.id)}
