@@ -6,10 +6,17 @@ import { base44 } from '@/api/base44Client';
 import { LogIn, LogOut, User } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 export default function TopBanner() {
   const { activeRole, selectRole, activeContainer, selectContainer } = useRole();
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleContainerSwitch = (c) => {
+    selectContainer(c);
+    navigate(c === 'KB Manager' ? '/' : '/kb-user/dashboard');
+  };
 
   const handleLogout = () => base44.auth.logout('/');
   const handleLogin = () => base44.auth.redirectToLogin();
@@ -26,7 +33,7 @@ export default function TopBanner() {
         {APP_CONTAINERS.map(c => (
           <button
             key={c}
-            onClick={() => selectContainer(c)}
+            onClick={() => handleContainerSwitch(c)}
             className={cn(
               "px-3 py-1 rounded text-xs font-medium transition-all",
               activeContainer === c
