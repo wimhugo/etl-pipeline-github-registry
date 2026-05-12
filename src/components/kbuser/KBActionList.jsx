@@ -1,0 +1,68 @@
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { Loader2 } from 'lucide-react';
+import ActionCard from './ActionCard';
+import { Link } from 'react-router-dom';
+
+export default function KBActionList() {
+  const { data: globalConfigs = [] } = useQuery({
+    queryKey: ['globalConfig'],
+    queryFn: () => base44.entities.GlobalConfig.list(),
+  });
+  const config = globalConfigs[0] || {};
+  const rawBaseUrl = config.kb_search_data_url || '';
+  const apiUrl = (config.kb_search_data_api_url || '').replace(/\?ref=[^&]*/, '');
+
+  const { data: fileList = [] } = useQuery({
+    queryKey: ['kbSearchFiles', apiUrl],
+    queryFn: async () => { const r = await fetch(apiUrl); if (!r.ok) throw new Error(); return r.json(); },
+    enabled: !!apiUrl,
+  });
+  const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
+  const autoFile = jsonFiles.find(f => f.name.toLowerCase().includes('action'))?.name || '';
+  const actionsFile = config.kb_sub_entity_files?.actions || autoFile;
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['kbActionsContent', rawBaseUrl, actionsFile],
+    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${actionsFile}`); if (!r.ok) throw new Error(); return r.json(); },
+    enabled: !!actionsFile && !!rawBaseUrl,
+  });
+
+  const actions = Array.isArray(data) ? data : (data?.actions || []);
+
+  if (!rawBaseUrl && globalConfigs.length > 0) {
+    return (
+      <div className="rounded-lg border border-border/50 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+        No data source configured. Go to{' '}
+        <Link to="/kb-user/configuration" className="text-primary underline underline-offset-2">Configuration</Link>{' '}
+        to set up your repository.
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading actions…
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-sm text-destructive py-4">Failed to load actions: {error.message}</div>;
+  }
+
+  if (actions.length === 0) {
+    return <div className="text-sm text-muted-foreground py-8 text-center">No actions found in this file.</div>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {actions.map((action, i) => (
+        <ActionCard key={action.id || i} action={action} />
+      ))}
+      <p className="text-xs text-muted-foreground text-right pt-1">{actions.length} actions</p>
+    </div>
+  );
+}

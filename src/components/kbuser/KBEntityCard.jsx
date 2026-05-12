@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 
 const DETAIL_ROUTES = {
   policies: '/kb-user/detail/policies',
+  actions:  '/kb-user/detail/actions',
 };
 
 export default function KBEntityCard({ hint, meta, data, isLoading, isError, filename, fileMeta, count, extras = [] }) {
