@@ -28,7 +28,7 @@ function ActionDetail({ actionId, actionsMap }) {
         )}
       </div>
 {(action.description || action.definition || action.comment) && (
-        <p className="text-[11px] text-muted-foreground leading-relaxed">
+        <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
           {action.description || action.definition || action.comment}
         </p>
       )}
@@ -64,7 +64,7 @@ function ConstraintDetail({ constraint, constraintsMap }) {
         )}
       </div>
       {description && (
-        <p className="text-[11px] text-muted-foreground leading-relaxed">{description}</p>
+        <p className="text-[11px] text-muted-foreground/70 leading-relaxed">{description}</p>
       )}
       {!label && !id && (
         <span className="font-mono text-[10px] text-muted-foreground">{fallback}</span>
