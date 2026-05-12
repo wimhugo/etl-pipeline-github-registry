@@ -30,20 +30,25 @@ function runMatch(scenario, scenarioLabelMap, constraintsArray, policies) {
   // Step 2: find policies that contain ALL required constraint IDs in their rules
   function policyConstraintIds(policy) {
     const ids = new Set();
-    for (const ruleType of ['permission', 'prohibition', 'obligation', 'duty']) {
+    for (const ruleType of ['permission', 'permissions', 'prohibition', 'prohibitions', 'obligation', 'obligations', 'duty', 'duties']) {
       for (const rule of policy[ruleType] || []) {
-        for (const c of rule.constraint || []) {
-          if (c['@id'] || c.id) ids.add(c['@id'] || c.id);
-          if (c.uid) ids.add(c.uid);
+        const constraints = Array.isArray(rule.constraint) ? rule.constraint : (rule.constraint ? [rule.constraint] : []);
+        for (const c of constraints) {
+          const cid = c['@id'] || c.id || c.uid;
+          if (cid) ids.add(cid);
         }
       }
     }
     return ids;
   }
 
+  function normalizeId(id) {
+    return String(id).replace(/[.:]/g, '_').toLowerCase();
+  }
+
   const matches = policies.filter(p => {
-    const pIds = policyConstraintIds(p);
-    return [...requiredConstraintIds].every(id => pIds.has(id));
+    const pIds = new Set([...policyConstraintIds(p)].map(normalizeId));
+    return [...requiredConstraintIds].every(id => pIds.has(normalizeId(id)));
   });
 
   return { matches, requiredConstraintIds: [...requiredConstraintIds] };
