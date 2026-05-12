@@ -15,8 +15,8 @@ export default function KBSearch() {
     queryFn: () => base44.entities.GlobalConfig.list(),
   });
   const config = globalConfigs[0] || {};
-  const apiUrl = config.kb_search_data_api_url || '';
-  const rawBaseUrl = config.kb_search_data_url || '';
+  const apiUrl = config.kb_search_data_api_url || 'https://api.github.com/repos/wimhugo/openrel/contents/data/input/v0.3';
+  const rawBaseUrl = config.kb_search_data_url || 'https://raw.githubusercontent.com/wimhugo/openrel/main/data/input/v0.3';
 
   // Get the file list to resolve auto-detected policy file
   const { data: fileList = [] } = useQuery({
