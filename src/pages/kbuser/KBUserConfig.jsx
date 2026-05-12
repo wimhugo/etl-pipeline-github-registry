@@ -36,7 +36,7 @@ function parseGithubFolderUrl(url) {
 
 // Reconstruct a browser URL from a stored API URL + raw URL
 function reconstructBrowserUrl(apiUrl, rawUrl) {
-  const m = apiUrl?.match(/api\.github\.com\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)/);
+  const m = apiUrl?.match(/api\.github\.com\/repos\/([^/]+)\/([^/]+)\/contents\/([^?]+)/);
   if (!m) return '';
   const branch = rawUrl?.split('/')[5] || 'main';
   return `https://github.com/${m[1]}/${m[2]}/tree/${branch}/${m[3]}`;
