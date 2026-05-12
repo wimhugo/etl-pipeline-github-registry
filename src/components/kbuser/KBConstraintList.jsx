@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ConstraintCard from './ConstraintCard';
 
-export default function KBConstraintList() {
+export default function KBConstraintList({ searchQuery = '' }) {
   const { data: globalConfigs = [] } = useQuery({
     queryKey: ['globalConfig'],
     queryFn: () => base44.entities.GlobalConfig.list(),
@@ -29,7 +29,12 @@ export default function KBConstraintList() {
     enabled: !!constraintsFile && !!rawBaseUrl,
   });
 
-  const constraints = Array.isArray(data) ? data : (data?.constraints || []);
+  const allConstraints = Array.isArray(data) ? data : (data?.constraints || []);
+  const constraints = allConstraints.filter(c => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (c.label || '').toLowerCase().includes(q) || (c.id || '').toLowerCase().includes(q);
+  });
 
   if (!rawBaseUrl && globalConfigs.length > 0) {
     return (
@@ -54,7 +59,7 @@ export default function KBConstraintList() {
   }
 
   if (constraints.length === 0) {
-    return <div className="text-sm text-muted-foreground py-8 text-center">No constraints found in this file.</div>;
+    return <div className="text-sm text-muted-foreground py-8 text-center">{searchQuery ? 'No constraints match your search.' : 'No constraints found in this file.'}</div>;
   }
 
   return (
@@ -62,7 +67,7 @@ export default function KBConstraintList() {
       {constraints.map((constraint, i) => (
         <ConstraintCard key={constraint.id || i} constraint={constraint} />
       ))}
-      <p className="text-xs text-muted-foreground text-right pt-1">{constraints.length} constraints</p>
+      <p className="text-xs text-muted-foreground text-right pt-1">{constraints.length} of {allConstraints.length} constraints</p>
     </div>
   );
 }

@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Zap } from 'lucide-react';
+import { ArrowLeft, Zap, Search } from 'lucide-react';
 import KBActionList from '@/components/kbuser/KBActionList';
+import { Input } from '@/components/ui/input';
 
 export default function KBDetailActions() {
+  const [searchQuery, setSearchQuery] = useState('');
+
   return (
     <div className="space-y-5 max-w-4xl">
       <Link
@@ -26,7 +29,17 @@ export default function KBDetailActions() {
         </div>
       </div>
 
-      <KBActionList />
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Filter by label or ID…"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      <KBActionList searchQuery={searchQuery} />
     </div>
   );
 }

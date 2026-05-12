@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react';
 import ActionCard from './ActionCard';
 import { Link } from 'react-router-dom';
 
-export default function KBActionList() {
+export default function KBActionList({ searchQuery = '' }) {
   const { data: globalConfigs = [] } = useQuery({
     queryKey: ['globalConfig'],
     queryFn: () => base44.entities.GlobalConfig.list(),
@@ -29,7 +29,12 @@ export default function KBActionList() {
     enabled: !!actionsFile && !!rawBaseUrl,
   });
 
-  const actions = Array.isArray(data) ? data : (data?.actions || []);
+  const allActions = Array.isArray(data) ? data : (data?.actions || []);
+  const actions = allActions.filter(a => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (a.label || '').toLowerCase().includes(q) || (a.id || '').toLowerCase().includes(q);
+  });
 
   if (!rawBaseUrl && globalConfigs.length > 0) {
     return (
@@ -54,7 +59,7 @@ export default function KBActionList() {
   }
 
   if (actions.length === 0) {
-    return <div className="text-sm text-muted-foreground py-8 text-center">No actions found in this file.</div>;
+    return <div className="text-sm text-muted-foreground py-8 text-center">{searchQuery ? 'No actions match your search.' : 'No actions found in this file.'}</div>;
   }
 
   return (
@@ -62,7 +67,7 @@ export default function KBActionList() {
       {actions.map((action, i) => (
         <ActionCard key={action.id || i} action={action} />
       ))}
-      <p className="text-xs text-muted-foreground text-right pt-1">{actions.length} actions</p>
+      <p className="text-xs text-muted-foreground text-right pt-1">{actions.length} of {allActions.length} actions</p>
     </div>
   );
 }

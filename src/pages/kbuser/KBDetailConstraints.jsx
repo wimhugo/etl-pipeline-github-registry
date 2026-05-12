@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Filter } from 'lucide-react';
+import { ArrowLeft, Filter, Search } from 'lucide-react';
 import KBConstraintList from '@/components/kbuser/KBConstraintList';
+import { Input } from '@/components/ui/input';
 
 export default function KBDetailConstraints() {
+  const [searchQuery, setSearchQuery] = useState('');
+
   return (
     <div className="space-y-5 max-w-4xl">
       <Link
@@ -26,7 +29,17 @@ export default function KBDetailConstraints() {
         </div>
       </div>
 
-      <KBConstraintList />
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Filter by label or ID…"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      <KBConstraintList searchQuery={searchQuery} />
     </div>
   );
 }
