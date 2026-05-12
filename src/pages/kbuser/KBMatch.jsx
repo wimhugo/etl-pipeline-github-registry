@@ -40,7 +40,9 @@ export default function KBMatch() {
     enabled: !!scenariosFile && !!rawBaseUrl && globalConfigs.length > 0,
   });
 
-  const scenarioGroups = scenariosData?.scenarioGroups || (Array.isArray(scenariosData) ? scenariosData : []);
+  // The JSON key may have trailing spaces, so find it by trimming
+  const scenarioGroupsKey = scenariosData ? Object.keys(scenariosData).find(k => k.trim() === 'scenarioGroups') : null;
+  const scenarioGroups = (scenarioGroupsKey ? scenariosData[scenarioGroupsKey] : null) || (Array.isArray(scenariosData) ? scenariosData : []);
 
   const handleToggle = (id) => {
     setSelectedIds(prev => ({ ...prev, [id]: !prev[id] }));
