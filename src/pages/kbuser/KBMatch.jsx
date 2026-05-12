@@ -14,7 +14,21 @@ export default function KBMatch() {
   });
   const config = globalConfigs[0] || {};
   const rawBaseUrl = config.kb_search_data_url || 'https://raw.githubusercontent.com/wimhugo/openrel/main/data/input/v0.3';
-  const scenariosFile = config.kb_sub_entity_files?.scenarios || '';
+  const apiUrl = config.kb_search_data_api_url || '';
+
+  const { data: fileList = [] } = useQuery({
+    queryKey: ['kbSearchFiles', apiUrl],
+    queryFn: async () => {
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error('Failed to fetch file list');
+      return res.json();
+    },
+    enabled: !!apiUrl,
+  });
+
+  const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
+  const autoScenariosFile = jsonFiles.find(f => f.name.toLowerCase().includes('scenario'))?.name || '';
+  const scenariosFile = config.kb_sub_entity_files?.scenarios || autoScenariosFile;
 
   const { data: scenariosData, isLoading, error } = useQuery({
     queryKey: ['kbScenariosContent', rawBaseUrl, scenariosFile],
