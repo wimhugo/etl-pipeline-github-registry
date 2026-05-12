@@ -27,8 +27,10 @@ function ActionDetail({ actionId, actionsMap }) {
           </span>
         )}
       </div>
-      {action.description && (
-        <p className="text-[11px] text-muted-foreground leading-relaxed">{action.description}</p>
+{(action.description || action.definition || action.comment) && (
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          {action.description || action.definition || action.comment}
+        </p>
       )}
     </div>
   );
