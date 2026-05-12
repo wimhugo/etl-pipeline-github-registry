@@ -36,6 +36,41 @@ function ActionDetail({ actionId, actionsMap }) {
   );
 }
 
+function ConstraintDetail({ constraint }) {
+  if (!constraint) return null;
+  const label = constraint.label;
+  const description = constraint.description || constraint.definition || constraint.comment;
+  const id = constraint.id;
+  const fallback = `${constraint.leftOperand} ${constraint.operator} ${String(constraint.rightOperand)}`;
+
+  if (!label && !description) {
+    return (
+      <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 border-dashed">
+        {id || fallback}
+      </Badge>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-border/40 bg-muted/20 px-2.5 py-2 space-y-1.5">
+      <div className="flex items-center gap-2 flex-wrap">
+        {label && <span className="text-xs font-medium text-foreground">{label}</span>}
+        {id && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 text-primary font-mono text-[10px] px-2 py-0 cursor-pointer hover:bg-primary/20 transition-colors">
+            {id}
+          </span>
+        )}
+      </div>
+      {description && (
+        <p className="text-[11px] text-muted-foreground leading-relaxed">{description}</p>
+      )}
+      {!label && !id && (
+        <span className="font-mono text-[10px] text-muted-foreground">{fallback}</span>
+      )}
+    </div>
+  );
+}
+
 function RuleSection({ icon: Icon, label, color, items, actionsMap }) {
   if (!items || items.length === 0) return null;
   return (
@@ -52,11 +87,9 @@ function RuleSection({ icon: Icon, label, color, items, actionsMap }) {
             </div>
             <ActionDetail actionId={item.action} actionsMap={actionsMap} />
             {item.constraint && (
-              <div className="flex items-center gap-1.5 flex-wrap pl-1 mt-1">
-                <span className="text-muted-foreground text-[10px] uppercase tracking-wider">constraint:</span>
-                <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 border-dashed">
-                  {item.constraint.id || `${item.constraint.leftOperand} ${item.constraint.operator} ${String(item.constraint.rightOperand)}`}
-                </Badge>
+              <div className="pl-1 mt-1 space-y-1">
+                <span className="text-muted-foreground text-[10px] uppercase tracking-wider">constraint</span>
+                <ConstraintDetail constraint={item.constraint} />
               </div>
             )}
           </div>
