@@ -26,7 +26,7 @@ function parseGithubFolderUrl(url) {
     if (!match) return null;
     const [, owner, repo, branch, path] = match;
     return {
-      apiUrl: `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+      apiUrl: `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`,
       rawUrl: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`,
     };
   } catch {
@@ -38,7 +38,7 @@ function parseGithubFolderUrl(url) {
 function reconstructBrowserUrl(apiUrl, rawUrl) {
   const m = apiUrl?.match(/api\.github\.com\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)/);
   if (!m) return '';
-  const branch = rawUrl?.split('/')[6] || 'main';
+  const branch = rawUrl?.split('/')[5] || 'main';
   return `https://github.com/${m[1]}/${m[2]}/tree/${branch}/${m[3]}`;
 }
 
