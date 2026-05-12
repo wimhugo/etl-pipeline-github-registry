@@ -1,30 +1,70 @@
-import React from 'react';
-import { Pencil, Copy, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Pencil, Copy, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
-export default function UserScenarioCard({ scenario, onEdit, onClone, onDelete }) {
-  const count = scenario.selected_scenario_ids?.length || 0;
+export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, onEdit, onClone, onDelete }) {
+  const [expanded, setExpanded] = useState(false);
+  const ids = scenario.selected_scenario_ids || [];
+  const count = ids.length;
 
   return (
-    <div className="rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start gap-3">
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm text-foreground truncate">{scenario.label}</p>
-        {scenario.description && (
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{scenario.description}</p>
-        )}
-        <p className="text-xs text-muted-foreground/60 mt-1">{count} scenario{count !== 1 ? 's' : ''} selected</p>
+    <div className="w-full rounded-lg border border-border/60 bg-card overflow-hidden">
+      {/* Header row */}
+      <div className="flex items-center gap-2 px-4 py-3">
+        <button
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+          onClick={() => setExpanded(e => !e)}
+        >
+          {expanded
+            ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+            : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+          <div className="flex-1 min-w-0">
+            <span className="font-medium text-sm text-foreground">{scenario.label}</span>
+            {scenario.description && (
+              <span className="ml-2 text-xs text-muted-foreground truncate hidden sm:inline">{scenario.description}</span>
+            )}
+          </div>
+          <Badge variant="outline" className="text-[10px] px-2 py-0 shrink-0 ml-2">
+            {count} scenario{count !== 1 ? 's' : ''}
+          </Badge>
+        </button>
+
+        <div className="flex items-center gap-0.5 shrink-0 ml-1">
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit} title="Edit">
+            <Pencil className="w-3.5 h-3.5" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onClone} title="Clone">
+            <Copy className="w-3.5 h-3.5" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={onDelete} title="Delete">
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       </div>
-      <div className="flex items-center gap-1 shrink-0">
-        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit} title="Edit">
-          <Pencil className="w-3.5 h-3.5" />
-        </Button>
-        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onClone} title="Clone">
-          <Copy className="w-3.5 h-3.5" />
-        </Button>
-        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={onDelete} title="Delete">
-          <Trash2 className="w-3.5 h-3.5" />
-        </Button>
-      </div>
+
+      {/* Expanded content */}
+      {expanded && (
+        <div className="border-t border-border/40 bg-muted/10 px-4 py-3 space-y-2">
+          {scenario.description && (
+            <p className="text-xs text-muted-foreground mb-2">{scenario.description}</p>
+          )}
+          {ids.length === 0 ? (
+            <p className="text-xs text-muted-foreground/60 italic">No scenarios selected.</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {ids.map(id => (
+                <span
+                  key={id}
+                  className="inline-flex items-center rounded-full border border-border/50 bg-muted/40 px-2.5 py-0.5 text-xs text-foreground/80 font-mono"
+                >
+                  {scenarioLabelMap[id] || id}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

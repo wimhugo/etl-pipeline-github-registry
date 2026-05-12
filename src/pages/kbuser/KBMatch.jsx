@@ -6,9 +6,46 @@ import { Button } from '@/components/ui/button';
 import UserScenarioCard from '@/components/kbmatch/UserScenarioCard';
 import UserScenarioEditor from '@/components/kbmatch/UserScenarioEditor';
 
+function useScenarioLabelMap() {
+  const { data: globalConfigs = [] } = useQuery({
+    queryKey: ['globalConfig'],
+    queryFn: () => base44.entities.GlobalConfig.list(),
+  });
+  const config = globalConfigs[0] || {};
+  const rawBaseUrl = config.kb_search_data_url || '';
+  const apiUrl = (config.kb_search_data_api_url || '').replace(/\?ref=[^&]*/, '');
+
+  const { data: fileList = [] } = useQuery({
+    queryKey: ['kbMatchFiles', apiUrl],
+    queryFn: async () => { const r = await fetch(apiUrl); if (!r.ok) throw new Error(); return r.json(); },
+    enabled: !!apiUrl,
+  });
+  const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
+  const autoFile = jsonFiles.find(f => f.name.toLowerCase().includes('scenario'))?.name || '';
+  const scenariosFile = config.kb_sub_entity_files?.scenarios || autoFile;
+
+  const { data: scenariosData } = useQuery({
+    queryKey: ['kbScenariosContent', rawBaseUrl, scenariosFile],
+    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${scenariosFile}`); if (!r.ok) throw new Error(); return r.json(); },
+    enabled: !!scenariosFile && !!rawBaseUrl && globalConfigs.length > 0,
+  });
+
+  const key = scenariosData ? Object.keys(scenariosData).find(k => k.trim() === 'scenarioGroups') : null;
+  const groups = (key ? scenariosData[key] : null) || (Array.isArray(scenariosData) ? scenariosData : []);
+
+  const labelMap = {};
+  for (const group of groups) {
+    for (const s of group.scenarios || []) {
+      if (s.id) labelMap[s.id] = s.label || s.id;
+    }
+  }
+  return labelMap;
+}
+
 export default function KBMatch() {
   const queryClient = useQueryClient();
-  const [editingId, setEditingId] = useState(null); // null = list, 'new' = new, id = edit
+  const [editingId, setEditingId] = useState(null);
+  const scenarioLabelMap = useScenarioLabelMap(); // null = list, 'new' = new, id = edit
 
   const { data: scenarios = [], isLoading } = useQuery({
     queryKey: ['userScenarios'],
@@ -82,6 +119,7 @@ export default function KBMatch() {
           <UserScenarioCard
             key={s.id}
             scenario={s}
+            scenarioLabelMap={scenarioLabelMap}
             onEdit={() => setEditingId(s.id)}
             onClone={() => cloneMutation.mutate(s)}
             onDelete={() => deleteMutation.mutate(s.id)}
