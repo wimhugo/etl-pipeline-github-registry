@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, Loader2, FileJson, Database } from 'lucide-react';
+import { Save, Loader2, FileJson, Database, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 const SUB_ENTITY_HINTS = ['actions', 'constraints', 'agents', 'sources', 'scenarios'];
@@ -19,16 +19,34 @@ function fileHint(filename) {
   return null;
 }
 
-async function fetchFileList(apiUrl) {
-  const res = await fetch(apiUrl);
-  if (!res.ok) throw new Error(`Failed to fetch file list`);
-  return res.json();
+// Parse a standard GitHub browser folder URL into API + raw URLs
+function parseGithubFolderUrl(url) {
+  try {
+    const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/]+)\/(.+)/);
+    if (!match) return null;
+    const [, owner, repo, branch, path] = match;
+    return {
+      apiUrl: `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+      rawUrl: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Reconstruct a browser URL from a stored API URL + raw URL
+function reconstructBrowserUrl(apiUrl, rawUrl) {
+  const m = apiUrl?.match(/api\.github\.com\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)/);
+  if (!m) return '';
+  const branch = rawUrl?.split('/')[6] || 'main';
+  return `https://github.com/${m[1]}/${m[2]}/tree/${branch}/${m[3]}`;
 }
 
 export default function KBUserConfig() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [form, setForm] = useState({});
+  const [folderUrl, setFolderUrl] = useState('');
 
   const { data: globalConfigs = [] } = useQuery({
     queryKey: ['globalConfig'],
@@ -37,20 +55,32 @@ export default function KBUserConfig() {
   const globalConfig = globalConfigs[0];
 
   useEffect(() => {
-    if (globalConfig) setForm({ ...globalConfig });
+    if (globalConfig) {
+      setForm({ ...globalConfig });
+      setFolderUrl(reconstructBrowserUrl(
+        globalConfig.kb_search_data_api_url,
+        globalConfig.kb_search_data_url,
+      ));
+    }
   }, [globalConfig?.id]);
 
-  const apiUrl = form.kb_search_data_api_url || globalConfig?.kb_search_data_api_url || '';
+  const parsed = parseGithubFolderUrl(folderUrl);
+
+  // Use parsed or existing stored API URL to list files
+  const apiUrl = parsed?.apiUrl || form.kb_search_data_api_url || '';
 
   const { data: fileList = [], isLoading: filesLoading } = useQuery({
     queryKey: ['kbSearchFiles', apiUrl],
-    queryFn: () => fetchFileList(apiUrl),
+    queryFn: async () => {
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error('Failed to fetch file list');
+      return res.json();
+    },
     enabled: !!apiUrl,
   });
 
   const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
 
-  // Auto-detect sub-entity files from the file list
   const autoDetected = {};
   for (const hint of SUB_ENTITY_HINTS) {
     const matches = jsonFiles.filter(f => fileHint(f.name) === hint);
@@ -77,6 +107,13 @@ export default function KBUserConfig() {
     },
   });
 
+  const handleSave = () => {
+    saveMutation.mutate({
+      ...form,
+      ...(parsed ? { kb_search_data_api_url: parsed.apiUrl, kb_search_data_url: parsed.rawUrl } : {}),
+    });
+  };
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-center justify-between">
@@ -86,13 +123,13 @@ export default function KBUserConfig() {
             Configure the data repository and file assignments for KB Search.
           </p>
         </div>
-        <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} className="gap-1.5">
+        <Button onClick={handleSave} disabled={saveMutation.isPending} className="gap-1.5">
           <Save className="w-4 h-4" />
           {saveMutation.isPending ? 'Saving…' : 'Save'}
         </Button>
       </div>
 
-      {/* Repository root paths */}
+      {/* Repository root path */}
       <Card className="bg-card border-border/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
@@ -101,26 +138,32 @@ export default function KBUserConfig() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground">
-            Point to the GitHub folder containing your policy and sub-entity JSON files.
+            Paste the GitHub folder URL from your browser — the API endpoints are derived automatically.
           </p>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">GitHub API URL (for file listing)</Label>
+            <Label className="text-xs text-muted-foreground">GitHub Folder URL</Label>
             <Input
               className="bg-muted/50 text-sm font-mono"
-              placeholder="https://api.github.com/repos/owner/repo/contents/path"
-              value={form.kb_search_data_api_url || ''}
-              onChange={e => setForm(f => ({ ...f, kb_search_data_api_url: e.target.value }))}
+              placeholder="https://github.com/owner/repo/tree/branch/path/to/folder"
+              value={folderUrl}
+              onChange={e => setFolderUrl(e.target.value)}
             />
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Raw Content Base URL (for file reading)</Label>
-            <Input
-              className="bg-muted/50 text-sm font-mono"
-              placeholder="https://raw.githubusercontent.com/owner/repo/branch/path"
-              value={form.kb_search_data_url || ''}
-              onChange={e => setForm(f => ({ ...f, kb_search_data_url: e.target.value }))}
-            />
-          </div>
+
+          {folderUrl && !parsed && (
+            <div className="flex items-center gap-2 text-xs text-destructive">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              URL not recognised — expected: https://github.com/owner/repo/tree/branch/path
+            </div>
+          )}
+
+          {parsed && (
+            <div className="rounded-md bg-muted/30 border border-border/40 px-3 py-2 space-y-1">
+              <p className="text-xs text-muted-foreground mb-1">Derived endpoints:</p>
+              <p className="text-xs font-mono text-foreground/60 break-all">API: {parsed.apiUrl}</p>
+              <p className="text-xs font-mono text-foreground/60 break-all">Raw: {parsed.rawUrl}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -138,15 +181,14 @@ export default function KBUserConfig() {
             </div>
           )}
           {!filesLoading && jsonFiles.length === 0 && apiUrl && (
-            <p className="text-xs text-muted-foreground">No JSON files found. Check your API URL above and save first.</p>
+            <p className="text-xs text-muted-foreground">No JSON files found. Check your folder URL above.</p>
           )}
-          {!filesLoading && jsonFiles.length === 0 && !apiUrl && (
-            <p className="text-xs text-muted-foreground">Enter a GitHub API URL above to browse available files.</p>
+          {!filesLoading && !apiUrl && (
+            <p className="text-xs text-muted-foreground">Enter a GitHub folder URL above to browse available files.</p>
           )}
 
           {jsonFiles.length > 0 && (
             <>
-              {/* Policy file */}
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Policy File</Label>
                 <Select
@@ -164,12 +206,8 @@ export default function KBUserConfig() {
                 </Select>
               </div>
 
-              {/* Sub-entity files */}
               <div className="border-t border-border/40 pt-4 space-y-3">
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Sub-entity Files</p>
-                <p className="text-xs text-muted-foreground">
-                  Files are auto-detected from the repository. You can override the selection below.
-                </p>
                 {SUB_ENTITY_HINTS.map(hint => {
                   const auto = autoDetected[hint];
                   const selected = subEntityFiles[hint] || auto || '';
