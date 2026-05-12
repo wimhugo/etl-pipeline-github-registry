@@ -37,6 +37,7 @@ import KBMatch from './pages/kbuser/KBMatch';
 import KBCompose from './pages/kbuser/KBCompose';
 import KBPreferences from './pages/kbuser/KBPreferences';
 import KBUserConfig from './pages/kbuser/KBUserConfig';
+import KBDetailPolicies from './pages/kbuser/KBDetailPolicies';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -88,6 +89,7 @@ const AuthenticatedApp = () => {
         <Route path="/kb-user/compose" element={<KBCompose />} />
         <Route path="/kb-user/preferences" element={<KBPreferences />} />
         <Route path="/kb-user/configuration" element={<KBUserConfig />} />
+        <Route path="/kb-user/detail/policies" element={<KBDetailPolicies />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

@@ -1,5 +1,10 @@
 import React from 'react';
-import { Loader2, AlertCircle, FileJson } from 'lucide-react';
+import { Loader2, AlertCircle, FileJson, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+const DETAIL_ROUTES = {
+  policies: '/kb-user/detail/policies',
+};
 
 export default function KBEntityCard({ hint, meta, data, isLoading, isError, filename, fileMeta, count, extras = [] }) {
   const Icon = meta?.icon || FileJson;
@@ -67,6 +72,16 @@ export default function KBEntityCard({ hint, meta, data, isLoading, isError, fil
               </div>
             ))}
           </div>
+        )}
+
+        {/* Detail link */}
+        {DETAIL_ROUTES[hint] && !isLoading && !isError && count !== null && (
+          <Link
+            to={DETAIL_ROUTES[hint]}
+            className={`inline-flex items-center gap-1 text-[11px] ${meta?.color || 'text-primary'} hover:underline`}
+          >
+            View all <ArrowRight className="w-3 h-3" />
+          </Link>
         )}
 
         {/* Footer: file info */}
