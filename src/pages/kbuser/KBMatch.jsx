@@ -37,7 +37,7 @@ export default function KBMatch() {
       if (!res.ok) throw new Error('Failed to fetch scenarios file');
       return res.json();
     },
-    enabled: !!scenariosFile && !!rawBaseUrl,
+    enabled: !!scenariosFile && !!rawBaseUrl && globalConfigs.length > 0,
   });
 
   const scenarioGroups = scenariosData?.scenarioGroups || (Array.isArray(scenariosData) ? scenariosData : []);
