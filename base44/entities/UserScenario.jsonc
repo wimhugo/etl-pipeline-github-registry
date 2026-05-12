@@ -16,6 +16,26 @@
       "items": {
         "type": "string"
       }
+    },
+    "saved_matches": {
+      "type": "array",
+      "description": "Saved policy match results from the last Match run",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "saved_matches_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of when matches were last saved"
     }
   },
   "required": [

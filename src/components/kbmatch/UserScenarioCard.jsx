@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Pencil, Copy, Trash2, ChevronDown, ChevronRight, Search, Loader2 } from 'lucide-react';
+import { Pencil, Copy, Trash2, ChevronDown, ChevronRight, Search, Loader2, Save, BookmarkCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { base44 } from '@/api/base44Client';
 
 /**
  * Matching logic:
@@ -54,18 +55,39 @@ function runMatch(scenario, scenarioLabelMap, constraintsArray, policies) {
   return { matches, requiredConstraintIds: [...requiredConstraintIds] };
 }
 
-export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, constraintsArray = [], policies = [], dataReady = false, onEdit, onClone, onDelete }) {
+export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, constraintsArray = [], policies = [], dataReady = false, onEdit, onClone, onDelete, onSaved }) {
   const [expanded, setExpanded] = useState(false);
   const [matchResult, setMatchResult] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const ids = scenario.selected_scenario_ids || [];
   const count = ids.length;
+  const savedMatches = scenario.saved_matches || [];
+  const savedAt = scenario.saved_matches_at;
 
   const handleFindMatches = (e) => {
     e.stopPropagation();
     const result = runMatch(scenario, scenarioLabelMap, constraintsArray, policies);
     setMatchResult(result);
     setExpanded(true);
+  };
+
+  const handleSaveMatches = async () => {
+    setSaving(true);
+    await base44.entities.UserScenario.update(scenario.id, {
+      saved_matches: matchResult.matches.map(p => ({ id: p.id, label: p.label || p.id })),
+      saved_matches_at: new Date().toISOString(),
+    });
+    setSaving(false);
+    if (onSaved) onSaved();
+  };
+
+  const handleClearMatches = async () => {
+    await base44.entities.UserScenario.update(scenario.id, {
+      saved_matches: [],
+      saved_matches_at: null,
+    });
+    if (onSaved) onSaved();
   };
 
   return (
@@ -87,9 +109,14 @@ export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, cons
               <Badge variant="outline" className="text-[10px] px-2 py-0 shrink-0">
                 {count} scenario{count !== 1 ? 's' : ''}
               </Badge>
-              {matchResult && (
+              {matchResult ? (
                 <Badge className="text-[10px] px-2 py-0 shrink-0 bg-accent/20 text-accent border border-accent/40">
                   {matchResult.matches.length} match{matchResult.matches.length !== 1 ? 'es' : ''}
+                </Badge>
+              ) : savedMatches.length > 0 && (
+                <Badge className="text-[10px] px-2 py-0 shrink-0 bg-primary/15 text-primary border border-primary/30 gap-1 flex items-center">
+                  <BookmarkCheck className="w-2.5 h-2.5" />
+                  {savedMatches.length} saved
                 </Badge>
               )}
             </div>
@@ -148,12 +175,26 @@ export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, cons
           {/* Match results */}
           {matchResult && (
             <div className="border-t border-border/30 pt-3">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
-                Matching Policies
-                {matchResult.requiredConstraintIds.length > 0 && (
-                  <span className="ml-2 normal-case">({matchResult.requiredConstraintIds.length} constraint{matchResult.requiredConstraintIds.length !== 1 ? 's' : ''} required)</span>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Matching Policies
+                  {matchResult.requiredConstraintIds.length > 0 && (
+                    <span className="ml-2 normal-case">({matchResult.requiredConstraintIds.length} constraint{matchResult.requiredConstraintIds.length !== 1 ? 's' : ''} required)</span>
+                  )}
+                </p>
+                {matchResult.matches.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px] gap-1 border-primary/40 text-primary hover:bg-primary/10"
+                    onClick={handleSaveMatches}
+                    disabled={saving}
+                  >
+                    {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                    Save matches
+                  </Button>
                 )}
-              </p>
+              </div>
               {matchResult.requiredConstraintIds.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic">No constraints found for selected scenarios — check your constraints file configuration.</p>
               ) : matchResult.matches.length === 0 ? (
@@ -167,6 +208,36 @@ export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, cons
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Saved matches (shown when no fresh match result) */}
+          {!matchResult && savedMatches.length > 0 && (
+            <div className="border-t border-border/30 pt-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <BookmarkCheck className="w-3 h-3 text-primary" />
+                  Saved Matches
+                  {savedAt && (
+                    <span className="normal-case font-normal text-muted-foreground/60">— {new Date(savedAt).toLocaleDateString()}</span>
+                  )}
+                </p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-[10px] text-muted-foreground hover:text-destructive"
+                  onClick={handleClearMatches}
+                >
+                  Clear
+                </Button>
+              </div>
+              <div className="flex flex-col gap-1">
+                {savedMatches.map(p => (
+                  <span key={p.id} className="inline-flex items-center rounded border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-foreground/90 w-fit">
+                    {p.label || p.id}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
         </div>

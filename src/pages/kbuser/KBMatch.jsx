@@ -148,6 +148,7 @@ export default function KBMatch() {
             onEdit={() => setEditingId(s.id)}
             onClone={() => cloneMutation.mutate(s)}
             onDelete={() => deleteMutation.mutate(s.id)}
+            onSaved={() => queryClient.invalidateQueries({ queryKey: ['userScenarios'] })}
           />
         ))}
       </div>
