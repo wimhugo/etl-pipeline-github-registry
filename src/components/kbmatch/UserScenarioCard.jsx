@@ -53,11 +53,11 @@ export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, onEd
           {ids.length === 0 ? (
             <p className="text-xs text-muted-foreground/60 italic">No scenarios selected.</p>
           ) : (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-col gap-1">
               {ids.map(id => (
                 <span
                   key={id}
-                  className="inline-flex items-center rounded-full border border-border/50 bg-muted/40 px-2.5 py-0.5 text-xs text-foreground/80 font-mono"
+                  className="inline-flex items-center rounded border border-border/50 bg-muted/40 px-2.5 py-1 text-xs text-foreground/80 font-mono w-fit"
                 >
                   {scenarioLabelMap[id] || id}
                 </span>
