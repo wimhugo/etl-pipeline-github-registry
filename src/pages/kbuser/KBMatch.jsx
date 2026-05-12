@@ -86,7 +86,7 @@ export default function KBMatch() {
   }
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="space-y-5 w-full">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Match</h1>

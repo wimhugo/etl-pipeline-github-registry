@@ -11,26 +11,30 @@ export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, onEd
   return (
     <div className="w-full rounded-lg border border-border/60 bg-card overflow-hidden">
       {/* Header row */}
-      <div className="flex items-center gap-2 px-4 py-3">
+      <div className="flex items-start gap-2 px-4 py-3">
         <button
-          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+          className="flex items-start gap-2 flex-1 min-w-0 text-left"
           onClick={() => setExpanded(e => !e)}
         >
-          {expanded
-            ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
-            : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+          <span className="mt-0.5 shrink-0">
+            {expanded
+              ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+          </span>
           <div className="flex-1 min-w-0">
-            <span className="font-medium text-sm text-foreground">{scenario.label}</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-sm text-foreground">{scenario.label}</span>
+              <Badge variant="outline" className="text-[10px] px-2 py-0 shrink-0">
+                {count} scenario{count !== 1 ? 's' : ''}
+              </Badge>
+            </div>
             {scenario.description && (
-              <span className="ml-2 text-xs text-muted-foreground truncate hidden sm:inline">{scenario.description}</span>
+              <p className="text-xs text-muted-foreground mt-0.5">{scenario.description}</p>
             )}
           </div>
-          <Badge variant="outline" className="text-[10px] px-2 py-0 shrink-0 ml-2">
-            {count} scenario{count !== 1 ? 's' : ''}
-          </Badge>
         </button>
 
-        <div className="flex items-center gap-0.5 shrink-0 ml-1">
+        <div className="flex items-center gap-0.5 shrink-0">
           <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit} title="Edit">
             <Pencil className="w-3.5 h-3.5" />
           </Button>

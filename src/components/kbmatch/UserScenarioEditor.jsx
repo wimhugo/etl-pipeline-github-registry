@@ -89,7 +89,7 @@ export default function UserScenarioEditor({ scenario, onClose }) {
   const selectedCount = Object.values(selectedIds).filter(Boolean).length;
 
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className="space-y-5 w-full">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
