@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,6 +16,10 @@ export default function PipelineForm({ open, onClose, onSubmit, initialData }) {
     namespace: 'openrel',
     status: 'draft',
   });
+
+  useEffect(() => {
+    setForm(initialData || { name: '', description: '', schedule: 'manual', namespace: 'openrel', status: 'draft' });
+  }, [initialData?.id]);
 
   const handleSubmit = (e) => {
     e.preventDefault();

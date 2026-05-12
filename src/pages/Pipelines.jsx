@@ -8,9 +8,21 @@ import PipelineCard from '../components/pipelines/PipelineCard';
 import PipelineForm from '../components/pipelines/PipelineForm';
 import EmptyState from '../components/shared/EmptyState';
 import { useProject } from '@/lib/ProjectContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function Pipelines() {
   const [showForm, setShowForm] = useState(false);
+  const [editingPipeline, setEditingPipeline] = useState(null);
+  const [deletingPipeline, setDeletingPipeline] = useState(null);
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
   const { activeProject } = useProject();
@@ -29,6 +41,35 @@ export default function Pipelines() {
       queryClient.invalidateQueries({ queryKey: ['pipelines'] });
       setShowForm(false);
     },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Pipeline.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pipelines'] });
+      setEditingPipeline(null);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Pipeline.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pipelines'] });
+      setDeletingPipeline(null);
+    },
+  });
+
+  const copyMutation = useMutation({
+    mutationFn: (pipeline) => {
+      const { id, created_date, updated_date, created_by, ...rest } = pipeline;
+      return base44.entities.Pipeline.create({
+        ...rest,
+        name: `${pipeline.name} (copy)`,
+        status: 'draft',
+        project_id: activeProject?.id || null,
+      });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pipelines'] }),
   });
 
   const pipelines = activeProject
@@ -65,10 +106,10 @@ export default function Pipelines() {
         />
       </div>
 
-      {/* Grid */}
+      {/* Grid — 2 columns max */}
       {isLoading ? (
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {Array(3).fill(0).map((_, i) => (
+        <div className="grid md:grid-cols-2 gap-4">
+          {Array(4).fill(0).map((_, i) => (
             <div key={i} className="h-40 rounded-lg bg-card animate-pulse border border-border/50" />
           ))}
         </div>
@@ -81,16 +122,56 @@ export default function Pipelines() {
           onAction={!search ? () => setShowForm(true) : undefined}
         />
       ) : (
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map(p => <PipelineCard key={p.id} pipeline={p} />)}
+        <div className="grid md:grid-cols-2 gap-4">
+          {filtered.map(p => (
+            <PipelineCard
+              key={p.id}
+              pipeline={p}
+              onEdit={(pipeline) => setEditingPipeline(pipeline)}
+              onCopy={(pipeline) => copyMutation.mutate(pipeline)}
+              onDelete={(pipeline) => setDeletingPipeline(pipeline)}
+            />
+          ))}
         </div>
       )}
 
+      {/* Create form */}
       <PipelineForm
         open={showForm}
         onClose={() => setShowForm(false)}
         onSubmit={(data) => createMutation.mutate(data)}
       />
+
+      {/* Edit form */}
+      {editingPipeline && (
+        <PipelineForm
+          open={!!editingPipeline}
+          initialData={editingPipeline}
+          onClose={() => setEditingPipeline(null)}
+          onSubmit={(data) => updateMutation.mutate({ id: editingPipeline.id, data })}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deletingPipeline} onOpenChange={() => setDeletingPipeline(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete pipeline?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{deletingPipeline?.name}" will be permanently deleted. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteMutation.mutate(deletingPipeline.id)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
