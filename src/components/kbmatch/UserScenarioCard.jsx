@@ -17,7 +17,7 @@ function runMatch(scenario, scenarioLabelMap, constraintsArray, policies) {
   for (const sid of selectedIds) {
     const label = scenarioLabelMap[sid] || sid;
     for (const c of constraintsArray) {
-      const cScenario = c.scenario || c.Scenario || '';
+      const cScenario = String(c.scenario || c.Scenario || '');
       if (cScenario.trim() === label.trim()) {
         if (c.id) requiredConstraintIds.add(c.id);
       }
