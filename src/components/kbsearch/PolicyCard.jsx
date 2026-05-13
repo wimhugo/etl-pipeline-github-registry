@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Gavel, ExternalLink 
 import { Badge } from '@/components/ui/badge';
 
 function ActionDetail({ actionId, actionsMap }) {
-  const action = actionsMap?.[actionId];
+  const action = lookupInMap(actionId, actionsMap);
   if (!action) {
     return (
       <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
@@ -36,29 +36,38 @@ function ActionDetail({ actionId, actionsMap }) {
   );
 }
 
+// Normalize an id for fuzzy lookup: replace dots/hyphens with colons, lowercase
+function normalizeId(id) {
+  return String(id || '').replace(/[.\-]/g, ':').toLowerCase();
+}
+
+function lookupInMap(id, map) {
+  if (!map || !id) return null;
+  // Exact match first
+  if (map[id]) return map[id];
+  // Normalized match
+  const normId = normalizeId(id);
+  return Object.values(map).find(v => normalizeId(v.id) === normId) || null;
+}
+
 function ConstraintDetail({ constraint, constraintsMap }) {
   if (!constraint) return null;
-  // Merge inline constraint with looked-up definition from constraintsMap
-  const looked = constraintsMap?.[constraint.id] || {};
+  const looked = lookupInMap(constraint.id, constraintsMap) || {};
   const label = looked.label || constraint.label;
   const description = looked.description || looked.definition || looked.comment || constraint.description || constraint.definition || constraint.comment;
   const id = constraint.id;
-  const fallback = constraint.leftOperand ? `${constraint.leftOperand} ${constraint.operator} ${String(constraint.rightOperand)}` : null;
 
-  if (!label && !description) {
-    return (
-      <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 border-dashed">
-        {id || fallback}
-      </Badge>
-    );
-  }
+  // Build a human-readable expression from inline fields
+  const expression = constraint.leftOperand
+    ? `${constraint.leftOperand} ${constraint.operator || ''} ${Array.isArray(constraint.rightOperand) ? constraint.rightOperand.join(', ') : String(constraint.rightOperand ?? '')}`
+    : null;
 
   return (
     <div className="rounded-md border border-border/40 bg-muted/20 px-2.5 py-2 space-y-1.5">
       <div className="flex items-center gap-2 flex-wrap">
         {label && <span className="text-xs font-medium text-foreground">{label}</span>}
         {id && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 text-primary font-mono text-[10px] px-2 py-0 cursor-pointer hover:bg-primary/20 transition-colors">
+          <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 text-primary font-mono text-[10px] px-2 py-0">
             {id}
           </span>
         )}
@@ -66,8 +75,8 @@ function ConstraintDetail({ constraint, constraintsMap }) {
       {description && (
         <p className="text-[11px] text-muted-foreground/70 leading-relaxed">{description}</p>
       )}
-      {!label && !id && (
-        <span className="font-mono text-[10px] text-muted-foreground">{fallback}</span>
+      {expression && (
+        <p className="text-[10px] font-mono text-muted-foreground/60">{expression}</p>
       )}
     </div>
   );
