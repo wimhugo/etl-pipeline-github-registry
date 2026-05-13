@@ -48,8 +48,14 @@ export default function KBPolicyList({ searchQuery = '' }) {
 
   const { data: fileData, isLoading, error } = useQuery({
     queryKey: ['kbFileContent', rawBaseUrl, policyFile],
-    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${policyFile}`); if (!r.ok) throw new Error(); return r.json(); },
+    queryFn: async () => {
+      const r = await fetch(`${rawBaseUrl}/${policyFile}?_=${Date.now()}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
     enabled: !!policyFile && !!rawBaseUrl,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const actionsArray = Array.isArray(actionsData) ? actionsData : (actionsData?.actions || []);
