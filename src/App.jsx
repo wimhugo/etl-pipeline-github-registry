@@ -108,8 +108,8 @@ function App() {
           <RoleProvider>
             <Router>
               <AuthenticatedApp />
+              <Toaster />
             </Router>
-            <Toaster />
           </RoleProvider>
         </ProjectProvider>
       </QueryClientProvider>
