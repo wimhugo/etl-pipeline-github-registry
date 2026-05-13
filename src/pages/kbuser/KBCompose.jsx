@@ -1,5 +1,194 @@
-import React from 'react';
-import PlaceholderPage from '../placeholder/PlaceholderPage';
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
+import { Search, Plus, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { useToast } from '@/components/ui/use-toast';
+import ComposePolicyCard from '@/components/kbcompose/ComposePolicyCard';
+
+function useComposeData() {
+  const { data: globalConfigs = [] } = useQuery({
+    queryKey: ['globalConfig'],
+    queryFn: () => base44.entities.GlobalConfig.list(),
+  });
+  const config = globalConfigs[0] || {};
+  const apiUrl = (config.kb_search_data_api_url || '').replace(/\?ref=[^&]*/, '');
+  const rawBaseUrl = config.kb_search_data_url || '';
+
+  const { data: fileList = [] } = useQuery({
+    queryKey: ['kbSearchFiles', apiUrl],
+    queryFn: async () => { const r = await fetch(apiUrl); if (!r.ok) throw new Error(); return r.json(); },
+    enabled: !!apiUrl,
+  });
+  const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
+
+  const autoPolicy = jsonFiles.find(f => f.name.toLowerCase().includes('polic'))?.name || '';
+  const policyFile = config.kb_policy_file || autoPolicy;
+
+  const autoActionsFile = jsonFiles.find(f => f.name.toLowerCase().includes('action'))?.name || '';
+  const actionsFile = config.kb_sub_entity_files?.actions || autoActionsFile;
+
+  const autoConstraintsFile = jsonFiles.find(f => f.name.toLowerCase().includes('constraint'))?.name || '';
+  const constraintsFile = config.kb_sub_entity_files?.constraints || autoConstraintsFile;
+
+  const { data: policyData, isLoading: policiesLoading, error: policiesError } = useQuery({
+    queryKey: ['kbFileContent', rawBaseUrl, policyFile],
+    queryFn: async () => {
+      const r = await fetch(`${rawBaseUrl}/${policyFile}?_=${Date.now()}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+    enabled: !!policyFile && !!rawBaseUrl,
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  const { data: actionsData } = useQuery({
+    queryKey: ['kbActionsContent', rawBaseUrl, actionsFile],
+    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${actionsFile}`); if (!r.ok) throw new Error(); return r.json(); },
+    enabled: !!actionsFile && !!rawBaseUrl,
+  });
+
+  const { data: constraintsData } = useQuery({
+    queryKey: ['kbConstraintsContent', rawBaseUrl, constraintsFile],
+    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${constraintsFile}`); if (!r.ok) throw new Error(); return r.json(); },
+    enabled: !!constraintsFile && !!rawBaseUrl,
+  });
+
+  const remotePolicies = policyData?.policies || (Array.isArray(policyData) ? policyData : []);
+
+  const actionsArray = Array.isArray(actionsData) ? actionsData : (actionsData?.actions || []);
+  const actionsMap = Object.fromEntries(actionsArray.map(a => [a.id, a]));
+
+  const constraintsArray = Array.isArray(constraintsData) ? constraintsData : (constraintsData?.constraints || []);
+  const constraintsMap = Object.fromEntries(constraintsArray.map(c => [c.id, c]));
+
+  return {
+    remotePolicies,
+    actionsMap,
+    constraintsMap,
+    policiesLoading,
+    policiesError,
+    noConfig: !rawBaseUrl && globalConfigs.length > 0,
+  };
+}
+
 export default function KBCompose() {
-  return <PlaceholderPage title="Compose" description="Compose structured content from knowledge base resources." />;
+  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  // Local overlay: deleted ids + cloned additions
+  const [deletedIds, setDeletedIds] = useState(new Set());
+  const [cloned, setCloned] = useState([]);
+
+  const { remotePolicies, actionsMap, constraintsMap, policiesLoading, policiesError, noConfig } = useComposeData();
+
+  // Merge: remote (minus deleted) + clones
+  const allPolicies = useMemo(() => {
+    const base = remotePolicies.filter(p => !deletedIds.has(p.id));
+    return [...base, ...cloned];
+  }, [remotePolicies, deletedIds, cloned]);
+
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return allPolicies;
+    const q = searchQuery.toLowerCase();
+    return allPolicies.filter(p =>
+      (p.label || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q)
+    );
+  }, [allPolicies, searchQuery]);
+
+  const handleCopy = (policy) => {
+    const newId = `${policy.id}-copy-${Date.now()}`;
+    const copy = { ...policy, id: newId, label: `${policy.label} (copy)` };
+    setCloned(prev => [...prev, copy]);
+    toast({ title: 'Policy copied', description: `Created "${copy.label}"` });
+  };
+
+  const handleDelete = (policy) => {
+    // If it's a clone, remove from cloned list; otherwise mark as deleted
+    const isClone = cloned.some(c => c.id === policy.id);
+    if (isClone) {
+      setCloned(prev => prev.filter(c => c.id !== policy.id));
+    } else {
+      setDeletedIds(prev => new Set([...prev, policy.id]));
+    }
+    toast({ title: 'Policy removed', description: `"${policy.label}" removed from this view.` });
+  };
+
+  if (noConfig) {
+    return (
+      <div className="space-y-5 max-w-4xl">
+        <h1 className="text-2xl font-semibold tracking-tight">Compose</h1>
+        <div className="rounded-lg border border-border/50 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+          No data source configured. Go to{' '}
+          <Link to="/kb-user/configuration" className="text-primary underline underline-offset-2">Configuration</Link>{' '}
+          to set up your repository URL and file assignments.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5 max-w-4xl">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Compose</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Create, edit, copy, or delete policies from the knowledge base.
+          </p>
+        </div>
+        <Button size="sm" className="gap-1.5 shrink-0 mt-1" disabled title="Create new policy (coming soon)">
+          <Plus className="w-4 h-4" /> New Policy
+        </Button>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Filter by label or ID…"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      {policiesLoading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading policies…
+        </div>
+      )}
+
+      {policiesError && (
+        <div className="text-sm text-destructive py-4">Failed to load policies: {policiesError.message}</div>
+      )}
+
+      {!policiesLoading && !policiesError && (
+        <>
+          <div className="space-y-2">
+            {filtered.map(policy => (
+              <ComposePolicyCard
+                key={policy.id}
+                policy={policy}
+                actionsMap={actionsMap}
+                constraintsMap={constraintsMap}
+                onCopy={handleCopy}
+                onDelete={handleDelete}
+              />
+            ))}
+            {filtered.length === 0 && (
+              <div className="text-sm text-muted-foreground py-8 text-center">
+                {searchQuery ? 'No policies match your search.' : 'No policies found.'}
+              </div>
+            )}
+          </div>
+          {filtered.length > 0 && (
+            <p className="text-xs text-muted-foreground text-right pt-1">
+              {filtered.length} of {allPolicies.length} policies
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
