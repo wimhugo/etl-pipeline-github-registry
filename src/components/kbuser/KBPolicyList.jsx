@@ -37,6 +37,9 @@ export default function KBPolicyList({ searchQuery = '', advancedFilters = {}, o
   const autoConstraintsFile = jsonFiles.find(f => f.name.toLowerCase().includes('constraint'))?.name || '';
   const constraintsFile = config.kb_sub_entity_files?.constraints || autoConstraintsFile;
 
+  const autoStatesFile = jsonFiles.find(f => f.name.toLowerCase().includes('state'))?.name || '';
+  const statesFile = config.kb_sub_entity_files?.states || autoStatesFile;
+
   const { data: actionsData } = useQuery({
     queryKey: ['kbActionsContent', rawBaseUrl, actionsFile],
     queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${actionsFile}`); if (!r.ok) throw new Error(); return r.json(); },
@@ -47,6 +50,12 @@ export default function KBPolicyList({ searchQuery = '', advancedFilters = {}, o
     queryKey: ['kbConstraintsContent', rawBaseUrl, constraintsFile],
     queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${constraintsFile}`); if (!r.ok) throw new Error(); return r.json(); },
     enabled: !!constraintsFile && !!rawBaseUrl,
+  });
+
+  const { data: statesData } = useQuery({
+    queryKey: ['kbStatesContent', rawBaseUrl, statesFile],
+    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${statesFile}`); if (!r.ok) throw new Error(); return r.json(); },
+    enabled: !!statesFile && !!rawBaseUrl,
   });
 
   const { data: fileData, isLoading, error } = useQuery({
@@ -66,6 +75,9 @@ export default function KBPolicyList({ searchQuery = '', advancedFilters = {}, o
 
   const constraintsArray = Array.isArray(constraintsData) ? constraintsData : (constraintsData?.constraints || []);
   const constraintsMap = Object.fromEntries(constraintsArray.map(c => [c.id, c]));
+
+  const statesArray = Array.isArray(statesData) ? statesData : (statesData?.states || []);
+  const statesMap = Object.fromEntries(statesArray.map(s => [s.id, s]));
 
   const policies = fileData?.policies || (Array.isArray(fileData) ? fileData : []);
 
@@ -126,7 +138,7 @@ export default function KBPolicyList({ searchQuery = '', advancedFilters = {}, o
   return (
     <div className="space-y-2">
       {filtered.map(policy => (
-        <PolicyCard key={policy.id} policy={policy} actionsMap={actionsMap} constraintsMap={constraintsMap} />
+        <PolicyCard key={policy.id} policy={policy} actionsMap={actionsMap} constraintsMap={constraintsMap} statesMap={statesMap} />
       ))}
       <p className="text-xs text-muted-foreground text-right pt-1">
         {filtered.length} of {policies.length} policies

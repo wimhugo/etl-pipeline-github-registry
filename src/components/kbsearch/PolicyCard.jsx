@@ -1,6 +1,45 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Gavel, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+const STATUS_COLORS = {
+  active:     'bg-accent/15 text-accent border-accent/30',
+  deprecated: 'bg-muted text-muted-foreground border-border/40',
+  pending:    'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
+  rejected:   'bg-destructive/15 text-destructive border-destructive/30',
+  amendment:  'bg-primary/15 text-primary border-primary/30',
+  draft:      'bg-secondary text-secondary-foreground border-border/40',
+};
+
+function StatusBadge({ statusId, statesMap }) {
+  if (!statusId) return null;
+  const shortKey = String(statusId).split(/[:/]/).pop()?.toLowerCase();
+  const state = statesMap?.[statusId]
+    || statesMap?.[shortKey]
+    || Object.values(statesMap || {}).find(s => String(s.id || '').split(/[:/]/).pop()?.toLowerCase() === shortKey)
+    || { id: statusId, label: shortKey || statusId };
+  const label = state.label || state.id;
+  const definition = state.definition || '';
+  const colorKey = String(state.id || shortKey || '').split(/[:/]/).pop()?.toLowerCase();
+  const colorClass = STATUS_COLORS[colorKey] || 'bg-muted text-muted-foreground border-border/40';
+
+  const badge = (
+    <span className={`inline-flex items-center rounded-full border text-[10px] px-2 py-0 font-normal cursor-default ${colorClass}`}>
+      {label}
+    </span>
+  );
+
+  if (!definition) return badge;
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-xs">{definition}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 function ActionDetail({ actionId, actionsMap }) {
   const action = lookupInMap(actionId, actionsMap);
@@ -110,7 +149,7 @@ function RuleSection({ icon: Icon, label, color, items, actionsMap, constraintsM
   );
 }
 
-export default function PolicyCard({ policy, actionsMap, constraintsMap }) {
+export default function PolicyCard({ policy, actionsMap, constraintsMap, statesMap }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -123,14 +162,19 @@ export default function PolicyCard({ policy, actionsMap, constraintsMap }) {
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </span>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm text-foreground">{policy.label}</span>
-            {policy.odrl_type && (
-              <Badge className="text-[10px] px-1.5 py-0 bg-primary/15 text-primary border-primary/30 font-normal">
-                {policy.odrl_type}
-              </Badge>
-            )}
-          </div>
+          <span className="font-medium text-sm text-foreground">{policy.label}</span>
+          {(policy.odrl_type || policy.status) && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-1">
+              {policy.odrl_type && (
+                <Badge className="text-[10px] px-1.5 py-0 bg-primary/15 text-primary border-primary/30 font-normal">
+                  {policy.odrl_type}
+                </Badge>
+              )}
+              {policy.status && (
+                <StatusBadge statusId={policy.status} statesMap={statesMap} />
+              )}
+            </div>
+          )}
           <div className="font-mono text-[11px] text-muted-foreground mt-0.5 truncate">{policy.id}</div>
         </div>
       </button>
