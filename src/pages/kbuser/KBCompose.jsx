@@ -118,8 +118,8 @@ export default function KBCompose() {
     return [...base, ...cloned];
   }, [remotePolicies, deletedIds, cloned]);
 
-  const odrlTypes = useMemo(() => [...new Set(remotePolicies.map(p => p.odrl_type).filter(Boolean))], [remotePolicies]);
-  const statuses  = useMemo(() => [...new Set(remotePolicies.map(p => p.status).filter(Boolean))], [remotePolicies]);
+  const odrlTypes = useMemo(() => [...new Set(allPolicies.map(p => p.odrl_type).filter(Boolean))], [allPolicies]);
+  const statuses  = useMemo(() => [...new Set(allPolicies.map(p => p.status).filter(Boolean))], [allPolicies]);
 
   const matchFacet = (fieldValue, facet) => {
     if (!facet?.values?.length) return true;
