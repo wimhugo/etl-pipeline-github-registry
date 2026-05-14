@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Save, Loader2, FileJson, Database, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
-const SUB_ENTITY_HINTS = ['actions', 'constraints', 'agents', 'sources', 'scenarios', 'template'];
+const SUB_ENTITY_HINTS = ['actions', 'constraints', 'agents', 'sources', 'scenarios', 'template', 'states'];
 
 function fileHint(filename) {
   const lower = filename.toLowerCase();
@@ -210,7 +210,7 @@ export default function KBUserConfig() {
                   const selected = subEntityFiles[hint] || auto || '';
                   return (
                     <div key={hint} className="space-y-1">
-                      <Label className="text-xs text-muted-foreground capitalize">{hint === 'template' ? 'Policy Template' : hint}</Label>
+                      <Label className="text-xs text-muted-foreground capitalize">{hint === 'template' ? 'Policy Template' : hint === 'states' ? 'Status Vocabulary' : hint}</Label>
                       <Select value={selected} onValueChange={val => setSubEntityFile(hint, val)}>
                         <SelectTrigger className="bg-muted/50 text-sm font-mono">
                           <SelectValue placeholder={auto ? `Auto: ${auto}` : 'Not detected — select manually'} />
