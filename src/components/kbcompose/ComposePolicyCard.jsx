@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Gavel, Copy, Trash2, Pencil, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 function normalizeId(id) {
   return String(id || '').replace(/[.\-]/g, ':').toLowerCase();
@@ -109,20 +110,32 @@ const STATUS_COLORS = {
 
 function StatusBadge({ statusId, statesMap }) {
   if (!statusId) return null;
-  // Look up by full id first, then by last path segment (handles "openrel:status/active" -> "active")
   const shortKey = String(statusId).split(/[:/]/).pop()?.toLowerCase();
-  const state = statesMap?.[statusId] || statesMap?.[shortKey] || { id: statusId, label: shortKey || statusId };
+  // Try full id, short key, and scan all values for a match on any segment
+  const state = statesMap?.[statusId]
+    || statesMap?.[shortKey]
+    || Object.values(statesMap || {}).find(s => String(s.id || '').split(/[:/]/).pop()?.toLowerCase() === shortKey)
+    || { id: statusId, label: shortKey || statusId };
   const label = state.label || state.id;
-  const definition = state.definition || state.description || state.comment || '';
-  const colorKey = (state.id || '').split(/[:/]/).pop()?.toLowerCase() || shortKey;
+  const definition = state.definition || '';
+  const colorKey = String(state.id || shortKey || '').split(/[:/]/).pop()?.toLowerCase();
   const colorClass = STATUS_COLORS[colorKey] || 'bg-muted text-muted-foreground border-border/40';
-  return (
-    <span
-      title={definition || undefined}
-      className={`inline-flex items-center rounded-full border text-[10px] px-2 py-0 font-normal cursor-default ${colorClass}`}
-    >
+
+  const badge = (
+    <span className={`inline-flex items-center rounded-full border text-[10px] px-2 py-0 font-normal cursor-default ${colorClass}`}>
       {label}
     </span>
+  );
+
+  if (!definition) return badge;
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-xs">{definition}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
