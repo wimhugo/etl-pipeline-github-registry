@@ -139,7 +139,7 @@ export default function KBCompose() {
 
   const handleCopy = (policy) => {
     const newId = `${policy.id}-copy-${Date.now()}`;
-    const copy = { ...policy, id: newId, label: `${policy.label} (copy)` };
+    const copy = { ...policy, id: newId, label: `${policy.label} (copy)`, status: 'openrel:status/draft' };
     setCloned(prev => [...prev, copy]);
     toast({ title: 'Policy copied', description: `Created "${copy.label}"` });
   };
