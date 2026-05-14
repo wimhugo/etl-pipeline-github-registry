@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
 import KBPolicyList from '@/components/kbuser/KBPolicyList';
+import PolicyFilterBar from '@/components/kbpolicy/PolicyFilterBar';
 
 export default function KBSearch() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState({ odrl_type: '', status: '' });
+  const [filterOptions, setFilterOptions] = useState({ odrlTypes: [], statuses: [] });
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -15,17 +16,20 @@ export default function KBSearch() {
         </p>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          className="pl-9 bg-muted/50 text-sm"
-          placeholder="Filter by label or id…"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-        />
-      </div>
+      <PolicyFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        filters={filters}
+        onFiltersChange={setFilters}
+        odrlTypes={filterOptions.odrlTypes}
+        statuses={filterOptions.statuses}
+      />
 
-      <KBPolicyList searchQuery={searchQuery} />
+      <KBPolicyList
+        searchQuery={searchQuery}
+        advancedFilters={filters}
+        onDataReady={setFilterOptions}
+      />
     </div>
   );
 }

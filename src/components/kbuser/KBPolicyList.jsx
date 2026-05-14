@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Loader2 } from 'lucide-react';
@@ -6,10 +6,13 @@ import PolicyCard from '@/components/kbsearch/PolicyCard';
 import { Link } from 'react-router-dom';
 
 /**
- * Reusable policy listing with optional search filter.
- * Used by both KBSearch and KBDetailPolicies.
+ * Reusable policy listing with optional search + advanced filters.
+ * Props:
+ *   searchQuery: string
+ *   advancedFilters: { odrl_type?: string, status?: string }
+ *   onDataReady: ({ odrlTypes, statuses }) => void  – called once data is loaded
  */
-export default function KBPolicyList({ searchQuery = '' }) {
+export default function KBPolicyList({ searchQuery = '', advancedFilters = {}, onDataReady }) {
   const { data: globalConfigs = [] } = useQuery({
     queryKey: ['globalConfig'],
     queryFn: () => base44.entities.GlobalConfig.list(),
@@ -66,10 +69,20 @@ export default function KBPolicyList({ searchQuery = '' }) {
 
   const policies = fileData?.policies || (Array.isArray(fileData) ? fileData : []);
 
+  // Derive distinct filter values from data and notify parent
+  useEffect(() => {
+    if (!policies.length || !onDataReady) return;
+    const odrlTypes = [...new Set(policies.map(p => p.odrl_type).filter(Boolean))];
+    const statuses  = [...new Set(policies.map(p => p.status).filter(Boolean))];
+    onDataReady({ odrlTypes, statuses });
+  }, [policies.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const filtered = policies.filter(p => {
-    if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
-    return (p.label || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q);
+    if (q && !(p.label || '').toLowerCase().includes(q) && !(p.id || '').toLowerCase().includes(q)) return false;
+    if (advancedFilters.odrl_type && p.odrl_type !== advancedFilters.odrl_type) return false;
+    if (advancedFilters.status && p.status !== advancedFilters.status) return false;
+    return true;
   });
 
   const noConfig = !rawBaseUrl;

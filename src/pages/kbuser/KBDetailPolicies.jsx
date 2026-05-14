@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, Search } from 'lucide-react';
+import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import KBPolicyList from '@/components/kbuser/KBPolicyList';
-import { Input } from '@/components/ui/input';
+import PolicyFilterBar from '@/components/kbpolicy/PolicyFilterBar';
 
 export default function KBDetailPolicies() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState({ odrl_type: '', status: '' });
+  const [filterOptions, setFilterOptions] = useState({ odrlTypes: [], statuses: [] });
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -31,17 +33,20 @@ export default function KBDetailPolicies() {
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Filter by label or ID…"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
-      </div>
+      <PolicyFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        filters={filters}
+        onFiltersChange={setFilters}
+        odrlTypes={filterOptions.odrlTypes}
+        statuses={filterOptions.statuses}
+      />
 
-      <KBPolicyList searchQuery={searchQuery} />
+      <KBPolicyList
+        searchQuery={searchQuery}
+        advancedFilters={filters}
+        onDataReady={setFilterOptions}
+      />
     </div>
   );
 }

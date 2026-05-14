@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Search, Plus, Loader2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import ComposePolicyCard from '@/components/kbcompose/ComposePolicyCard';
+import PolicyFilterBar from '@/components/kbpolicy/PolicyFilterBar';
 
 function useComposeData() {
   const { data: globalConfigs = [] } = useQuery({
@@ -105,6 +105,7 @@ function useComposeData() {
 export default function KBCompose() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState({ odrl_type: '', status: '' });
   // Local overlay: deleted ids + cloned additions
   const [deletedIds, setDeletedIds] = useState(new Set());
   const [cloned, setCloned] = useState([]);
@@ -117,13 +118,18 @@ export default function KBCompose() {
     return [...base, ...cloned];
   }, [remotePolicies, deletedIds, cloned]);
 
+  const odrlTypes = useMemo(() => [...new Set(remotePolicies.map(p => p.odrl_type).filter(Boolean))], [remotePolicies]);
+  const statuses  = useMemo(() => [...new Set(remotePolicies.map(p => p.status).filter(Boolean))], [remotePolicies]);
+
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return allPolicies;
-    const q = searchQuery.toLowerCase();
-    return allPolicies.filter(p =>
-      (p.label || '').toLowerCase().includes(q) || (p.id || '').toLowerCase().includes(q)
-    );
-  }, [allPolicies, searchQuery]);
+    return allPolicies.filter(p => {
+      const q = searchQuery.toLowerCase();
+      if (q && !(p.label || '').toLowerCase().includes(q) && !(p.id || '').toLowerCase().includes(q)) return false;
+      if (filters.odrl_type && p.odrl_type !== filters.odrl_type) return false;
+      if (filters.status && p.status !== filters.status) return false;
+      return true;
+    });
+  }, [allPolicies, searchQuery, filters]);
 
   const handleCopy = (policy) => {
     const newId = `${policy.id}-copy-${Date.now()}`;
@@ -170,15 +176,14 @@ export default function KBCompose() {
         </Button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Filter by label or ID…"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
-      </div>
+      <PolicyFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        filters={filters}
+        onFiltersChange={setFilters}
+        odrlTypes={odrlTypes}
+        statuses={statuses}
+      />
 
       {policiesLoading && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
