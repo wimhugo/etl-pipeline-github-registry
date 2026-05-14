@@ -69,11 +69,13 @@ export default function KBUserConfig() {
   const { data: fileList = [], isLoading: filesLoading } = useQuery({
     queryKey: ['kbSearchFiles', apiUrl],
     queryFn: async () => {
-      const res = await fetch(apiUrl);
+      const res = await fetch(`${apiUrl}?_=${Date.now()}`);
       if (!res.ok) throw new Error('Failed to fetch file list');
       return res.json();
     },
     enabled: !!apiUrl,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
