@@ -137,6 +137,18 @@ export default function KBCompose() {
     });
   }, [allPolicies, searchQuery, filters]);
 
+  const handleEdit = (updatedPolicy) => {
+    const isClone = cloned.some(c => c.id === updatedPolicy.id);
+    if (isClone) {
+      setCloned(prev => prev.map(c => c.id === updatedPolicy.id ? updatedPolicy : c));
+    } else {
+      // Promote to cloned list so edits live locally without touching the remote
+      setDeletedIds(prev => new Set([...prev, updatedPolicy.id]));
+      setCloned(prev => [...prev, updatedPolicy]);
+    }
+    toast({ title: 'Policy updated', description: `"${updatedPolicy.label}" saved as draft.` });
+  };
+
   const handleCopy = (policy) => {
     const newId = `${policy.id}-copy-${Date.now()}`;
     const copy = { ...policy, id: newId, label: `${policy.label} (copy)`, status: 'openrel:status/draft' };
@@ -211,6 +223,7 @@ export default function KBCompose() {
                 actionsMap={actionsMap}
                 constraintsMap={constraintsMap}
                 statesMap={statesMap}
+                onEdit={handleEdit}
                 onCopy={handleCopy}
                 onDelete={handleDelete}
               />

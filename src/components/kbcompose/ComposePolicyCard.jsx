@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Gavel, Copy, Trash2,
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import PolicyEditor from '@/components/kbcompose/PolicyEditor';
 
 function normalizeId(id) {
   return String(id || '').replace(/[.\-]/g, ':').toLowerCase();
@@ -141,6 +142,7 @@ function StatusBadge({ statusId, statesMap }) {
 
 export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, statesMap, onEdit, onCopy, onDelete }) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   return (
     <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
@@ -177,9 +179,8 @@ export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, 
             size="icon"
             variant="ghost"
             className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            title="Edit (coming soon)"
-            disabled
-            onClick={() => onEdit?.(policy)}
+            title="Edit policy"
+            onClick={() => setEditing(true)}
           >
             <Pencil className="w-3.5 h-3.5" />
           </Button>
@@ -210,6 +211,15 @@ export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, 
           <RuleSection icon={ShieldOff}  label="Prohibitions" color="text-destructive" items={policy.prohibitions} actionsMap={actionsMap} constraintsMap={constraintsMap} />
           <RuleSection icon={Gavel}      label="Duties"       color="text-yellow-400"  items={policy.duties}       actionsMap={actionsMap} constraintsMap={constraintsMap} />
         </div>
+      )}
+
+      {editing && (
+        <PolicyEditor
+          policy={policy}
+          actionsMap={actionsMap}
+          onSave={(updated) => onEdit?.(updated)}
+          onClose={() => setEditing(false)}
+        />
       )}
     </div>
   );
