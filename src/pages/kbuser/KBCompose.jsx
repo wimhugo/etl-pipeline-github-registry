@@ -50,20 +50,26 @@ function useComposeData() {
 
   const { data: actionsData } = useQuery({
     queryKey: ['kbActionsContent', rawBaseUrl, actionsFile],
-    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${actionsFile}`); if (!r.ok) throw new Error(); return r.json(); },
+    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${actionsFile}?_=${Date.now()}`); if (!r.ok) throw new Error(); return r.json(); },
     enabled: !!actionsFile && !!rawBaseUrl,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const { data: constraintsData } = useQuery({
     queryKey: ['kbConstraintsContent', rawBaseUrl, constraintsFile],
-    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${constraintsFile}`); if (!r.ok) throw new Error(); return r.json(); },
+    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${constraintsFile}?_=${Date.now()}`); if (!r.ok) throw new Error(); return r.json(); },
     enabled: !!constraintsFile && !!rawBaseUrl,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const { data: statesData } = useQuery({
     queryKey: ['kbStatesContent', rawBaseUrl, statesFile],
-    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${statesFile}`); if (!r.ok) throw new Error(); return r.json(); },
+    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${statesFile}?_=${Date.now()}`); if (!r.ok) throw new Error(); return r.json(); },
     enabled: !!statesFile && !!rawBaseUrl,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const remotePolicies = policyData?.policies || (Array.isArray(policyData) ? policyData : []);
@@ -75,7 +81,15 @@ function useComposeData() {
   const constraintsMap = Object.fromEntries(constraintsArray.map(c => [c.id, c]));
 
   const statesArray = Array.isArray(statesData) ? statesData : (statesData?.states || []);
-  const statesMap = Object.fromEntries(statesArray.map(s => [s.id, s]));
+  // Index by both full id and the last path/colon segment so prefixed values like "openrel:status/active" resolve correctly
+  const statesMap = statesArray.reduce((acc, s) => {
+    if (s.id) {
+      acc[s.id] = s;
+      const shortKey = s.id.split(/[:/]/).pop()?.toLowerCase();
+      if (shortKey && shortKey !== s.id) acc[shortKey] = s;
+    }
+    return acc;
+  }, {});
 
   return {
     remotePolicies,

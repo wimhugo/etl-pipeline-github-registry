@@ -109,13 +109,13 @@ const STATUS_COLORS = {
 
 function StatusBadge({ statusId, statesMap }) {
   if (!statusId) return null;
-  // Use fuzzy lookup so prefixed IDs like "openrel:status/active" match entries keyed by short id
-  const state = lookupInMap(statusId, statesMap) || { id: statusId, label: statusId };
+  // Look up by full id first, then by last path segment (handles "openrel:status/active" -> "active")
+  const shortKey = String(statusId).split(/[:/]/).pop()?.toLowerCase();
+  const state = statesMap?.[statusId] || statesMap?.[shortKey] || { id: statusId, label: shortKey || statusId };
   const label = state.label || state.id;
   const definition = state.definition || state.description || state.comment || '';
-  // Try to match color by the last segment of the id (e.g. "active" from "openrel:status/active")
-  const shortKey = (state.id || statusId).split(/[:/]/).pop()?.toLowerCase();
-  const colorClass = STATUS_COLORS[shortKey] || 'bg-muted text-muted-foreground border-border/40';
+  const colorKey = (state.id || '').split(/[:/]/).pop()?.toLowerCase() || shortKey;
+  const colorClass = STATUS_COLORS[colorKey] || 'bg-muted text-muted-foreground border-border/40';
   return (
     <span
       title={definition || undefined}
