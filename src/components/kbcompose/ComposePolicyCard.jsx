@@ -109,10 +109,13 @@ const STATUS_COLORS = {
 
 function StatusBadge({ statusId, statesMap }) {
   if (!statusId) return null;
-  const state = statesMap?.[statusId] || { id: statusId, label: statusId };
+  // Use fuzzy lookup so prefixed IDs like "openrel:status/active" match entries keyed by short id
+  const state = lookupInMap(statusId, statesMap) || { id: statusId, label: statusId };
   const label = state.label || state.id;
   const definition = state.definition || state.description || state.comment || '';
-  const colorClass = STATUS_COLORS[state.id] || STATUS_COLORS[statusId] || 'bg-muted text-muted-foreground border-border/40';
+  // Try to match color by the last segment of the id (e.g. "active" from "openrel:status/active")
+  const shortKey = (state.id || statusId).split(/[:/]/).pop()?.toLowerCase();
+  const colorClass = STATUS_COLORS[shortKey] || 'bg-muted text-muted-foreground border-border/40';
   return (
     <span
       title={definition || undefined}
@@ -139,17 +142,19 @@ export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, 
 
         {/* Title + id */}
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpanded(e => !e)}>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm text-foreground">{policy.label}</span>
-            {policy.odrl_type && (
-              <Badge className="text-[10px] px-1.5 py-0 bg-primary/15 text-primary border-primary/30 font-normal">
-                {policy.odrl_type}
-              </Badge>
-            )}
-            {policy.status && (
-              <StatusBadge statusId={policy.status} statesMap={statesMap} />
-            )}
-          </div>
+          <span className="font-medium text-sm text-foreground">{policy.label}</span>
+          {(policy.odrl_type || policy.status) && (
+            <div className="flex items-center gap-1.5 flex-wrap mt-1">
+              {policy.odrl_type && (
+                <Badge className="text-[10px] px-1.5 py-0 bg-primary/15 text-primary border-primary/30 font-normal">
+                  {policy.odrl_type}
+                </Badge>
+              )}
+              {policy.status && (
+                <StatusBadge statusId={policy.status} statesMap={statesMap} />
+              )}
+            </div>
+          )}
           <div className="font-mono text-[11px] text-muted-foreground mt-0.5 truncate">{policy.id}</div>
         </div>
 
