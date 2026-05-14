@@ -77,11 +77,17 @@ export default function KBPolicyList({ searchQuery = '', advancedFilters = {}, o
     onDataReady({ odrlTypes, statuses });
   }, [policies.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const matchFacet = (fieldValue, facet) => {
+    if (!facet?.values?.length) return true;
+    if (facet.logic === 'AND') return facet.values.every(v => v === fieldValue);
+    return facet.values.includes(fieldValue); // OR
+  };
+
   const filtered = policies.filter(p => {
     const q = searchQuery.toLowerCase();
     if (q && !(p.label || '').toLowerCase().includes(q) && !(p.id || '').toLowerCase().includes(q)) return false;
-    if (advancedFilters.odrl_type && p.odrl_type !== advancedFilters.odrl_type) return false;
-    if (advancedFilters.status && p.status !== advancedFilters.status) return false;
+    if (!matchFacet(p.odrl_type, advancedFilters.odrl_type)) return false;
+    if (!matchFacet(p.status, advancedFilters.status)) return false;
     return true;
   });
 

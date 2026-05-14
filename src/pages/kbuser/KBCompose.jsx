@@ -105,7 +105,7 @@ function useComposeData() {
 export default function KBCompose() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState({ odrl_type: '', status: '' });
+  const [filters, setFilters] = useState({});
   // Local overlay: deleted ids + cloned additions
   const [deletedIds, setDeletedIds] = useState(new Set());
   const [cloned, setCloned] = useState([]);
@@ -121,12 +121,18 @@ export default function KBCompose() {
   const odrlTypes = useMemo(() => [...new Set(remotePolicies.map(p => p.odrl_type).filter(Boolean))], [remotePolicies]);
   const statuses  = useMemo(() => [...new Set(remotePolicies.map(p => p.status).filter(Boolean))], [remotePolicies]);
 
+  const matchFacet = (fieldValue, facet) => {
+    if (!facet?.values?.length) return true;
+    if (facet.logic === 'AND') return facet.values.every(v => v === fieldValue);
+    return facet.values.includes(fieldValue);
+  };
+
   const filtered = useMemo(() => {
     return allPolicies.filter(p => {
       const q = searchQuery.toLowerCase();
       if (q && !(p.label || '').toLowerCase().includes(q) && !(p.id || '').toLowerCase().includes(q)) return false;
-      if (filters.odrl_type && p.odrl_type !== filters.odrl_type) return false;
-      if (filters.status && p.status !== filters.status) return false;
+      if (!matchFacet(p.odrl_type, filters.odrl_type)) return false;
+      if (!matchFacet(p.status, filters.status)) return false;
       return true;
     });
   }, [allPolicies, searchQuery, filters]);

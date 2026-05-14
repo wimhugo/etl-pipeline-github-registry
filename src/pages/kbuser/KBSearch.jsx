@@ -4,7 +4,7 @@ import PolicyFilterBar from '@/components/kbpolicy/PolicyFilterBar';
 
 export default function KBSearch() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState({ odrl_type: '', status: '' });
+  const [filters, setFilters] = useState({});
   const [filterOptions, setFilterOptions] = useState({ odrlTypes: [], statuses: [] });
 
   return (
