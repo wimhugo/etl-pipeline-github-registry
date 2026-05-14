@@ -33,6 +33,9 @@ function useComposeData() {
   const autoConstraintsFile = jsonFiles.find(f => f.name.toLowerCase().includes('constraint'))?.name || '';
   const constraintsFile = config.kb_sub_entity_files?.constraints || autoConstraintsFile;
 
+  const autoStatesFile = jsonFiles.find(f => f.name.toLowerCase().includes('state') || f.name.toLowerCase().includes('status'))?.name || '';
+  const statesFile = config.kb_sub_entity_files?.states || autoStatesFile;
+
   const { data: policyData, isLoading: policiesLoading, error: policiesError } = useQuery({
     queryKey: ['kbFileContent', rawBaseUrl, policyFile],
     queryFn: async () => {
@@ -57,6 +60,12 @@ function useComposeData() {
     enabled: !!constraintsFile && !!rawBaseUrl,
   });
 
+  const { data: statesData } = useQuery({
+    queryKey: ['kbStatesContent', rawBaseUrl, statesFile],
+    queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${statesFile}`); if (!r.ok) throw new Error(); return r.json(); },
+    enabled: !!statesFile && !!rawBaseUrl,
+  });
+
   const remotePolicies = policyData?.policies || (Array.isArray(policyData) ? policyData : []);
 
   const actionsArray = Array.isArray(actionsData) ? actionsData : (actionsData?.actions || []);
@@ -65,10 +74,14 @@ function useComposeData() {
   const constraintsArray = Array.isArray(constraintsData) ? constraintsData : (constraintsData?.constraints || []);
   const constraintsMap = Object.fromEntries(constraintsArray.map(c => [c.id, c]));
 
+  const statesArray = Array.isArray(statesData) ? statesData : (statesData?.states || []);
+  const statesMap = Object.fromEntries(statesArray.map(s => [s.id, s]));
+
   return {
     remotePolicies,
     actionsMap,
     constraintsMap,
+    statesMap,
     policiesLoading,
     policiesError,
     noConfig: !rawBaseUrl && globalConfigs.length > 0,
@@ -82,7 +95,7 @@ export default function KBCompose() {
   const [deletedIds, setDeletedIds] = useState(new Set());
   const [cloned, setCloned] = useState([]);
 
-  const { remotePolicies, actionsMap, constraintsMap, policiesLoading, policiesError, noConfig } = useComposeData();
+  const { remotePolicies, actionsMap, constraintsMap, statesMap, policiesLoading, policiesError, noConfig } = useComposeData();
 
   // Merge: remote (minus deleted) + clones
   const allPolicies = useMemo(() => {
@@ -172,6 +185,7 @@ export default function KBCompose() {
                 policy={policy}
                 actionsMap={actionsMap}
                 constraintsMap={constraintsMap}
+                statesMap={statesMap}
                 onCopy={handleCopy}
                 onDelete={handleDelete}
               />

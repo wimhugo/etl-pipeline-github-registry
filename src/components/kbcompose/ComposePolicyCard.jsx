@@ -98,7 +98,32 @@ function RuleSection({ icon: Icon, label, color, items, actionsMap, constraintsM
   );
 }
 
-export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, onEdit, onCopy, onDelete }) {
+const STATUS_COLORS = {
+  active:     'bg-accent/15 text-accent border-accent/30',
+  deprecated: 'bg-muted text-muted-foreground border-border/40',
+  pending:    'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
+  rejected:   'bg-destructive/15 text-destructive border-destructive/30',
+  amendment:  'bg-primary/15 text-primary border-primary/30',
+  draft:      'bg-secondary text-secondary-foreground border-border/40',
+};
+
+function StatusBadge({ statusId, statesMap }) {
+  if (!statusId) return null;
+  const state = statesMap?.[statusId] || { id: statusId, label: statusId };
+  const label = state.label || state.id;
+  const definition = state.definition || state.description || state.comment || '';
+  const colorClass = STATUS_COLORS[state.id] || STATUS_COLORS[statusId] || 'bg-muted text-muted-foreground border-border/40';
+  return (
+    <span
+      title={definition || undefined}
+      className={`inline-flex items-center rounded-full border text-[10px] px-2 py-0 font-normal cursor-default ${colorClass}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, statesMap, onEdit, onCopy, onDelete }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -120,6 +145,9 @@ export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, 
               <Badge className="text-[10px] px-1.5 py-0 bg-primary/15 text-primary border-primary/30 font-normal">
                 {policy.odrl_type}
               </Badge>
+            )}
+            {policy.status && (
+              <StatusBadge statusId={policy.status} statesMap={statesMap} />
             )}
           </div>
           <div className="font-mono text-[11px] text-muted-foreground mt-0.5 truncate">{policy.id}</div>
