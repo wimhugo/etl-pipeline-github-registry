@@ -109,8 +109,14 @@ export default function KBCompose() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({});
   // Local overlay: deleted ids + cloned additions
-  const [deletedIds, setDeletedIds] = useState(new Set());
-  const [cloned, setCloned] = useState([]);
+  const [deletedIds, setDeletedIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('kbcompose_deletedIds') || '[]')); }
+    catch { return new Set(); }
+  });
+  const [cloned, setCloned] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('kbcompose_drafts') || '[]'); }
+    catch { return []; }
+  });
 
   const { remotePolicies, actionsMap, constraintsMap, statesMap, policiesLoading, policiesError, noConfig, config, policyFile } = useComposeData();
 
@@ -141,14 +147,22 @@ export default function KBCompose() {
     });
   }, [allPolicies, searchQuery, filters]);
 
+  const persistCloned = (next) => {
+    localStorage.setItem('kbcompose_drafts', JSON.stringify(next));
+    setCloned(next);
+  };
+  const persistDeletedIds = (next) => {
+    localStorage.setItem('kbcompose_deletedIds', JSON.stringify([...next]));
+    setDeletedIds(next);
+  };
+
   const handleEdit = (updatedPolicy) => {
     const isClone = cloned.some(c => c.id === updatedPolicy.id);
     if (isClone) {
-      setCloned(prev => prev.map(c => c.id === updatedPolicy.id ? updatedPolicy : c));
+      persistCloned(cloned.map(c => c.id === updatedPolicy.id ? updatedPolicy : c));
     } else {
-      // Promote to cloned list so edits live locally without touching the remote
-      setDeletedIds(prev => new Set([...prev, updatedPolicy.id]));
-      setCloned(prev => [...prev, updatedPolicy]);
+      persistDeletedIds(new Set([...deletedIds, updatedPolicy.id]));
+      persistCloned([...cloned, updatedPolicy]);
     }
     toast({ title: 'Policy updated', description: `"${updatedPolicy.label}" saved as draft.` });
   };
@@ -156,7 +170,7 @@ export default function KBCompose() {
   const handleCopy = (policy) => {
     const newId = `${policy.id}-copy-${Date.now()}`;
     const copy = { ...policy, id: newId, label: `${policy.label} (copy)`, status: 'openrel:status/draft', derived_from: policy.id };
-    setCloned(prev => [...prev, copy]);
+    persistCloned([...cloned, copy]);
     toast({ title: 'Policy copied', description: `Created "${copy.label}"` });
   };
 
@@ -189,9 +203,9 @@ export default function KBCompose() {
     // If it's a clone, remove from cloned list; otherwise mark as deleted
     const isClone = cloned.some(c => c.id === policy.id);
     if (isClone) {
-      setCloned(prev => prev.filter(c => c.id !== policy.id));
+      persistCloned(cloned.filter(c => c.id !== policy.id));
     } else {
-      setDeletedIds(prev => new Set([...prev, policy.id]));
+      persistDeletedIds(new Set([...deletedIds, policy.id]));
     }
     toast({ title: 'Policy removed', description: `"${policy.label}" removed from this view.` });
   };
