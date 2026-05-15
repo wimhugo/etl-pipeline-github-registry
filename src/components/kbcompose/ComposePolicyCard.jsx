@@ -88,9 +88,11 @@ function RuleSection({ icon: Icon, label, color, items, actionsMap, constraintsM
             <span className="text-muted-foreground text-[10px] uppercase tracking-wider">action</span>
             <ActionDetail actionId={item.action} actionsMap={actionsMap} />
             {item.constraint && (
-              <div className="pl-1 mt-1 space-y-1">
+              <div className="pl-4 mt-2 border-l-2 border-border/40 space-y-1.5">
                 <span className="text-muted-foreground text-[10px] uppercase tracking-wider">constraint</span>
-                <ConstraintDetail constraint={item.constraint} constraintsMap={constraintsMap} />
+                {(Array.isArray(item.constraint) ? item.constraint : [item.constraint]).map((c, ci) => (
+                  <ConstraintDetail key={ci} constraint={c} constraintsMap={constraintsMap} />
+                ))}
               </div>
             )}
           </div>
