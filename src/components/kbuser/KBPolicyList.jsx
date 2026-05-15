@@ -80,6 +80,7 @@ export default function KBPolicyList({ searchQuery = '', advancedFilters = {}, o
   const statesMap = Object.fromEntries(statesArray.map(s => [s.id, s]));
 
   const policies = fileData?.policies || (Array.isArray(fileData) ? fileData : []);
+  const policiesMap = Object.fromEntries(policies.map(p => [p.id, p]));
 
   // Derive distinct filter values from data and notify parent
   useEffect(() => {
@@ -138,7 +139,7 @@ export default function KBPolicyList({ searchQuery = '', advancedFilters = {}, o
   return (
     <div className="space-y-2">
       {filtered.map(policy => (
-        <PolicyCard key={policy.id} policy={policy} actionsMap={actionsMap} constraintsMap={constraintsMap} statesMap={statesMap} />
+        <PolicyCard key={policy.id} policy={policy} actionsMap={actionsMap} constraintsMap={constraintsMap} statesMap={statesMap} policiesMap={policiesMap} />
       ))}
       <p className="text-xs text-muted-foreground text-right pt-1">
         {filtered.length} of {policies.length} policies

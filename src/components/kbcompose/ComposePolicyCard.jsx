@@ -142,7 +142,19 @@ function StatusBadge({ statusId, statesMap }) {
   );
 }
 
-export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, statesMap, onEdit, onCopy, onDelete }) {
+function DerivedFrom({ derivedFromId, policiesMap }) {
+  if (!derivedFromId) return null;
+  const source = policiesMap?.[derivedFromId];
+  const label = source?.label || derivedFromId;
+  return (
+    <div className="mt-3 flex items-center gap-2 text-xs">
+      <span className="text-muted-foreground uppercase tracking-wider text-[10px] font-semibold shrink-0">Derived from</span>
+      <span className="font-medium text-foreground">{label}</span>
+    </div>
+  );
+}
+
+export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, statesMap, policiesMap, onEdit, onCopy, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
 
@@ -209,6 +221,7 @@ export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, 
 
       {expanded && (
         <div className="px-4 pb-4 pt-1 border-t border-border/40 bg-muted/10">
+          <DerivedFrom derivedFromId={policy.derived_from} policiesMap={policiesMap} />
           <RuleSection icon={ShieldCheck} label="Permissions"  color="text-accent"      items={policy.permissions}  actionsMap={actionsMap} constraintsMap={constraintsMap} />
           <RuleSection icon={ShieldOff}  label="Prohibitions" color="text-destructive" items={policy.prohibitions} actionsMap={actionsMap} constraintsMap={constraintsMap} />
           <RuleSection icon={Gavel}      label="Duties"       color="text-yellow-400"  items={policy.duties}       actionsMap={actionsMap} constraintsMap={constraintsMap} />

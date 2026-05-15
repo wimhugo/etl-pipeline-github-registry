@@ -118,6 +118,8 @@ export default function KBCompose() {
     return [...base, ...cloned];
   }, [remotePolicies, deletedIds, cloned]);
 
+  const policiesMap = useMemo(() => Object.fromEntries(allPolicies.map(p => [p.id, p])), [allPolicies]);
+
   const odrlTypes = useMemo(() => [...new Set(allPolicies.map(p => p.odrl_type).filter(Boolean))], [allPolicies]);
   const statuses  = useMemo(() => [...new Set(allPolicies.map(p => p.status).filter(Boolean))], [allPolicies]);
 
@@ -223,6 +225,7 @@ export default function KBCompose() {
                 actionsMap={actionsMap}
                 constraintsMap={constraintsMap}
                 statesMap={statesMap}
+                policiesMap={policiesMap}
                 onEdit={handleEdit}
                 onCopy={handleCopy}
                 onDelete={handleDelete}
