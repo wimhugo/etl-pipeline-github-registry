@@ -99,6 +99,8 @@ function useComposeData() {
     policiesLoading,
     policiesError,
     noConfig: !rawBaseUrl && globalConfigs.length > 0,
+    config,
+    policyFile,
   };
 }
 
@@ -110,7 +112,7 @@ export default function KBCompose() {
   const [deletedIds, setDeletedIds] = useState(new Set());
   const [cloned, setCloned] = useState([]);
 
-  const { remotePolicies, actionsMap, constraintsMap, statesMap, policiesLoading, policiesError, noConfig } = useComposeData();
+  const { remotePolicies, actionsMap, constraintsMap, statesMap, policiesLoading, policiesError, noConfig, config, policyFile } = useComposeData();
 
   // Merge: remote (minus deleted) + clones
   const allPolicies = useMemo(() => {
@@ -156,6 +158,31 @@ export default function KBCompose() {
     const copy = { ...policy, id: newId, label: `${policy.label} (copy)`, status: 'openrel:status/draft', derived_from: policy.id };
     setCloned(prev => [...prev, copy]);
     toast({ title: 'Policy copied', description: `Created "${copy.label}"` });
+  };
+
+  const handleSubmitPR = async (policy) => {
+    const repo = config.github_repo;
+    const branch = config.github_branch || 'main';
+    if (!repo || !policyFile) {
+      toast({ title: 'Configuration missing', description: 'GitHub repo or policy file not configured.', variant: 'destructive' });
+      return;
+    }
+    const filePath = `${(config.github_output_folder || 'data').replace(/\/$/, '')}/${policyFile}`;
+    const res = await base44.functions.invoke('submitPolicyPR', { policy, repo, branch, filePath });
+    if (res.data?.success) {
+      // Update local status to pending
+      handleEdit({ ...policy, status: 'openrel:status/pending' });
+      toast({
+        title: 'Pull request created',
+        description: (
+          <a href={res.data.pr_url} target="_blank" rel="noopener noreferrer" className="underline text-primary">
+            View PR #{res.data.pr_number}
+          </a>
+        ),
+      });
+    } else {
+      toast({ title: 'PR failed', description: res.data?.error || 'Unknown error', variant: 'destructive' });
+    }
   };
 
   const handleDelete = (policy) => {
@@ -229,6 +256,7 @@ export default function KBCompose() {
                 onEdit={handleEdit}
                 onCopy={handleCopy}
                 onDelete={handleDelete}
+                onSubmitPR={handleSubmitPR}
               />
             ))}
             {filtered.length === 0 && (

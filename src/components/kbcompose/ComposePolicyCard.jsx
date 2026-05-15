@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Gavel, Copy, Trash2, Pencil, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Gavel, Copy, Trash2, Pencil, ExternalLink, GitPullRequest, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -154,9 +154,12 @@ function DerivedFrom({ derivedFromId, policiesMap }) {
   );
 }
 
-export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, statesMap, policiesMap, onEdit, onCopy, onDelete }) {
+export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, statesMap, policiesMap, onEdit, onCopy, onDelete, onSubmitPR }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const isDraft = String(policy.status || '').split(/[:/]/).pop()?.toLowerCase() === 'draft';
 
   return (
     <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
@@ -189,6 +192,23 @@ export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, 
 
         {/* Action buttons */}
         <div className="flex items-center gap-1 shrink-0">
+          {isDraft && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-[11px] gap-1 border-primary/40 text-primary hover:bg-primary/10"
+              title="Submit as pull request"
+              disabled={submitting}
+              onClick={async () => {
+                setSubmitting(true);
+                await onSubmitPR?.(policy);
+                setSubmitting(false);
+              }}
+            >
+              {submitting ? <Loader2 className="w-3 h-3 animate-spin" /> : <GitPullRequest className="w-3 h-3" />}
+              Submit PR
+            </Button>
+          )}
           <Button
             size="icon"
             variant="ghost"
