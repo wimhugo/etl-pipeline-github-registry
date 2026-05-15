@@ -111,7 +111,6 @@ function ActionEditor({ item, idx, actionsMap, constraintsMap, onItemChange, onD
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0 space-y-1.5">
           <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Action</span>
-          <ActionChip actionId={item.action} actionsMap={actionsMap} />
           <Select value={item.action || ''} onValueChange={handleActionChange}>
             <SelectTrigger className="h-7 text-xs bg-muted/30 border-border/50">
               <SelectValue placeholder="Select action…" />
