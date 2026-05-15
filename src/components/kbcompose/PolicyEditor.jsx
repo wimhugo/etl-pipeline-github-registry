@@ -6,10 +6,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
- * PolicyEditor dialog – edit/add/delete actions in each rule section of a policy.
+ * PolicyEditor dialog – edit/add/delete actions and their constraints per rule section.
  * Props:
- *   policy      – the policy object to edit
- *   actionsMap  – { [id]: action }
+ *   policy         – the policy object to edit
+ *   actionsMap     – { [id]: action }
+ *   constraintsMap – { [id]: constraint }
  *   onSave(updatedPolicy) – called with the modified policy (status forced to draft)
  *   onClose()
  */
@@ -49,12 +50,143 @@ function ActionChip({ actionId, actionsMap }) {
   );
 }
 
-function RuleSectionEditor({ sectionKey, label, icon: Icon, color, items, actionsMap, onChange }) {
+function ConstraintRow({ constraintId, constraintsMap, onRemove }) {
+  const c = lookupInMap(constraintId, constraintsMap);
+  const label = c?.label || constraintId;
+  const id = c?.id || constraintId;
+  return (
+    <div className="flex items-center gap-2 rounded border border-border/40 bg-muted/20 px-2 py-1.5">
+      <div className="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap">
+        <span className="text-xs text-foreground">{label}</span>
+        <span className="font-mono text-[10px] rounded-full border border-primary/40 bg-primary/10 text-primary px-1.5 py-0 truncate">
+          {id}
+        </span>
+      </div>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-5 w-5 shrink-0 text-muted-foreground hover:text-destructive"
+        onClick={onRemove}
+        title="Remove constraint"
+      >
+        <Trash2 className="w-3 h-3" />
+      </Button>
+    </div>
+  );
+}
+
+function ActionEditor({ item, idx, actionsMap, constraintsMap, onItemChange, onDelete }) {
+  const actionIds = Object.keys(actionsMap);
+  const constraintIds = Object.keys(constraintsMap);
+
+  // Normalise: constraint can be a single object {id,…} or an array of such
+  const existingConstraints = item.constraint
+    ? (Array.isArray(item.constraint) ? item.constraint : [item.constraint])
+    : [];
+
+  const handleActionChange = (newActionId) => {
+    onItemChange(idx, { ...item, action: newActionId });
+  };
+
+  const handleAddConstraint = (cid) => {
+    if (!cid) return;
+    const already = existingConstraints.some(c => c.id === cid);
+    if (already) return;
+    const newList = [...existingConstraints, { id: cid }];
+    onItemChange(idx, { ...item, constraint: newList.length === 1 ? newList[0] : newList });
+  };
+
+  const handleRemoveConstraint = (cid) => {
+    const newList = existingConstraints.filter(c => c.id !== cid);
+    const next = newList.length === 0 ? undefined : newList.length === 1 ? newList[0] : newList;
+    const updated = { ...item };
+    if (next === undefined) delete updated.constraint;
+    else updated.constraint = next;
+    onItemChange(idx, updated);
+  };
+
+  return (
+    <div className="rounded-md border border-border/40 bg-muted/20 px-2.5 py-2 space-y-2">
+      {/* Action row */}
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Action</span>
+          <ActionChip actionId={item.action} actionsMap={actionsMap} />
+          <Select value={item.action || ''} onValueChange={handleActionChange}>
+            <SelectTrigger className="h-7 text-xs bg-muted/30 border-border/50">
+              <SelectValue placeholder="Select action…" />
+            </SelectTrigger>
+            <SelectContent className="max-h-60">
+              {actionIds.map(aid => {
+                const a = actionsMap[aid];
+                return (
+                  <SelectItem key={aid} value={aid} className="text-xs">
+                    {a?.label || aid}
+                    {a?.id && <span className="ml-1.5 text-muted-foreground font-mono text-[10px]">({a.id})</span>}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive mt-5"
+          title="Remove action"
+          onClick={() => onDelete(idx)}
+        >
+          <Trash2 className="w-3 h-3" />
+        </Button>
+      </div>
+
+      {/* Constraints sub-section */}
+      <div className="pl-3 border-l-2 border-border/40 space-y-1.5">
+        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Constraints</span>
+        {existingConstraints.length === 0 && (
+          <p className="text-[11px] text-muted-foreground italic">No constraints.</p>
+        )}
+        {existingConstraints.map((c, ci) => (
+          <ConstraintRow
+            key={ci}
+            constraintId={c.id}
+            constraintsMap={constraintsMap}
+            onRemove={() => handleRemoveConstraint(c.id)}
+          />
+        ))}
+        {/* Add constraint selector */}
+        {constraintIds.length > 0 && (
+          <Select value="" onValueChange={handleAddConstraint}>
+            <SelectTrigger className="h-7 text-xs bg-muted/30 border-border/50 border-dashed">
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <Plus className="w-3 h-3" /> Add constraint…
+              </span>
+            </SelectTrigger>
+            <SelectContent className="max-h-60">
+              {constraintIds
+                .filter(cid => !existingConstraints.some(c => c.id === cid))
+                .map(cid => {
+                  const c = constraintsMap[cid];
+                  return (
+                    <SelectItem key={cid} value={cid} className="text-xs">
+                      {c?.label || cid}
+                      {c?.id && <span className="ml-1.5 text-muted-foreground font-mono text-[10px]">({c.id})</span>}
+                    </SelectItem>
+                  );
+                })}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RuleSectionEditor({ sectionKey, label, icon: Icon, color, items, actionsMap, constraintsMap, onChange }) {
   const actionIds = Object.keys(actionsMap);
 
-  const handleActionChange = (idx, newActionId) => {
-    const next = items.map((item, i) => i === idx ? { ...item, action: newActionId } : item);
-    onChange(sectionKey, next);
+  const handleItemChange = (idx, updatedItem) => {
+    onChange(sectionKey, items.map((it, i) => i === idx ? updatedItem : it));
   };
 
   const handleDelete = (idx) => {
@@ -77,38 +209,15 @@ function RuleSectionEditor({ sectionKey, label, icon: Icon, color, items, action
           <p className="text-[11px] text-muted-foreground italic">No {label.toLowerCase()} defined.</p>
         )}
         {items.map((item, idx) => (
-          <div key={idx} className="flex items-start gap-2 rounded-md border border-border/40 bg-muted/20 px-2.5 py-2">
-            <div className="flex-1 min-w-0 space-y-1.5">
-              {/* Current action display */}
-              <ActionChip actionId={item.action} actionsMap={actionsMap} />
-              {/* Action selector */}
-              <Select value={item.action || ''} onValueChange={(v) => handleActionChange(idx, v)}>
-                <SelectTrigger className="h-7 text-xs bg-muted/30 border-border/50">
-                  <SelectValue placeholder="Select action…" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {actionIds.map(aid => {
-                    const a = actionsMap[aid];
-                    return (
-                      <SelectItem key={aid} value={aid} className="text-xs">
-                        {a?.label || aid}
-                        {a?.id && <span className="ml-1.5 text-muted-foreground font-mono text-[10px]">({a.id})</span>}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive mt-0.5"
-              title="Remove action"
-              onClick={() => handleDelete(idx)}
-            >
-              <Trash2 className="w-3 h-3" />
-            </Button>
-          </div>
+          <ActionEditor
+            key={idx}
+            item={item}
+            idx={idx}
+            actionsMap={actionsMap}
+            constraintsMap={constraintsMap}
+            onItemChange={handleItemChange}
+            onDelete={handleDelete}
+          />
         ))}
       </div>
 
@@ -125,7 +234,7 @@ function RuleSectionEditor({ sectionKey, label, icon: Icon, color, items, action
   );
 }
 
-export default function PolicyEditor({ policy, actionsMap, onSave, onClose }) {
+export default function PolicyEditor({ policy, actionsMap, constraintsMap, onSave, onClose }) {
   const [draft, setDraft] = useState(() => ({
     ...policy,
     permissions:  [...(policy.permissions  || [])],
@@ -165,6 +274,7 @@ export default function PolicyEditor({ policy, actionsMap, onSave, onClose }) {
               color={color}
               items={draft[key] || []}
               actionsMap={actionsMap}
+              constraintsMap={constraintsMap}
               onChange={handleSectionChange}
             />
           ))}

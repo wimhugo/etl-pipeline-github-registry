@@ -219,6 +219,7 @@ export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, 
         <PolicyEditor
           policy={policy}
           actionsMap={actionsMap}
+          constraintsMap={constraintsMap}
           onSave={(updated) => onEdit?.(updated)}
           onClose={() => setEditing(false)}
         />
