@@ -261,15 +261,15 @@ export default function ObjectAnalysis() {
                 {analysisResult.hasActions && (
                   <div className="ml-6 space-y-1">
                     {analysisResult.detectedPatterns
-                      .filter(p => p.includes('Configured Action:') || p.includes('Action/Permission'))
+                      .filter(p => p.includes('Configured Action:') || p.includes('Potential Action:'))
                       .map((pattern, idx) => (
                         <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
                           <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
                           <span className="font-mono">{pattern}</span>
                         </div>
                       ))}
-                    {analysisResult.detectedPatterns.filter(p => p.includes('Configured Action:') || p.includes('Action/Permission')).length === 0 && (
-                      <p className="text-xs text-muted-foreground italic">Generic action patterns detected (no configured actions matched)</p>
+                    {analysisResult.detectedPatterns.filter(p => p.includes('Configured Action:') || p.includes('Potential Action:')).length === 0 && (
+                      <p className="text-xs text-muted-foreground italic">Generic action language detected</p>
                     )}
                   </div>
                 )}
@@ -289,15 +289,15 @@ export default function ObjectAnalysis() {
                 {analysisResult.hasConstraints && (
                   <div className="ml-6 space-y-1">
                     {analysisResult.detectedPatterns
-                      .filter(p => p.includes('Configured Constraint:') || p.includes('Constraint patterns'))
+                      .filter(p => p.includes('Configured Constraint:') || p.includes('Potential Constraint:'))
                       .map((pattern, idx) => (
                         <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
                           <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
                           <span className="font-mono">{pattern}</span>
                         </div>
                       ))}
-                    {analysisResult.detectedPatterns.filter(p => p.includes('Configured Constraint:') || p.includes('Constraint patterns')).length === 0 && (
-                      <p className="text-xs text-muted-foreground italic">Generic constraint patterns detected (no configured constraints matched)</p>
+                    {analysisResult.detectedPatterns.filter(p => p.includes('Configured Constraint:') || p.includes('Potential Constraint:')).length === 0 && (
+                      <p className="text-xs text-muted-foreground italic">Generic constraint language detected</p>
                     )}
                   </div>
                 )}

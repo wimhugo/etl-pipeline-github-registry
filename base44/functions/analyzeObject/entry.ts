@@ -171,10 +171,26 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Check for generic action patterns if no configured actions found
+    // Extract potential action terms from content even if not in configured list
+    const actionKeywords = ['action', 'permission', 'prohibition', 'duty', 'obligation', 'reproduce', 'copy', 'distribute', 'share', 'display', 'perform', 'modify', 'adapt', 'translate', 'extract', 'reuse', 'sell', 'rent', 'lend', 'broadcast', 'communicate', 'make available'];
+    const foundActionTerms = [];
+    actionKeywords.forEach(keyword => {
+      if (contentLower.includes(keyword.toLowerCase()) && !actionTerms.some(t => t.toLowerCase() === keyword)) {
+        foundActionTerms.push(keyword);
+      }
+    });
+    
+    if (foundActionTerms.length > 0) {
+      analysis.hasActions = true;
+      foundActionTerms.forEach(term => {
+        analysis.detectedPatterns.push(`Potential Action: ${term}`);
+      });
+    }
+
+    // Fallback: generic action pattern mention
     if (!analysis.hasActions && (contentLower.includes('action') || contentLower.includes('permission') || contentLower.includes('prohibition'))) {
       analysis.hasActions = true;
-      analysis.detectedPatterns.push('Action/Permission patterns detected');
+      analysis.detectedPatterns.push('Generic action language detected');
     }
 
     // Check for configured Constraint terms
@@ -185,10 +201,26 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Check for generic constraint patterns if no configured constraints found
+    // Extract potential constraint terms from content even if not in configured list
+    const constraintKeywords = ['constraint', 'limit', 'restriction', 'expires', 'expire', 'duration', 'scope', 'territory', 'language', 'medium', 'purpose', 'educational', 'commercial', 'non-commercial', 'attribution', 'credit', 'notice'];
+    const foundConstraintTerms = [];
+    constraintKeywords.forEach(keyword => {
+      if (contentLower.includes(keyword.toLowerCase()) && !constraintTerms.some(t => t.toLowerCase() === keyword)) {
+        foundConstraintTerms.push(keyword);
+      }
+    });
+    
+    if (foundConstraintTerms.length > 0) {
+      analysis.hasConstraints = true;
+      foundConstraintTerms.forEach(term => {
+        analysis.detectedPatterns.push(`Potential Constraint: ${term}`);
+      });
+    }
+
+    // Fallback: generic constraint pattern mention
     if (!analysis.hasConstraints && (contentLower.includes('constraint') || contentLower.includes('limit') || contentLower.includes('restriction'))) {
       analysis.hasConstraints = true;
-      analysis.detectedPatterns.push('Constraint patterns detected');
+      analysis.detectedPatterns.push('Generic constraint language detected');
     }
 
     // Generate summary
