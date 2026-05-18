@@ -15,29 +15,53 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'PID is required' }, { status: 400 });
         }
 
-        const url = `https://api.pidmr.argo.grnet.gr/v1/metaresolvers/resolve?pid=${encodeURIComponent(pid)}&pidmode=metadata&format=json`;
+        // First, resolve the PID to get the target URL
+        const resolveUrl = `https://api.pidmr.argo.grnet.gr/v1/metaresolvers/resolve?pid=${encodeURIComponent(pid)}&pidmode=metadata&format=json`;
         
-        const response = await fetch(url, {
+        const resolveResponse = await fetch(resolveUrl, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
             },
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
+        if (!resolveResponse.ok) {
+            const errorText = await resolveResponse.text();
             return Response.json({ 
                 error: 'Failed to resolve PID', 
-                details: errorText || response.statusText 
-            }, { status: response.status });
+                details: errorText || resolveResponse.statusText 
+            }, { status: resolveResponse.status });
         }
 
-        const data = await response.json();
+        const resolveData = await resolveResponse.json();
+        const targetUrl = resolveData.url || resolveData.redirectUrl;
+        
+        // Fetch the actual metadata from DataCite API
+        const metadataUrl = `https://api.datacite.org/dois/${pid}`;
+        const metadataResponse = await fetch(metadataUrl, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+            },
+        });
+
+        if (!metadataResponse.ok) {
+            const errorText = await metadataResponse.text();
+            return Response.json({ 
+                error: 'Failed to fetch metadata', 
+                details: errorText || metadataResponse.statusText 
+            }, { status: metadataResponse.status });
+        }
+
+        const metadataData = await metadataResponse.json();
+        
+        // DataCite returns metadata in data.attributes
+        const fullMetadata = metadataData.data?.attributes || metadataData.attributes || metadataData;
         
         return Response.json({ 
-            redirectURL: data.url,
-            pid: data.pid,
-            metadata: data
+            redirectURL: targetUrl,
+            pid: pid,
+            metadata: fullMetadata
         });
     } catch (error) {
         return Response.json({ error: error.message }, { status: 500 });
