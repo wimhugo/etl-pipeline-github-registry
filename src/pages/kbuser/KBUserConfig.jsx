@@ -239,20 +239,10 @@ export default function KBUserConfig() {
             Configure the data repository and file assignments for KB Search.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleSave} disabled={saveMutation.isPending} className="gap-1.5">
-            <Save className="w-4 h-4" />
-            {saveMutation.isPending ? 'Saving…' : 'Save'}
-          </Button>
-          <Button 
-            onClick={() => form.badge_mappings && prMutation.mutate({ badge_mapping_file: form.badge_mapping_file, badge_mappings: form.badge_mappings })} 
-            disabled={!form.badge_mapping_file || prMutation.isPending || !form.badge_mappings?.length} 
-            className="gap-1.5"
-          >
-            <Loader2 className={cn("w-4 h-4", prMutation.isPending && "animate-spin")} />
-            {prMutation.isPending ? 'Creating PR…' : 'Submit to GitHub'}
-          </Button>
-        </div>
+        <Button variant="outline" onClick={handleSave} disabled={saveMutation.isPending} className="gap-1.5">
+          <Save className="w-4 h-4" />
+          {saveMutation.isPending ? 'Saving…' : 'Save'}
+        </Button>
       </div>
 
       {/* Repository root path */}
@@ -380,7 +370,18 @@ export default function KBUserConfig() {
             Map user profile verification statuses to context badge labels, standardise badge colours, and indicate which constraint keys apply to each badge.
           </p>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Badge Mapping File Path</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Badge Mapping File Path</Label>
+              <Button 
+                onClick={() => form.badge_mappings && prMutation.mutate({ badge_mapping_file: form.badge_mapping_file, badge_mappings: form.badge_mappings })} 
+                disabled={!form.badge_mapping_file || prMutation.isPending || !form.badge_mappings?.length} 
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+              >
+                <Loader2 className={cn("w-3 h-3", prMutation.isPending && "animate-spin")} />
+                {prMutation.isPending ? 'Creating PR…' : 'Submit to GitHub'}
+              </Button>
+            </div>
             <Input
               className="bg-muted/50 text-sm font-mono"
               placeholder="e.g., .openrel/config/badge-mappings.json"
