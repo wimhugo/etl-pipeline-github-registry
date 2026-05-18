@@ -173,8 +173,13 @@ export default function BadgeMappingTable({
     setLoadError(null);
     
     try {
-      const url = 'https://raw.githubusercontent.com/wimhugo/openrel/main/.configs/badge_mapping.yaml';
-      const response = await fetch(url);
+      const url = `https://raw.githubusercontent.com/wimhugo/openrel/main/.configs/badge_mapping.yaml?t=${Date.now()}`;
+      const response = await fetch(url, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        }
+      });
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
       }
