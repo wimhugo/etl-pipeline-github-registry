@@ -35,7 +35,7 @@ export default function ObjectAnalysis() {
   useEffect(() => {
     const fetchOpenrelActions = async () => {
       try {
-        const configs = await base44.asServiceRole.entities.GlobalConfig.filter({});
+        const configs = await base44.entities.GlobalConfig.list();
         if (configs && configs.length > 0) {
           const config = configs[0];
           const subEntityFiles = config.kb_sub_entity_files || {};
