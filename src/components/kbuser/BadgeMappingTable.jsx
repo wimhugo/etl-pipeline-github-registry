@@ -150,15 +150,23 @@ export default function BadgeMappingTable({
 }) {
   const [editIdx, setEditIdx] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [sections, setSections] = useState(() => {
-    // Initialize from rows prop if it's an array of sections, otherwise default to User section
-    if (Array.isArray(rows) && rows.length > 0 && rows[0]?.name !== undefined) {
-      return rows;
-    }
-    return [{ name: 'User', rows: Array.isArray(rows) ? rows : [] }];
-  });
+  const [sections, setSections] = useState([]);
   const [loadingFromGithub, setLoadingFromGithub] = useState(false);
   const [loadError, setLoadError] = useState(null);
+  
+  // Initialize sections from rows prop whenever it changes
+  useEffect(() => {
+    if (Array.isArray(rows) && rows.length > 0 && rows[0]?.name !== undefined) {
+      // It's already sections data
+      setSections(rows);
+    } else if (Array.isArray(rows)) {
+      // It's legacy flat rows data - wrap in User section
+      setSections([{ name: 'User', rows }]);
+    } else {
+      // Empty - default to User section
+      setSections([{ name: 'User', rows: [] }]);
+    }
+  }, [rows]);
 
   const loadFromGithub = async () => {
     setLoadingFromGithub(true);
@@ -200,6 +208,7 @@ export default function BadgeMappingTable({
     setSections(updated);
     // Notify parent of all sections changes
     if (onChange) {
+      console.log('🔄 BadgeMappingTable onChange (updateSectionRows):', updated);
       onChange(updated);
     }
   };
@@ -209,6 +218,7 @@ export default function BadgeMappingTable({
     const updated = [...sections, newSection];
     setSections(updated);
     if (onChange) {
+      console.log('🔄 BadgeMappingTable onChange (addSection):', updated);
       onChange(updated);
     }
   };
@@ -217,6 +227,7 @@ export default function BadgeMappingTable({
     const updated = sections.map((s, i) => i === sectionIdx ? { ...s, name: newName } : s);
     setSections(updated);
     if (onChange) {
+      console.log('🔄 BadgeMappingTable onChange (updateSectionName):', updated);
       onChange(updated);
     }
   };
@@ -225,6 +236,7 @@ export default function BadgeMappingTable({
     const updated = sections.filter((_, i) => i !== sectionIdx);
     setSections(updated);
     if (onChange) {
+      console.log('🔄 BadgeMappingTable onChange (removeSection):', updated);
       onChange(updated);
     }
   };

@@ -60,6 +60,8 @@ export default function KBUserConfig() {
 
   useEffect(() => {
     if (globalConfig) {
+      console.log('📥 Loading GlobalConfig:', globalConfig);
+      console.log('📊 badge_mappings from DB:', globalConfig.badge_mappings);
       setForm({ ...globalConfig });
       setFolderUrl(reconstructBrowserUrl(globalConfig.kb_search_data_api_url));
     }
@@ -216,6 +218,8 @@ export default function KBUserConfig() {
       github_repo: folderUrl.match(/github\.com\/([^/]+)\/([^/]+)\//)?.slice(1, 3).join('/'),
       github_branch: folderUrl.match(/\/tree\/([^/]+)\//)?.[1] || 'main',
     } : {};
+    
+    console.log('💾 Saving badge_mappings:', form.badge_mappings);
     
     saveMutation.mutate({
       ...form,
