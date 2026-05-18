@@ -8,7 +8,24 @@ Deno.serve(async (req) => {
   const body = await req.json();
   const { action, repo, branch = 'main', path, content, message, sha, github_token } = body;
 
-  const token = github_token || Deno.env.get('GITHUB_TOKEN');
+  // Try to get token from request first, then from GlobalConfig, then from env
+  let token = github_token;
+  if (!token) {
+    try {
+      const base44Config = createClientFromRequest(req);
+      const configs = await base44Config.entities.GlobalConfig.filter({});
+      if (configs && configs.length > 0 && configs[0].github_token) {
+        token = configs[0].github_token;
+        console.log('✅ Using GitHub token from GlobalConfig');
+      }
+    } catch (e) {
+      console.log('⚠️ Could not fetch GlobalConfig:', e.message);
+    }
+  }
+  if (!token) {
+    token = Deno.env.get('GITHUB_TOKEN');
+    console.log('ℹ️ Using GitHub token from environment variable');
+  }
   if (!token) return Response.json({ error: 'No GitHub token configured' }, { status: 400 });
 
   const headers = {
