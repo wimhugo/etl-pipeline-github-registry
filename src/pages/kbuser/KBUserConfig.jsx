@@ -62,7 +62,14 @@ export default function KBUserConfig() {
     if (globalConfig) {
       console.log('📥 Loading GlobalConfig:', globalConfig);
       console.log('📊 badge_mappings from DB:', globalConfig.badge_mappings);
-      setForm({ ...globalConfig });
+      // Extract repo/branch from kb_search_data_api_url if github_repo not set
+      let repo = globalConfig.github_repo;
+      let branch = globalConfig.github_branch || 'main';
+      if (!repo && globalConfig.kb_search_data_api_url) {
+        const match = globalConfig.kb_search_data_api_url.match(/api\.github\.com\/repos\/([^/]+\/[^/]+)\//);
+        if (match) repo = match[1];
+      }
+      setForm({ ...globalConfig, github_repo: repo, github_branch: branch });
       setFolderUrl(reconstructBrowserUrl(globalConfig.kb_search_data_api_url));
     }
   }, [globalConfig?.id]);

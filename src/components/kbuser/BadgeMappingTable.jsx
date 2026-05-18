@@ -175,9 +175,14 @@ export default function BadgeMappingTable({
     setLoadError(null);
     
     try {
-      // Use mappingFile prop if available, otherwise default
-      const filePath = mappingFile || '.configs/badge_mapping.yaml';
-      const url = `https://raw.githubusercontent.com/${githubRepo || 'wimhugo/openrel'}/${githubBranch || 'main'}/${filePath}?t=${Date.now()}`;
+      if (!mappingFile) {
+        throw new Error('Badge Mapping File Path not configured. Please set it above.');
+      }
+      if (!githubRepo) {
+        throw new Error('GitHub repository not configured. Please set the GitHub Folder URL above.');
+      }
+      
+      const url = `https://raw.githubusercontent.com/${githubRepo}/${githubBranch}/${mappingFile}?t=${Date.now()}`;
       
       console.log('📥 Loading badge mapping from:', url);
       const response = await fetch(url, {
@@ -198,7 +203,6 @@ export default function BadgeMappingTable({
       
       if (parsedSections.length > 0) {
         setSections(parsedSections);
-        // Notify parent of all sections
         if (onChange) {
           onChange(parsedSections);
         }
