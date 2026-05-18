@@ -61,21 +61,31 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
   });
   const globalConfig = globalConfigs[0];
 
-  // Convert badge_mappings array to the expected format
-  const parsedData = globalConfig?.badge_mappings
-    ? {
-        sections: [
-          {
-            context: 'Intended Use',
-            items: globalConfig.badge_mappings
-              .filter(m => m.profileBadge && !m.profileBadge.toLowerCase().includes('verified'))
-              .map(m => ({
-                name: m.profileBadge,
-                profileBadges: [m.profileBadge]
-              }))
-          }
-        ]
+  // Fetch badge mapping file from GitHub using the githubFiles function
+  const { data: badgeMappingFile, isLoading: isLoadingBadgeMapping } = useQuery({
+    queryKey: ['badgeMappingFile', globalConfig?.badge_mapping_file],
+    queryFn: async () => {
+      if (!globalConfig?.badge_mapping_file) return null;
+      
+      try {
+        const response = await base44.functions.invoke('githubFiles', {
+          operation: 'getFile',
+          repo: globalConfig.github_repo || 'wimhugo/openrel',
+          branch: globalConfig.github_branch || 'main',
+          path: globalConfig.badge_mapping_file
+        });
+        return response.data;
+      } catch (error) {
+        console.error('Failed to fetch badge mapping from GitHub:', error);
+        return null;
       }
+    },
+    enabled: !!globalConfig?.badge_mapping_file,
+  });
+
+  // Parse the YAML content from GitHub
+  const parsedData = badgeMappingFile?.content
+    ? { sections: parseBadgeMappingYaml(badgeMappingFile.content).sections }
     : null;
 
   // Load saved selections from localStorage
@@ -131,13 +141,20 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
             Select the intended use(s) and ethics considerations based on your verified context badges.
           </p>
 
-          {!parsedData || relevantSections.length === 0 ? (
+          {isLoadingBadgeMapping ? (
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/40">
+              <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="text-sm text-muted-foreground">
+                <p className="font-medium">Loading badge mapping configuration...</p>
+              </div>
+            </div>
+          ) : !parsedData || relevantSections.length === 0 ? (
             <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/40">
               <AlertCircle className="w-5 h-5 text-muted-foreground shrink-0" />
               <div className="text-sm text-muted-foreground">
-                <p className="font-medium">No intended use or ethics sections found</p>
+                <p className="font-medium">No badge mapping found</p>
                 <p className="text-xs mt-1">
-                  The badge-mapping.yaml file should contain "Intended Use" and/or "Ethics Considerations" sections.
+                  Please configure the badge_mapping_file path in KB User Configuration.
                 </p>
               </div>
             </div>
