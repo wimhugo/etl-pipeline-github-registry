@@ -169,7 +169,7 @@ export default function UserProfilePanel({ onClose }) {
     <div className="fixed inset-0 z-[100] flex justify-end" style={{ background: 'rgba(0,0,0,0.35)' }}>
       <div
         ref={panelRef}
-        className="w-full max-w-sm bg-card border-l border-border shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200"
+        className="w-full max-w-md bg-card border-l border-border shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
