@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRole } from '@/lib/RoleContext';
 import { FileCheck2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,14 @@ export default function KBWorkflow() {
 
   const [activeWorkflow, setActiveWorkflow] = useState(defaultWorkflowForRole(activeRole));
   const [currentStep, setCurrentStep] = useState(0);
+
+  // Sync workflow when role changes (unless the role is selectable)
+  useEffect(() => {
+    if (!SELECTABLE_ROLES.has(activeRole)) {
+      setActiveWorkflow(defaultWorkflowForRole(activeRole));
+      setCurrentStep(0);
+    }
+  }, [activeRole]);
 
   const workflow = WORKFLOWS[activeWorkflow];
   const steps = workflow.steps;
