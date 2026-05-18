@@ -52,10 +52,19 @@ export default function WorkflowStep2FindResource() {
   };
 
   const handleExtractLicense = async () => {
-    if (!result?.metadata) return;
-
     setExtractingLicense(true);
     setError(null);
+
+    // If no metadata available, show the toast about upcoming HTML extraction
+    if (!result?.metadata) {
+      toast({
+        title: 'HTML-based license extraction coming soon',
+        description: 'We will extract rights, access, and license data from the target URL HTML.',
+        duration: 5000
+      });
+      setExtractingLicense(false);
+      return;
+    }
 
     try {
       const response = await base44.functions.invoke('extractLicenseInfo', { metadata: result.metadata });
@@ -195,7 +204,7 @@ export default function WorkflowStep2FindResource() {
               {!result.licenseInfo && result?.redirectURL && (
                 <Button
                   onClick={handleExtractLicense}
-                  disabled={extractingLicense || !result?.metadata}
+                  disabled={extractingLicense}
                   variant="outline"
                   className="w-full gap-2"
                 >
