@@ -50,8 +50,11 @@ Deno.serve(async (req) => {
     console.log('Cleaned file_path from URL to:', cleanFilePath);
   }
 
+  // URL encode the file path to handle special characters like dots, spaces, etc.
+  const encodedFilePath = encodeURIComponent(cleanFilePath);
+
   // 1. Fetch the current file from GitHub API to get SHA and content (or detect if it doesn't exist)
-  const apiBase = `https://api.github.com/repos/${targetRepo}/contents/${cleanFilePath}`;
+  const apiBase = `https://api.github.com/repos/${targetRepo}/contents/${encodedFilePath}`;
   console.log('Fetching file from:', apiBase);
   const fileRes = await fetch(`${apiBase}?ref=${targetBranch}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
