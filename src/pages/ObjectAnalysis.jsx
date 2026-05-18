@@ -19,6 +19,7 @@ export default function ObjectAnalysis() {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [error, setError] = useState(null);
   const [openrelActions, setOpenrelActions] = useState([]);
+  const [actionsLoaded, setActionsLoaded] = useState(false);
   const [actionMappings, setActionMappings] = useState({});
 
   // Check for URL parameter on mount
@@ -35,6 +36,7 @@ export default function ObjectAnalysis() {
   useEffect(() => {
     const fetchOpenrelActions = async () => {
       try {
+        console.log('=== Fetching OpenREL Actions ===');
         const configs = await base44.entities.GlobalConfig.list();
         console.log('GlobalConfig count:', configs?.length);
         if (configs && configs.length > 0) {
@@ -43,6 +45,7 @@ export default function ObjectAnalysis() {
           const dataBaseUrl = config.kb_search_data_url;
           console.log('subEntityFiles:', subEntityFiles);
           console.log('dataBaseUrl:', dataBaseUrl);
+          console.log('actions file:', subEntityFiles.actions);
           
           if (subEntityFiles.actions && dataBaseUrl) {
             const actionsUrl = `${dataBaseUrl}/${subEntityFiles.actions}`;
@@ -51,19 +54,35 @@ export default function ObjectAnalysis() {
             console.log('Response status:', actionsRes.status);
             if (actionsRes.ok) {
               const actionsData = await actionsRes.json();
+              console.log('Raw actionsData:', actionsData);
               let actions = [];
               if (Array.isArray(actionsData)) {
                 actions = actionsData;
+                console.log('Actions is array, count:', actions.length);
               } else if (actionsData.actions && Array.isArray(actionsData.actions)) {
                 actions = actionsData.actions;
+                console.log('Actions has .actions key, count:', actions.length);
+              } else {
+                console.log('Actions data structure not recognized:', Object.keys(actionsData));
               }
               setOpenrelActions(actions);
-              console.log('Loaded actions:', actions.length);
+              console.log('Final actions array:', actions.length, 'First item:', actions[0]);
+              setActionsLoaded(true);
+            } else {
+              console.log('No actions found in file');
+              setActionsLoaded(true);
             }
+          } else {
+            console.log('No actions file configured');
+            setActionsLoaded(true);
           }
+        } else {
+          console.log('No GlobalConfig found');
+          setActionsLoaded(true);
         }
       } catch (e) {
         console.log('Error fetching actions:', e.message);
+        setActionsLoaded(true);
       }
     };
     fetchOpenrelActions();
@@ -317,7 +336,9 @@ export default function ObjectAnalysis() {
                           <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
                             <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
                             <span className="font-mono flex-1">{detectedTerm}</span>
-                            {openrelActions.length > 0 ? (
+                            {!actionsLoaded ? (
+                              <Badge variant="secondary" className="text-xs">Loading actions...</Badge>
+                            ) : openrelActions.length > 0 ? (
                               <Select
                                 value={actionMappings[mappingKey] || autoMatchedLabel}
                                 onValueChange={(value) => setActionMappings(prev => ({ ...prev, [mappingKey]: value }))}
@@ -334,7 +355,7 @@ export default function ObjectAnalysis() {
                                 </SelectContent>
                               </Select>
                             ) : (
-                              <Badge variant="secondary" className="text-xs">No OpenREL Actions loaded</Badge>
+                              <Badge variant="secondary" className="text-xs">No actions configured</Badge>
                             )}
                             {autoMatchedLabel && (
                               <Badge className="text-xs bg-accent/20 text-accent border-accent/30">Auto-matched</Badge>
