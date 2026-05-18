@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Save, Loader2, FileJson, Database, AlertCircle, Tag } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import BadgeMappingTable from '@/components/kbuser/BadgeMappingTable';
 
@@ -170,18 +171,10 @@ export default function KBUserConfig() {
   });
 
   const handleSave = () => {
-    // Save to GlobalConfig
     saveMutation.mutate({
       ...form,
       ...(parsed ? { kb_search_data_api_url: parsed.apiUrl, kb_search_data_url: parsed.rawUrl } : {}),
     });
-    // Create PR if file path is provided
-    if (form.badge_mapping_file) {
-      prMutation.mutate({
-        badge_mapping_file: form.badge_mapping_file,
-        badge_mappings: form.badge_mappings,
-      });
-    }
   };
 
   return (
@@ -193,10 +186,20 @@ export default function KBUserConfig() {
             Configure the data repository and file assignments for KB Search.
           </p>
         </div>
-        <Button onClick={handleSave} disabled={saveMutation.isPending} className="gap-1.5">
-          <Save className="w-4 h-4" />
-          {saveMutation.isPending ? 'Saving…' : 'Save'}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleSave} disabled={saveMutation.isPending} className="gap-1.5">
+            <Save className="w-4 h-4" />
+            {saveMutation.isPending ? 'Saving…' : 'Save'}
+          </Button>
+          <Button 
+            onClick={() => form.badge_mappings && prMutation.mutate({ badge_mapping_file: form.badge_mapping_file, badge_mappings: form.badge_mappings })} 
+            disabled={!form.badge_mapping_file || prMutation.isPending || !form.badge_mappings?.length} 
+            className="gap-1.5"
+          >
+            <Loader2 className={cn("w-4 h-4", prMutation.isPending && "animate-spin")} />
+            {prMutation.isPending ? 'Creating PR…' : 'Submit to GitHub'}
+          </Button>
+        </div>
       </div>
 
       {/* Repository root path */}
