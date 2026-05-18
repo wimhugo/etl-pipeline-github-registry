@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Microscope, Link2, Loader2, CheckCircle2, AlertCircle, FileJson, Shield, Zap } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Microscope, Link2, Type, File, Loader2, CheckCircle2, AlertCircle, FileJson, Shield, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
 
 export default function ObjectAnalysis() {
+  const [inputType, setInputType] = useState('url');
   const [objectUrl, setObjectUrl] = useState('');
+  const [textContent, setTextContent] = useState('');
+  const [fileUrl, setFileUrl] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [error, setError] = useState(null);
@@ -19,6 +24,7 @@ export default function ObjectAnalysis() {
     const urlParam = params.get('url');
     if (urlParam) {
       setObjectUrl(urlParam);
+      setInputType('url');
     }
   }, []);
 
@@ -26,23 +32,37 @@ export default function ObjectAnalysis() {
     setError(null);
     setAnalysisResult(null);
 
-    // Validate URL
-    if (!objectUrl) {
-      setError('Please enter an Object URL');
-      return;
-    }
-
-    try {
-      new URL(objectUrl);
-    } catch (err) {
-      setError('Invalid URL format. Please enter a valid URL.');
+    // Validate input based on type
+    if (inputType === 'url') {
+      if (!objectUrl) {
+        setError('Please enter an Object URL');
+        return;
+      }
+      try {
+        new URL(objectUrl);
+      } catch (err) {
+        setError('Invalid URL format. Please enter a valid URL.');
+        return;
+      }
+    } else if (inputType === 'text') {
+      if (!textContent.trim()) {
+        setError('Please enter some text to analyze');
+        return;
+      }
+    } else if (inputType === 'file') {
+      setError('File upload is not yet implemented');
       return;
     }
 
     setIsAnalyzing(true);
 
     try {
-      const response = await base44.functions.invoke('analyzeObject', { objectUrl });
+      const response = await base44.functions.invoke('analyzeObject', { 
+        inputType, 
+        objectUrl: inputType === 'url' ? objectUrl : undefined,
+        textContent: inputType === 'text' ? textContent : undefined,
+        fileUrl: inputType === 'file' ? fileUrl : undefined
+      });
       setAnalysisResult(response.data.analysis);
     } catch (err) {
       setError(err.message || 'Failed to analyze object');
@@ -60,28 +80,64 @@ export default function ObjectAnalysis() {
         </p>
       </div>
 
-      {/* URL Input Card */}
+      {/* Input Method Tabs */}
       <Card className="bg-card border-border/50">
         <CardHeader>
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Link2 className="w-4 h-4" />
-            Object URL
-          </CardTitle>
+          <CardTitle className="text-sm font-medium">Input Method</CardTitle>
           <CardDescription>
-            Enter the URL of the object to analyze, or it will be pre-populated from the page parameters.
+            Choose how to provide the content for analysis.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-3">
-            <Input
-              value={objectUrl}
-              onChange={(e) => setObjectUrl(e.target.value)}
-              placeholder="https://example.com/object.json"
-              className="flex-1"
-            />
+          <Tabs value={inputType} onValueChange={setInputType}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="url" className="gap-2">
+                <Link2 className="w-4 h-4" />
+                URL
+              </TabsTrigger>
+              <TabsTrigger value="text" className="gap-2">
+                <Type className="w-4 h-4" />
+                Text
+              </TabsTrigger>
+              <TabsTrigger value="file" className="gap-2">
+                <File className="w-4 h-4" />
+                File
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="url" className="space-y-4 mt-4">
+              <div className="flex gap-3">
+                <Input
+                  value={objectUrl}
+                  onChange={(e) => setObjectUrl(e.target.value)}
+                  placeholder="https://example.com/object.json"
+                  className="flex-1"
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="text" className="space-y-4 mt-4">
+              <Textarea
+                value={textContent}
+                onChange={(e) => setTextContent(e.target.value)}
+                placeholder="Paste or type the content to analyze here..."
+                className="min-h-[200px]"
+              />
+            </TabsContent>
+            <TabsContent value="file" className="space-y-4 mt-4">
+              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border/50 rounded-lg bg-muted/20">
+                <File className="w-8 h-8 text-muted-foreground mb-2" />
+                <p className="text-sm font-medium text-foreground">File Upload</p>
+                <p className="text-xs text-muted-foreground text-center mt-1">
+                  Upload a text file for analysis<br />
+                  <span className="text-accent">Coming soon</span>
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex justify-end mt-4">
             <Button 
               onClick={handleAnalyse} 
-              disabled={isAnalyzing}
+              disabled={isAnalyzing || inputType === 'file'}
               className="gap-2"
             >
               {isAnalyzing ? (
@@ -143,12 +199,12 @@ export default function ObjectAnalysis() {
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">URL:</span>
-                <span className="text-foreground font-mono truncate max-w-[300px]">{analysisResult.url}</span>
+                <span className="text-muted-foreground">Source:</span>
+                <span className="text-foreground font-mono truncate max-w-[300px]">{analysisResult.source}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Content Type:</span>
-                <span className="text-foreground font-mono">{analysisResult.contentType || 'Unknown'}</span>
+                <span className="text-muted-foreground">Input Type:</span>
+                <span className="text-foreground font-mono capitalize">{analysisResult.inputType}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Content Length:</span>

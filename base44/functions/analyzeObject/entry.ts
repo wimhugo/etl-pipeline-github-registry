@@ -14,39 +14,67 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden: Administrator access required' }, { status: 403 });
     }
 
-    const { objectUrl } = await req.json();
+    const { inputType, objectUrl, textContent, fileUrl } = await req.json();
 
-    if (!objectUrl || typeof objectUrl !== 'string') {
-      return Response.json({ error: 'Object URL is required' }, { status: 400 });
+    let content = '';
+    let sourceInfo = '';
+
+    // Handle different input types
+    if (inputType === 'url') {
+      if (!objectUrl || typeof objectUrl !== 'string') {
+        return Response.json({ error: 'Object URL is required' }, { status: 400 });
+      }
+
+      // Validate URL format
+      try {
+        new URL(objectUrl);
+      } catch (err) {
+        return Response.json({ error: 'Invalid URL format' }, { status: 400 });
+      }
+
+      // Fetch the object from the URL
+      const response = await fetch(objectUrl, {
+        headers: {
+          'Accept': 'application/json, application/ld+json, text/html, text/plain, */*',
+        },
+      });
+
+      if (!response.ok) {
+        return Response.json({ 
+          error: `Failed to fetch object: ${response.status} ${response.statusText}` 
+        }, { status: 400 });
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      sourceInfo = `URL: ${objectUrl} (${contentType})`;
+      content = await response.text();
+    } else if (inputType === 'text') {
+      if (!textContent || typeof textContent !== 'string') {
+        return Response.json({ error: 'Text content is required' }, { status: 400 });
+      }
+      sourceInfo = 'Text input';
+      content = textContent;
+    } else if (inputType === 'file') {
+      if (!fileUrl) {
+        return Response.json({ error: 'File URL is required' }, { status: 400 });
+      }
+      // Fetch the uploaded file
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        return Response.json({ 
+          error: `Failed to fetch file: ${response.status} ${response.statusText}` 
+        }, { status: 400 });
+      }
+      sourceInfo = 'Uploaded file';
+      content = await response.text();
+    } else {
+      return Response.json({ error: 'Invalid input type. Must be "url", "text", or "file"' }, { status: 400 });
     }
-
-    // Validate URL format
-    try {
-      new URL(objectUrl);
-    } catch (err) {
-      return Response.json({ error: 'Invalid URL format' }, { status: 400 });
-    }
-
-    // Fetch the object from the URL
-    const response = await fetch(objectUrl, {
-      headers: {
-        'Accept': 'application/json, application/ld+json, text/html, text/plain, */*',
-      },
-    });
-
-    if (!response.ok) {
-      return Response.json({ 
-        error: `Failed to fetch object: ${response.status} ${response.statusText}` 
-      }, { status: 400 });
-    }
-
-    const contentType = response.headers.get('content-type') || '';
-    const content = await response.text();
 
     // Analyze content for OpenREL/ODRL rules, actions, and constraints
     const analysis = {
-      url: objectUrl,
-      contentType: contentType,
+      source: sourceInfo,
+      inputType: inputType,
       contentLength: content.length,
       hasRules: false,
       hasActions: false,
