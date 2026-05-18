@@ -23,11 +23,14 @@ Deno.serve(async (req) => {
     return Response.json({ error: `ORCID record not found for ${clean}` }, { status: 404 });
   }
 
-  // Extract country from ORCID person record
-  let orcid_country = null;
+  // Extract all addresses from ORCID person record
+  let orcid_addresses = [];
   if (personRes.ok) {
     const personData = await personRes.json();
-    orcid_country = personData?.['addresses']?.['address']?.[0]?.['country']?.['value'] || null;
+    const addrs = personData?.['addresses']?.['address'] || [];
+    orcid_addresses = addrs
+      .map(a => a?.['country']?.['value'])
+      .filter(Boolean);
   }
 
   const institutions = [];
@@ -71,5 +74,5 @@ Deno.serve(async (req) => {
     }
   }
 
-  return Response.json({ institutions, orcid_country });
+  return Response.json({ institutions, orcid_addresses });
 });

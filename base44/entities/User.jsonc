@@ -55,9 +55,30 @@
       "type": "string",
       "description": "Name of the default/primary institution"
     },
+    "locations": {
+      "type": "array",
+      "description": "Geographic locations sourced from ORCID, ROR, or entered manually",
+      "items": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "description": "Country name or ISO code"
+          },
+          "source": {
+            "type": "string",
+            "description": "Source: orcid, ror, or manual"
+          }
+        }
+      }
+    },
+    "default_location": {
+      "type": "string",
+      "description": "The selected default geographic location"
+    },
     "location": {
       "type": "string",
-      "description": "Geographic location of the researcher (country name or ISO code), auto-filled from ORCID or ROR"
+      "description": "Legacy single location field (kept for backwards compatibility)"
     }
   },
   "required": []
