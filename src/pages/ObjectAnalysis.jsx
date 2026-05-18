@@ -253,14 +253,17 @@ export default function ObjectAnalysis() {
           {analysisResult.detectedPatterns && analysisResult.detectedPatterns.length > 0 && (
             <Card className="bg-card border-border/50">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Detected Patterns</CardTitle>
+                <CardTitle className="text-sm font-medium">Detected Patterns ({analysisResult.detectedPatterns.length})</CardTitle>
+                <CardDescription>
+                  Specific terms and structures found in the content that match OpenREL/ODRL patterns.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-1.5">
                   {analysisResult.detectedPatterns.map((pattern, idx) => (
-                    <li key={idx} className="text-xs text-foreground flex items-center gap-2">
-                      <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
-                      {pattern}
+                    <li key={idx} className="text-xs text-foreground flex items-start gap-2 p-2 rounded-md bg-muted/30">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0 mt-0.5" />
+                      <span className="font-mono">{pattern}</span>
                     </li>
                   ))}
                 </ul>
