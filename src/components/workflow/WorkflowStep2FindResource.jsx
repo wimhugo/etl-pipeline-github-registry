@@ -34,8 +34,9 @@ export default function WorkflowStep2FindResource() {
         const targetUrl = response.data?.targetUrl;
         setError(customMessage);
         if (targetUrl) {
-          setResult({ pid: pid.trim(), redirectURL: targetUrl, metadataOnly: true, error: true });
+          setResult({ pid: pid.trim(), redirectURL: targetUrl, metadataOnly: true });
         }
+        setLoading(false);
         return;
       }
 
@@ -144,7 +145,7 @@ export default function WorkflowStep2FindResource() {
               <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
               <div className="space-y-1">
                 <p className="text-sm text-destructive">{error}</p>
-                {result && result.redirectURL && (
+                {result?.redirectURL && (
                   <a
                     href={result.redirectURL}
                     target="_blank"
