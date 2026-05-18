@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Loader2, Search, AlertCircle, CheckCircle2, ExternalLink, FileText, Lock, Unlock, Clock, Link, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
 
 export default function WorkflowStep2FindResource() {
   const [pid, setPid] = useState('');
@@ -81,7 +81,8 @@ export default function WorkflowStep2FindResource() {
       
       // Check if this is the "metadata mode not supported" error
       if (errorMessage.includes('This mode') && errorMessage.includes('is not supported')) {
-        toast.info('HTML-based license extraction will be implemented soon', {
+        toast({
+          title: 'HTML-based license extraction coming soon',
           description: 'We will extract rights, access, and license data from the target URL HTML.',
           duration: 5000
         });
@@ -191,10 +192,10 @@ export default function WorkflowStep2FindResource() {
                 </div>
               </div>
 
-              {!result.licenseInfo && (
+              {!result.licenseInfo && result?.redirectURL && (
                 <Button
                   onClick={handleExtractLicense}
-                  disabled={extractingLicense}
+                  disabled={extractingLicense || !result?.metadata}
                   variant="outline"
                   className="w-full gap-2"
                 >
