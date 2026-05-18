@@ -3,17 +3,23 @@ import { useRole, ROLES, APP_CONTAINERS } from '@/lib/RoleContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { base44 } from '@/api/base44Client';
-import { LogIn, LogOut, User } from 'lucide-react';
+import { LogIn, LogOut, User, Workflow } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import UserProfilePanel from '@/components/user/UserProfilePanel';
+import WorkflowPanel from '@/components/workflow/WorkflowPanel';
 
 export default function TopBanner() {
   const { activeRole, selectRole, activeContainer, selectContainer } = useRole();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [workflowOpen, setWorkflowOpen] = useState(false);
+
+  // Default workflow by role
+  const defaultWorkflow =
+    activeRole === 'End User' ? 'reuse' : 'licence';
 
   const handleContainerSwitch = (c) => {
     selectContainer(c);
@@ -65,6 +71,20 @@ export default function TopBanner() {
         </Select>
       </div>
 
+      {/* Workflow launcher */}
+      {user && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setWorkflowOpen(true)}
+          className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+          title="Open workflow"
+        >
+          <Workflow className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Workflow</span>
+        </Button>
+      )}
+
       {/* User / Auth */}
       {user ? (
         <div className="flex items-center gap-2">
@@ -91,6 +111,12 @@ export default function TopBanner() {
         </Button>
       )}
 
+      {workflowOpen && (
+        <WorkflowPanel
+          initialWorkflow={defaultWorkflow}
+          onClose={() => setWorkflowOpen(false)}
+        />
+      )}
       {profileOpen && <UserProfilePanel onClose={() => setProfileOpen(false)} />}
     </div>
   );
