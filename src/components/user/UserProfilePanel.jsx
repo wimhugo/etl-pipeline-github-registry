@@ -90,16 +90,25 @@ export default function UserProfilePanel({ onClose }) {
         setLocations(stored.length ? stored : legacy);
         setDefaultLocation(freshUser.default_location || freshUser.location || '');
         setResearchContexts(freshUser.research_contexts || []);
-        // Restore saved verification state WITHOUT re-running verifyInstitution
-        // (which would call addLocation again and create duplicates)
-        if (freshUser.primary_institution_status && freshUser.default_institution) {
-          setVerifications({
-            [freshUser.default_institution]: {
-              loading: false,
-              status: freshUser.primary_institution_status,
-              match: freshUser.primary_institution_ror || null,
-            }
-          });
+        // Restore saved verification from persisted fields (no ROR call, no location side-effects)
+        const savedStatus = freshUser.primary_institution_status;
+        const savedRor = freshUser.primary_institution_ror || null;
+        const primaryInst = freshUser.default_institution;
+        if (primaryInst) {
+          if (savedStatus) {
+            // Already verified — just restore from saved data
+            setVerifications({
+              [primaryInst]: { loading: false, status: savedStatus, match: savedRor }
+            });
+          } else {
+            // Not yet verified — call ROR but DON'T add locations (already saved)
+            setVerifications({ [primaryInst]: { loading: true } });
+            base44.functions.invoke('verifyInstitution', { name: primaryInst }).then(res => {
+              setVerifications({
+                [primaryInst]: { loading: false, status: res.data?.status, match: res.data?.match || null }
+              });
+            });
+          }
         }
       }
     });
@@ -186,7 +195,7 @@ export default function UserProfilePanel({ onClose }) {
     const uniqueLocations = locations.filter(
       (loc, idx, arr) => arr.findIndex(l => l.value === loc.value) === idx
     );
-    // Persist ROR verification result for the primary institution
+    // Persist ROR verification — use live verifications state (covers both loaded and freshly fetched)
     const primaryVerif = defaultInstitution ? verifications[defaultInstitution] : null;
     await base44.auth.updateMe({
       orcid: orcid.trim(),
