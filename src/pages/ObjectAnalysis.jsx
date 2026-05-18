@@ -329,15 +329,12 @@ export default function ObjectAnalysis() {
                         const autoMatchedLabel = parts[2] || '';
                         const mappingKey = `action-${idx}-${detectedTerm}`;
                         
-                        // Pre-populate with auto-matched value if available
-                        const initialValue = actionMappings[mappingKey] || autoMatchedLabel;
-                        
                         return (
                           <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
                             <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
                             <span className="font-mono flex-1">{detectedTerm}</span>
                             {!actionsLoaded ? (
-                              <Badge variant="secondary" className="text-xs">Loading actions...</Badge>
+                              <Badge variant="secondary" className="text-xs">Loading...</Badge>
                             ) : openrelActions.length > 0 ? (
                               <Select
                                 value={actionMappings[mappingKey] || autoMatchedLabel}
@@ -355,10 +352,12 @@ export default function ObjectAnalysis() {
                                 </SelectContent>
                               </Select>
                             ) : (
-                              <Badge variant="secondary" className="text-xs">No actions configured</Badge>
+                              <div className="w-[200px] h-8 text-xs border border-border rounded px-2 py-1 text-muted-foreground">
+                                No actions
+                              </div>
                             )}
                             {autoMatchedLabel && (
-                              <Badge className="text-xs bg-accent/20 text-accent border-accent/30">Auto-matched</Badge>
+                              <Badge className="text-xs bg-accent/20 text-accent border-accent/30">Auto: {autoMatchedLabel}</Badge>
                             )}
                           </div>
                         );
@@ -385,12 +384,46 @@ export default function ObjectAnalysis() {
                   <div className="ml-6 space-y-1">
                     {analysisResult.detectedPatterns
                       .filter(p => p.includes('Configured Constraint:') || p.includes('Potential Constraint:'))
-                      .map((pattern, idx) => (
-                        <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
-                          <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
-                          <span className="font-mono">{pattern}</span>
-                        </div>
-                      ))}
+                      .map((pattern, idx) => {
+                        const parts = pattern.split('|');
+                        const detectedTerm = parts[0].replace(/^(Configured Constraint: |Potential Constraint: )/, '');
+                        const autoMatchedId = parts[1] || '';
+                        const autoMatchedLabel = parts[2] || '';
+                        const mappingKey = `constraint-${idx}-${detectedTerm}`;
+                        
+                        return (
+                          <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
+                            <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
+                            <span className="font-mono flex-1">{detectedTerm}</span>
+                            {!actionsLoaded ? (
+                              <Badge variant="secondary" className="text-xs">Loading...</Badge>
+                            ) : openrelActions.length > 0 ? (
+                              <Select
+                                value={actionMappings[mappingKey] || autoMatchedLabel}
+                                onValueChange={(value) => setActionMappings(prev => ({ ...prev, [mappingKey]: value }))}
+                              >
+                                <SelectTrigger className="w-[200px] h-8 text-xs">
+                                  <SelectValue placeholder="Map to Constraint" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {openrelActions.map((action, actionIdx) => (
+                                    <SelectItem key={actionIdx} value={action.label}>
+                                      {action.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="w-[200px] h-8 text-xs border border-border rounded px-2 py-1 text-muted-foreground">
+                                No constraints
+                              </div>
+                            )}
+                            {autoMatchedLabel && (
+                              <Badge className="text-xs bg-accent/20 text-accent border-accent/30">Auto: {autoMatchedLabel}</Badge>
+                            )}
+                          </div>
+                        );
+                      })}
                     {analysisResult.detectedPatterns.filter(p => p.includes('Configured Constraint:') || p.includes('Potential Constraint:')).length === 0 && (
                       <p className="text-xs text-muted-foreground italic">Generic constraint language detected</p>
                     )}

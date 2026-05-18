@@ -66,11 +66,28 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Invalid input type. Must be "url", "text", or "file"' }, { status: 400 });
     }
 
-    // Fetch GlobalConfig to get configured Actions and Constraints files
-    let actionTerms = [];
-    let constraintTerms = [];
-    let fullActions = [];
-    let fullConstraints = [];
+    // STEP 1: Detect patterns in content WITHOUT any reference to OpenREL files
+    const detectedActions = [];
+    const detectedConstraints = [];
+    
+    const actionKeywords = ['reproduce', 'copy', 'distribute', 'share', 'display', 'perform', 'modify', 'adapt', 'translate', 'extract', 'reuse', 'sell', 'rent', 'lend', 'broadcast', 'communicate', 'make available', 'print', 'download', 'stream', 'archive', 'preserve', 'synchronize', 'digitize'];
+    const constraintKeywords = ['expires', 'expire', 'duration', 'scope', 'territory', 'language', 'medium', 'purpose', 'educational', 'commercial', 'non-commercial', 'attribution', 'credit', 'notice', 'limit', 'restriction', 'max', 'min', 'until', 'from', 'after'];
+    
+    actionKeywords.forEach(keyword => {
+      if (contentLower.includes(keyword.toLowerCase())) {
+        detectedActions.push(keyword);
+      }
+    });
+    
+    constraintKeywords.forEach(keyword => {
+      if (contentLower.includes(keyword.toLowerCase())) {
+        detectedConstraints.push(keyword);
+      }
+    });
+    
+    // STEP 2: Load OpenREL Actions and Constraints files, try to auto-match
+    let openrelActions = [];
+    let openrelConstraints = [];
     
     try {
       const configs = await base44.asServiceRole.entities.GlobalConfig.filter({});
@@ -79,51 +96,46 @@ Deno.serve(async (req) => {
         const subEntityFiles = config.kb_sub_entity_files || {};
         const dataBaseUrl = config.kb_search_data_url;
         
-        // Fetch Actions file if configured
         if (subEntityFiles.actions && dataBaseUrl) {
-          try {
-            const actionsUrl = `${dataBaseUrl}/${subEntityFiles.actions}`;
-            const actionsRes = await fetch(actionsUrl);
-            if (actionsRes.ok) {
-              const actionsData = await actionsRes.json();
-              // Extract action labels - handle both array and object with actions key
-              if (Array.isArray(actionsData)) {
-                fullActions = actionsData;
-                actionTerms = actionsData.map(a => a.label).filter(Boolean);
-              } else if (actionsData.actions && Array.isArray(actionsData.actions)) {
-                fullActions = actionsData.actions;
-                actionTerms = actionsData.actions.map(a => a.label).filter(Boolean);
-              }
-            }
-          } catch (e) {
-            console.log('Warning: Could not fetch actions file:', e.message);
+          const actionsUrl = `${dataBaseUrl}/${subEntityFiles.actions}`;
+          const actionsRes = await fetch(actionsUrl);
+          if (actionsRes.ok) {
+            const actionsData = await actionsRes.json();
+            openrelActions = Array.isArray(actionsData) ? actionsData : (actionsData.actions || []);
           }
         }
         
-        // Fetch Constraints file if configured
         if (subEntityFiles.constraints && dataBaseUrl) {
-          try {
-            const constraintsUrl = `${dataBaseUrl}/${subEntityFiles.constraints}`;
-            const constraintsRes = await fetch(constraintsUrl);
-            if (constraintsRes.ok) {
-              const constraintsData = await constraintsRes.json();
-              // Extract constraint labels - handle both array and object with constraints key
-              if (Array.isArray(constraintsData)) {
-                fullConstraints = constraintsData;
-                constraintTerms = constraintsData.map(c => c.label).filter(Boolean);
-              } else if (constraintsData.constraints && Array.isArray(constraintsData.constraints)) {
-                fullConstraints = constraintsData.constraints;
-                constraintTerms = constraintsData.constraints.map(c => c.label).filter(Boolean);
-              }
-            }
-          } catch (e) {
-            console.log('Warning: Could not fetch constraints file:', e.message);
+          const constraintsUrl = `${dataBaseUrl}/${subEntityFiles.constraints}`;
+          const constraintsRes = await fetch(constraintsUrl);
+          if (constraintsRes.ok) {
+            const constraintsData = await constraintsRes.json();
+            openrelConstraints = Array.isArray(constraintsData) ? constraintsData : (constraintsData.constraints || []);
           }
         }
       }
     } catch (e) {
-      console.log('Warning: Could not fetch GlobalConfig:', e.message);
+      console.log('Could not load OpenREL files:', e.message);
     }
+    
+    // Auto-match detected items with OpenREL items
+    const matchedActions = detectedActions.map(detected => {
+      const matched = openrelActions.find(openrel => {
+        const label = (openrel.label || '').toLowerCase();
+        const detectedLower = detected.toLowerCase();
+        return label === detectedLower || label.includes(detectedLower) || detectedLower.includes(label);
+      });
+      return { detected, matchedLabel: matched?.label || '', matchedId: matched?.id || '' };
+    });
+    
+    const matchedConstraints = detectedConstraints.map(detected => {
+      const matched = openrelConstraints.find(openrel => {
+        const label = (openrel.label || '').toLowerCase();
+        const detectedLower = detected.toLowerCase();
+        return label === detectedLower || label.includes(detectedLower) || detectedLower.includes(label);
+      });
+      return { detected, matchedLabel: matched?.label || '', matchedId: matched?.id || '' };
+    });
 
     // Analyze content for OpenREL/ODRL rules, actions, and constraints
     const analysis = {
@@ -137,14 +149,6 @@ Deno.serve(async (req) => {
       summary: '',
     };
 
-    // Check for ODRL/OpenREL patterns
-    const odrlTerms = ['odrl:', 'odrl:', 'Permission', 'Prohibition', 'Constraint', 'Action', 'Party', 'Asset'];
-    const openrelTerms = ['openrel:', 'Policy', 'Rule', 'Action', 'Constraint'];
-    
-    // Add configured action and constraint terms to the search lists
-    const allActionTerms = [...odrlTerms, ...openrelTerms, ...actionTerms];
-    const allConstraintTerms = [...odrlTerms, ...openrelTerms, ...constraintTerms];
-    
     const contentLower = content.toLowerCase();
     
     // Check for JSON-LD context with ODRL
@@ -153,7 +157,10 @@ Deno.serve(async (req) => {
       analysis.detectedPatterns.push('JSON-LD with ODRL context');
     }
 
-    // Check for ODRL terms
+    // Check for ODRL/OpenREL structural patterns
+    const odrlTerms = ['odrl:', 'Permission', 'Prohibition', 'Constraint', 'Action', 'Party', 'Asset'];
+    const openrelTerms = ['openrel:', 'Policy', 'Rule', 'Action', 'Constraint'];
+    
     odrlTerms.forEach(term => {
       if (contentLower.includes(term.toLowerCase())) {
         analysis.hasRules = true;
@@ -161,7 +168,6 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Check for OpenREL terms
     openrelTerms.forEach(term => {
       if (contentLower.includes(term.toLowerCase())) {
         analysis.hasRules = true;
@@ -169,47 +175,25 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Check for configured Action terms and auto-match
-    actionTerms.forEach(term => {
-      if (contentLower.includes(term.toLowerCase())) {
-        analysis.hasActions = true;
-        // Find the full action object to get additional metadata
-        const matchedAction = fullActions.find(a => a.label === term);
-        if (matchedAction) {
-          analysis.detectedPatterns.push(`Configured Action: ${term}|${matchedAction.id || ''}|${term}`);
-        } else {
-          analysis.detectedPatterns.push(`Configured Action: ${term}||${term}`);
-        }
-      }
-    });
-
-    // Extract potential action terms from content even if not in configured list
-    const actionKeywords = ['action', 'permission', 'prohibition', 'duty', 'obligation', 'reproduce', 'copy', 'distribute', 'share', 'display', 'perform', 'modify', 'adapt', 'translate', 'extract', 'reuse', 'sell', 'rent', 'lend', 'broadcast', 'communicate', 'make available'];
-    const foundActionTerms = [];
-    actionKeywords.forEach(keyword => {
-      if (contentLower.includes(keyword.toLowerCase()) && !actionTerms.some(t => t.toLowerCase() === keyword)) {
-        foundActionTerms.push(keyword);
+    // STEP 3: Return results with matched actions and constraints
+    analysis.hasActions = matchedActions.length > 0;
+    analysis.hasConstraints = matchedConstraints.length > 0;
+    
+    matchedActions.forEach(item => {
+      if (item.matchedLabel) {
+        analysis.detectedPatterns.push(`Configured Action: ${item.detected}|${item.matchedId}|${item.matchedLabel}`);
+      } else {
+        analysis.detectedPatterns.push(`Potential Action: ${item.detected}||`);
       }
     });
     
-    if (foundActionTerms.length > 0) {
-      analysis.hasActions = true;
-      foundActionTerms.forEach(term => {
-        // Try to auto-match with OpenREL actions using fuzzy matching
-        const matchedAction = fullActions.find(a => {
-          const labelLower = a.label.toLowerCase();
-          const termLower = term.toLowerCase();
-          // Exact match or label contains the term
-          return labelLower === termLower || labelLower.includes(termLower) || termLower.includes(labelLower);
-        });
-        
-        if (matchedAction) {
-          analysis.detectedPatterns.push(`Potential Action: ${term}|${matchedAction.id || ''}|${matchedAction.label}`);
-        } else {
-          analysis.detectedPatterns.push(`Potential Action: ${term}||`);
-        }
-      });
-    }
+    matchedConstraints.forEach(item => {
+      if (item.matchedLabel) {
+        analysis.detectedPatterns.push(`Configured Constraint: ${item.detected}|${item.matchedId}|${item.matchedLabel}`);
+      } else {
+        analysis.detectedPatterns.push(`Potential Constraint: ${item.detected}||`);
+      }
+    });
 
     // Fallback: generic action pattern mention
     if (!analysis.hasActions && (contentLower.includes('action') || contentLower.includes('permission') || contentLower.includes('prohibition'))) {
@@ -217,43 +201,15 @@ Deno.serve(async (req) => {
       analysis.detectedPatterns.push('Generic action language detected');
     }
 
-    // Check for configured Constraint terms and auto-match
-    constraintTerms.forEach(term => {
-      if (contentLower.includes(term.toLowerCase())) {
-        analysis.hasConstraints = true;
-        const matchedConstraint = fullConstraints.find(c => c.label === term);
-        if (matchedConstraint) {
-          analysis.detectedPatterns.push(`Configured Constraint: ${term}|${matchedConstraint.id || ''}|${term}`);
-        } else {
-          analysis.detectedPatterns.push(`Configured Constraint: ${term}||${term}`);
-        }
-      }
-    });
-
-    // Extract potential constraint terms from content even if not in configured list
-    const constraintKeywords = ['constraint', 'limit', 'restriction', 'expires', 'expire', 'duration', 'scope', 'territory', 'language', 'medium', 'purpose', 'educational', 'commercial', 'non-commercial', 'attribution', 'credit', 'notice'];
-    const foundConstraintTerms = [];
-    constraintKeywords.forEach(keyword => {
-      if (contentLower.includes(keyword.toLowerCase()) && !constraintTerms.some(t => t.toLowerCase() === keyword)) {
-        foundConstraintTerms.push(keyword);
-      }
-    });
+    // Check for ODRL/OpenREL generic patterns (fallback)
+    if (!analysis.hasActions && (contentLower.includes('action') || contentLower.includes('permission') || contentLower.includes('prohibition'))) {
+      analysis.hasActions = true;
+      analysis.detectedPatterns.push('Generic action language detected');
+    }
     
-    if (foundConstraintTerms.length > 0) {
+    if (!analysis.hasConstraints && (contentLower.includes('constraint') || contentLower.includes('limit') || contentLower.includes('restriction'))) {
       analysis.hasConstraints = true;
-      foundConstraintTerms.forEach(term => {
-        const matchedConstraint = fullConstraints.find(c => {
-          const labelLower = c.label.toLowerCase();
-          const termLower = term.toLowerCase();
-          return labelLower === termLower || labelLower.includes(termLower) || termLower.includes(labelLower);
-        });
-        
-        if (matchedConstraint) {
-          analysis.detectedPatterns.push(`Potential Constraint: ${term}|${matchedConstraint.id || ''}|${matchedConstraint.label}`);
-        } else {
-          analysis.detectedPatterns.push(`Potential Constraint: ${term}||`);
-        }
-      });
+      analysis.detectedPatterns.push('Generic constraint language detected');
     }
 
     // Fallback: generic constraint pattern mention
