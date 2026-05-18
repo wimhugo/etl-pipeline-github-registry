@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Loader2, Search, AlertCircle, CheckCircle2, ExternalLink, FileText, Lock, Unlock, Clock, Link, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export default function WorkflowStep2FindResource() {
   const [pid, setPid] = useState('');
@@ -75,7 +76,16 @@ export default function WorkflowStep2FindResource() {
         await handleMatchSpdx(licenseInfo.license.name, licenseInfo.license.url);
       }
     } catch (err) {
-      setError(err.message || 'Failed to extract license information');
+      const errorMessage = err.message || 'Failed to extract license information';
+      setError(errorMessage);
+      
+      // Check if this is the "metadata mode not supported" error
+      if (errorMessage.includes('This mode') && errorMessage.includes('is not supported')) {
+        toast.info('HTML-based license extraction will be implemented soon', {
+          description: 'We will extract rights, access, and license data from the target URL HTML.',
+          duration: 5000
+        });
+      }
     } finally {
       setExtractingLicense(false);
     }
