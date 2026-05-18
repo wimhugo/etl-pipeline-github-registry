@@ -184,24 +184,23 @@ export default function BadgeMappingTable({
         throw new Error('GitHub repository not configured. Please set the GitHub Folder URL above.');
       }
       
-      // Ensure path doesn't start with /
+      // Use backend function to avoid CORS issues
       const cleanPath = mappingFile.replace(/^\//, '');
-      const url = `https://raw.githubusercontent.com/${githubRepo}/${githubBranch}/${cleanPath}?t=${Date.now()}`;
+      console.log('📥 Fetching via backend function:', { repo: githubRepo, branch: githubBranch, path: cleanPath });
       
-      console.log('📥 Loading badge mapping from:', url);
-      const response = await fetch(url, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        }
+      const response = await base44.functions.invoke('githubFiles', {
+        action: 'get_file',
+        repo: githubRepo,
+        branch: githubBranch,
+        path: cleanPath
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Failed to fetch badge mapping:', response.status, errorText);
-        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+      if (!response.data || !response.data.content) {
+        throw new Error('File not found or empty');
       }
-      const content = await response.text();
+      
+      // Content is base64 encoded
+      const content = atob(response.data.content);
       console.log('✅ Fetched badge mapping content');
       const parsedSections = parseYamlToSections(content);
       
