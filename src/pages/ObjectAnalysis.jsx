@@ -335,26 +335,26 @@ export default function ObjectAnalysis() {
                             <span className="font-mono flex-1">{detectedTerm}</span>
                             {!actionsLoaded ? (
                               <Badge variant="secondary" className="text-xs">Loading...</Badge>
-                            ) : openrelActions.length > 0 ? (
+                            ) : (
                               <Select
-                                value={actionMappings[mappingKey] || autoMatchedLabel}
+                                value={actionMappings[mappingKey] || autoMatchedLabel || ""}
                                 onValueChange={(value) => setActionMappings(prev => ({ ...prev, [mappingKey]: value }))}
                               >
                                 <SelectTrigger className="w-[200px] h-8 text-xs">
-                                  <SelectValue placeholder="Map to Action" />
+                                  <SelectValue placeholder={openrelActions.length > 0 ? "Map to Action" : "No actions configured"} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {openrelActions.map((action, actionIdx) => (
-                                    <SelectItem key={actionIdx} value={action.label}>
-                                      {action.label}
-                                    </SelectItem>
-                                  ))}
+                                  {openrelActions.length > 0 ? (
+                                    openrelActions.map((action, actionIdx) => (
+                                      <SelectItem key={actionIdx} value={action.label}>
+                                        {action.label}
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <div className="p-2 text-xs text-muted-foreground">No actions configured</div>
+                                  )}
                                 </SelectContent>
                               </Select>
-                            ) : (
-                              <div className="w-[200px] h-8 text-xs border border-border rounded px-2 py-1 text-muted-foreground">
-                                No actions
-                              </div>
                             )}
                             {autoMatchedLabel && (
                               <Badge className="text-xs bg-accent/20 text-accent border-accent/30">Auto: {autoMatchedLabel}</Badge>
@@ -397,26 +397,26 @@ export default function ObjectAnalysis() {
                             <span className="font-mono flex-1">{detectedTerm}</span>
                             {!actionsLoaded ? (
                               <Badge variant="secondary" className="text-xs">Loading...</Badge>
-                            ) : openrelActions.length > 0 ? (
+                            ) : (
                               <Select
-                                value={actionMappings[mappingKey] || autoMatchedLabel}
+                                value={actionMappings[mappingKey] || autoMatchedLabel || ""}
                                 onValueChange={(value) => setActionMappings(prev => ({ ...prev, [mappingKey]: value }))}
                               >
                                 <SelectTrigger className="w-[200px] h-8 text-xs">
-                                  <SelectValue placeholder="Map to Constraint" />
+                                  <SelectValue placeholder={openrelActions.length > 0 ? "Map to Constraint" : "No constraints configured"} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {openrelActions.map((action, actionIdx) => (
-                                    <SelectItem key={actionIdx} value={action.label}>
-                                      {action.label}
-                                    </SelectItem>
-                                  ))}
+                                  {openrelActions.length > 0 ? (
+                                    openrelActions.map((action, actionIdx) => (
+                                      <SelectItem key={actionIdx} value={action.label}>
+                                        {action.label}
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <div className="p-2 text-xs text-muted-foreground">No constraints configured</div>
+                                  )}
                                 </SelectContent>
                               </Select>
-                            ) : (
-                              <div className="w-[200px] h-8 text-xs border border-border rounded px-2 py-1 text-muted-foreground">
-                                No constraints
-                              </div>
                             )}
                             {autoMatchedLabel && (
                               <Badge className="text-xs bg-accent/20 text-accent border-accent/30">Auto: {autoMatchedLabel}</Badge>
