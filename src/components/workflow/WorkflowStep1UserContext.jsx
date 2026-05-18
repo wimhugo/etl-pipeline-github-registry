@@ -231,7 +231,7 @@ export default function WorkflowStep1UserContext({ workflowId }) {
       </Section>
 
       {/* Identity */}
-      <Section icon={User} title="Identity" defaultOpen={true}>
+      <Section icon={User} title="Identity" defaultOpen={false}>
         <div>
           <ProfileField icon={User} label="Name" value={user?.full_name || user?.email} />
           <ProfileField
@@ -248,7 +248,7 @@ export default function WorkflowStep1UserContext({ workflowId }) {
       </Section>
 
       {/* Primary Institution */}
-      <Section icon={Building2} title="Primary Institution" defaultOpen={true}>
+      <Section icon={Building2} title="Primary Institution" defaultOpen={false}>
         {institution ? (
           <div className="space-y-2">
             <div className="flex items-start gap-2 flex-wrap">
@@ -305,7 +305,7 @@ export default function WorkflowStep1UserContext({ workflowId }) {
       </Section>
 
       {/* Jurisdiction / Location */}
-      <Section icon={MapPin} title="Jurisdiction / Location" defaultOpen={true}>
+      <Section icon={MapPin} title="Jurisdiction / Location" defaultOpen={false}>
         <div className="space-y-2">
           {location ? (
             <div className="flex items-center gap-2 flex-wrap">
@@ -347,7 +347,7 @@ export default function WorkflowStep1UserContext({ workflowId }) {
       </Section>
 
       {/* Research Context */}
-      <Section icon={FlaskConical} title="Research Context" defaultOpen={true}>
+      <Section icon={FlaskConical} title="Research Context" defaultOpen={false}>
         <div className="space-y-2">
           {RESEARCH_CONTEXT_OPTIONS.map(opt => {
             const checked = contexts.includes(opt);
