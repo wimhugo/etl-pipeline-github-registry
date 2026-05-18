@@ -4,6 +4,7 @@ import { FileCheck2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import WorkflowStep1UserContext from '@/components/workflow/WorkflowStep1UserContext';
+import WorkflowStep2FindResource from '@/components/workflow/WorkflowStep2FindResource';
 
 const WORKFLOWS = {
   licence: {
@@ -23,7 +24,7 @@ const WORKFLOWS = {
     icon: Search,
     steps: [
       { id: 'user-context', label: 'User Context' },
-      { id: 'find',         label: 'Find Resource',  placeholder: true },
+      { id: 'find',         label: 'Find Resource' },
       { id: 'match',        label: 'Match Policy',   placeholder: true },
       { id: 'apply',        label: 'Apply',          placeholder: true },
     ],
@@ -150,7 +151,10 @@ export default function KBWorkflow() {
         {steps[currentStep].id === 'user-context' && (
           <WorkflowStep1UserContext workflowId={activeWorkflow} />
         )}
-        {steps[currentStep].placeholder && (
+        {steps[currentStep].id === 'find' && (
+          <WorkflowStep2FindResource />
+        )}
+        {steps[currentStep].placeholder && steps[currentStep].id !== 'find' && (
           <div className="rounded-xl border border-border/50 bg-card flex flex-col items-center justify-center py-20 gap-3 text-center">
             <span className="text-3xl">🚧</span>
             <p className="text-sm font-medium text-foreground">{steps[currentStep].label}</p>
