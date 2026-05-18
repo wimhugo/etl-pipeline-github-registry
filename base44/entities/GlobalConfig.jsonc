@@ -52,6 +52,10 @@
         "type": "string"
       }
     },
+    "badge_mapping_file": {
+      "type": "string",
+      "description": "GitHub path where badge mappings YAML file is stored"
+    },
     "badge_mappings": {
       "type": "array",
       "description": "Mapping table between profile badges, context badges, colours, and constraint keys",
