@@ -165,8 +165,18 @@ export default function KBUserConfig() {
       });
       return res;
     },
-    onSuccess: () => {
-      toast({ title: 'Pull Request Created', description: 'Badge mappings saved to GitHub.' });
+    onSuccess: (data) => {
+      toast({ 
+        title: 'Pull Request Created', 
+        description: data?.pr_url ? `PR #${data.pr_number} created` : 'Badge mappings saved to GitHub.' 
+      });
+    },
+    onError: (error) => {
+      toast({ 
+        title: 'Failed to Create PR', 
+        description: error.message || 'An unexpected error occurred.',
+        variant: 'destructive'
+      });
     },
   });
 
