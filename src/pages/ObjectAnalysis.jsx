@@ -32,26 +32,50 @@ export default function ObjectAnalysis() {
     }
   }, []);
 
-  // Fetch OpenREL Actions from GlobalConfig on mount
+  // Fetch OpenREL Actions and Constraints from GlobalConfig on mount
   useEffect(() => {
-    const fetchOpenrelActions = async () => {
+    const fetchOpenrelData = async () => {
       try {
-        console.log('=== Fetching OpenREL Actions ===');
+        console.log('=== Fetching OpenREL Data ===');
         const configs = await base44.entities.GlobalConfig.list();
         console.log('GlobalConfig count:', configs?.length);
         if (configs && configs.length > 0) {
           const config = configs[0];
           const subEntityFiles = config.kb_sub_entity_files || {};
           const dataBaseUrl = config.kb_search_data_url;
+          const apiUrl = config.kb_search_data_api_url?.replace(/\?ref=[^&]*/, '');
           console.log('subEntityFiles:', subEntityFiles);
           console.log('dataBaseUrl:', dataBaseUrl);
-          console.log('actions file:', subEntityFiles.actions);
+          console.log('apiUrl:', apiUrl);
           
-          if (subEntityFiles.actions && dataBaseUrl) {
-            const actionsUrl = `${dataBaseUrl}/${subEntityFiles.actions}`;
-            console.log('Fetching from:', actionsUrl);
+          // Auto-detect files if not explicitly configured (same as Dashboard)
+          let actionsFile = subEntityFiles.actions;
+          let constraintsFile = subEntityFiles.constraints;
+          
+          if (apiUrl && (!actionsFile || !constraintsFile)) {
+            const fileRes = await fetch(apiUrl);
+            if (fileRes.ok) {
+              const fileList = await fileRes.json();
+              const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
+              const autoFile = (hint) => jsonFiles.find(f => f.name.toLowerCase().includes(hint))?.name || '';
+              
+              if (!actionsFile) {
+                actionsFile = autoFile('action');
+                console.log('Auto-detected actions file:', actionsFile);
+              }
+              if (!constraintsFile) {
+                constraintsFile = autoFile('constraint');
+                console.log('Auto-detected constraints file:', constraintsFile);
+              }
+            }
+          }
+          
+          // Fetch actions
+          if (actionsFile && dataBaseUrl) {
+            const actionsUrl = `${dataBaseUrl}/${actionsFile}`;
+            console.log('Fetching actions from:', actionsUrl);
             const actionsRes = await fetch(actionsUrl);
-            console.log('Response status:', actionsRes.status);
+            console.log('Actions response status:', actionsRes.status);
             if (actionsRes.ok) {
               const actionsData = await actionsRes.json();
               console.log('Raw actionsData:', actionsData);
@@ -62,30 +86,44 @@ export default function ObjectAnalysis() {
               } else if (actionsData.actions && Array.isArray(actionsData.actions)) {
                 actions = actionsData.actions;
                 console.log('Actions has .actions key, count:', actions.length);
-              } else {
-                console.log('Actions data structure not recognized:', Object.keys(actionsData));
               }
               setOpenrelActions(actions);
-              console.log('Final actions array:', actions.length, 'First item:', actions[0]);
-              setActionsLoaded(true);
-            } else {
-              console.log('No actions found in file');
-              setActionsLoaded(true);
+              console.log('Final actions array:', actions.length);
             }
-          } else {
-            console.log('No actions file configured');
-            setActionsLoaded(true);
           }
+          
+          // Fetch constraints
+          if (constraintsFile && dataBaseUrl) {
+            const constraintsUrl = `${dataBaseUrl}/${constraintsFile}`;
+            console.log('Fetching constraints from:', constraintsUrl);
+            const constraintsRes = await fetch(constraintsUrl);
+            console.log('Constraints response status:', constraintsRes.status);
+            if (constraintsRes.ok) {
+              const constraintsData = await constraintsRes.json();
+              console.log('Raw constraintsData:', constraintsData);
+              let constraints = [];
+              if (Array.isArray(constraintsData)) {
+                constraints = constraintsData;
+                console.log('Constraints is array, count:', constraints.length);
+              } else if (constraintsData.constraints && Array.isArray(constraintsData.constraints)) {
+                constraints = constraintsData.constraints;
+                console.log('Constraints has .constraints key, count:', constraints.length);
+              }
+              // Store constraints in a separate state if needed
+            }
+          }
+          
+          setActionsLoaded(true);
         } else {
           console.log('No GlobalConfig found');
           setActionsLoaded(true);
         }
       } catch (e) {
-        console.log('Error fetching actions:', e.message);
+        console.log('Error fetching OpenREL data:', e.message);
         setActionsLoaded(true);
       }
     };
-    fetchOpenrelActions();
+    fetchOpenrelData();
   }, []);
 
   const handleAnalyse = async () => {
