@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Microscope, Link2, Type, File, Loader2, CheckCircle2, AlertCircle, FileJson, Shield, Zap, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
@@ -374,7 +375,16 @@ export default function ObjectAnalysis() {
                             <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
                             <div className="flex items-center gap-1 flex-1">
                               <span className="font-mono">{detectedTerm}</span>
-                              <Info className="w-3 h-3 text-muted-foreground cursor-help" title={`Detected phrase: "${detectedTerm}"`} />
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">Detected phrase: "{detectedTerm}"</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </div>
                             {!dataLoaded ? (
                               <Badge variant="secondary" className="text-xs">Loading...</Badge>
@@ -439,7 +449,16 @@ export default function ObjectAnalysis() {
                             <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
                             <div className="flex items-center gap-1 flex-1">
                               <span className="font-mono">{detectedTerm}</span>
-                              <Info className="w-3 h-3 text-muted-foreground cursor-help" title={`Detected phrase: "${detectedTerm}"`} />
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">Detected phrase: "{detectedTerm}"</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </div>
                             {!dataLoaded ? (
                               <Badge variant="secondary" className="text-xs">Loading...</Badge>
