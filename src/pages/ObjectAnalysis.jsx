@@ -304,16 +304,22 @@ export default function ObjectAnalysis() {
                     {analysisResult.detectedPatterns
                       .filter(p => p.includes('Configured Action:') || p.includes('Potential Action:'))
                       .map((pattern, idx) => {
-                        const detectedTerm = pattern.replace(/^(Configured Action: |Potential Action: )/, '');
+                        const parts = pattern.split('|');
+                        const detectedTerm = parts[0].replace(/^(Configured Action: |Potential Action: )/, '');
+                        const autoMatchedId = parts[1] || '';
+                        const autoMatchedLabel = parts[2] || '';
                         const mappingKey = `action-${idx}-${detectedTerm}`;
+                        
+                        // Pre-populate with auto-matched value if available
+                        const initialValue = actionMappings[mappingKey] || autoMatchedLabel;
                         
                         return (
                           <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
                             <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
-                            <span className="font-mono flex-1">{pattern}</span>
+                            <span className="font-mono flex-1">{detectedTerm}</span>
                             {openrelActions.length > 0 ? (
                               <Select
-                                value={actionMappings[mappingKey] || ''}
+                                value={actionMappings[mappingKey] || autoMatchedLabel}
                                 onValueChange={(value) => setActionMappings(prev => ({ ...prev, [mappingKey]: value }))}
                               >
                                 <SelectTrigger className="w-[200px] h-8 text-xs">
@@ -329,6 +335,9 @@ export default function ObjectAnalysis() {
                               </Select>
                             ) : (
                               <Badge variant="secondary" className="text-xs">No OpenREL Actions loaded</Badge>
+                            )}
+                            {autoMatchedLabel && (
+                              <Badge className="text-xs bg-accent/20 text-accent border-accent/30">Auto-matched</Badge>
                             )}
                           </div>
                         );

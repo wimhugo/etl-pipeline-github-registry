@@ -69,6 +69,8 @@ Deno.serve(async (req) => {
     // Fetch GlobalConfig to get configured Actions and Constraints files
     let actionTerms = [];
     let constraintTerms = [];
+    let fullActions = [];
+    let fullConstraints = [];
     
     try {
       const configs = await base44.asServiceRole.entities.GlobalConfig.filter({});
@@ -86,8 +88,10 @@ Deno.serve(async (req) => {
               const actionsData = await actionsRes.json();
               // Extract action labels - handle both array and object with actions key
               if (Array.isArray(actionsData)) {
+                fullActions = actionsData;
                 actionTerms = actionsData.map(a => a.label).filter(Boolean);
               } else if (actionsData.actions && Array.isArray(actionsData.actions)) {
+                fullActions = actionsData.actions;
                 actionTerms = actionsData.actions.map(a => a.label).filter(Boolean);
               }
             }
@@ -105,8 +109,10 @@ Deno.serve(async (req) => {
               const constraintsData = await constraintsRes.json();
               // Extract constraint labels - handle both array and object with constraints key
               if (Array.isArray(constraintsData)) {
+                fullConstraints = constraintsData;
                 constraintTerms = constraintsData.map(c => c.label).filter(Boolean);
               } else if (constraintsData.constraints && Array.isArray(constraintsData.constraints)) {
+                fullConstraints = constraintsData.constraints;
                 constraintTerms = constraintsData.constraints.map(c => c.label).filter(Boolean);
               }
             }
@@ -163,11 +169,17 @@ Deno.serve(async (req) => {
       }
     });
 
-    // Check for configured Action terms
+    // Check for configured Action terms and auto-match
     actionTerms.forEach(term => {
       if (contentLower.includes(term.toLowerCase())) {
         analysis.hasActions = true;
-        analysis.detectedPatterns.push(`Configured Action: ${term}`);
+        // Find the full action object to get additional metadata
+        const matchedAction = fullActions.find(a => a.label === term);
+        if (matchedAction) {
+          analysis.detectedPatterns.push(`Configured Action: ${term}|${matchedAction.id || ''}|${term}`);
+        } else {
+          analysis.detectedPatterns.push(`Configured Action: ${term}||${term}`);
+        }
       }
     });
 
@@ -183,7 +195,19 @@ Deno.serve(async (req) => {
     if (foundActionTerms.length > 0) {
       analysis.hasActions = true;
       foundActionTerms.forEach(term => {
-        analysis.detectedPatterns.push(`Potential Action: ${term}`);
+        // Try to auto-match with OpenREL actions using fuzzy matching
+        const matchedAction = fullActions.find(a => {
+          const labelLower = a.label.toLowerCase();
+          const termLower = term.toLowerCase();
+          // Exact match or label contains the term
+          return labelLower === termLower || labelLower.includes(termLower) || termLower.includes(labelLower);
+        });
+        
+        if (matchedAction) {
+          analysis.detectedPatterns.push(`Potential Action: ${term}|${matchedAction.id || ''}|${matchedAction.label}`);
+        } else {
+          analysis.detectedPatterns.push(`Potential Action: ${term}||`);
+        }
       });
     }
 
@@ -193,11 +217,16 @@ Deno.serve(async (req) => {
       analysis.detectedPatterns.push('Generic action language detected');
     }
 
-    // Check for configured Constraint terms
+    // Check for configured Constraint terms and auto-match
     constraintTerms.forEach(term => {
       if (contentLower.includes(term.toLowerCase())) {
         analysis.hasConstraints = true;
-        analysis.detectedPatterns.push(`Configured Constraint: ${term}`);
+        const matchedConstraint = fullConstraints.find(c => c.label === term);
+        if (matchedConstraint) {
+          analysis.detectedPatterns.push(`Configured Constraint: ${term}|${matchedConstraint.id || ''}|${term}`);
+        } else {
+          analysis.detectedPatterns.push(`Configured Constraint: ${term}||${term}`);
+        }
       }
     });
 
@@ -213,7 +242,17 @@ Deno.serve(async (req) => {
     if (foundConstraintTerms.length > 0) {
       analysis.hasConstraints = true;
       foundConstraintTerms.forEach(term => {
-        analysis.detectedPatterns.push(`Potential Constraint: ${term}`);
+        const matchedConstraint = fullConstraints.find(c => {
+          const labelLower = c.label.toLowerCase();
+          const termLower = term.toLowerCase();
+          return labelLower === termLower || labelLower.includes(termLower) || termLower.includes(labelLower);
+        });
+        
+        if (matchedConstraint) {
+          analysis.detectedPatterns.push(`Potential Constraint: ${term}|${matchedConstraint.id || ''}|${matchedConstraint.label}`);
+        } else {
+          analysis.detectedPatterns.push(`Potential Constraint: ${term}||`);
+        }
       });
     }
 
