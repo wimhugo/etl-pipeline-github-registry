@@ -152,9 +152,14 @@ export default function KBUserConfig() {
 
   const prMutation = useMutation({
     mutationFn: async (data) => {
+      // Convert badge mappings to YAML format
+      const yamlContent = data.badge_mappings.map(row => 
+        `- profileBadge: "${row.profileBadge || ''}"\n  contextBadge: "${row.contextBadge || ''}"\n  colour: ${row.colour || 'muted'}\n  constraintMapping: "${row.constraintMapping || ''}"`
+      ).join('\n');
+      
       const res = await base44.functions.invoke('submitPolicyPR', {
         file_path: data.badge_mapping_file,
-        file_content: JSON.stringify({ badge_mappings: data.badge_mappings }, null, 2),
+        file_content: yamlContent,
         message: 'Update badge mappings',
       });
       return res;
