@@ -90,8 +90,17 @@ export default function UserProfilePanel({ onClose }) {
         setLocations(stored.length ? stored : legacy);
         setDefaultLocation(freshUser.default_location || freshUser.location || '');
         setResearchContexts(freshUser.research_contexts || []);
-        // Re-verify saved institutions so badges show on load
-        savedInstitutions.forEach(inst => verifyInstitution(inst.name));
+        // Restore saved verification state WITHOUT re-running verifyInstitution
+        // (which would call addLocation again and create duplicates)
+        if (freshUser.primary_institution_status && freshUser.default_institution) {
+          setVerifications({
+            [freshUser.default_institution]: {
+              loading: false,
+              status: freshUser.primary_institution_status,
+              match: freshUser.primary_institution_ror || null,
+            }
+          });
+        }
       }
     });
   }, []);
@@ -173,13 +182,17 @@ export default function UserProfilePanel({ onClose }) {
   const handleSave = async () => {
     setSavingProfile(true);
     setSaveSuccess(false);
+    // Deduplicate locations by value before saving
+    const uniqueLocations = locations.filter(
+      (loc, idx, arr) => arr.findIndex(l => l.value === loc.value) === idx
+    );
     // Persist ROR verification result for the primary institution
     const primaryVerif = defaultInstitution ? verifications[defaultInstitution] : null;
     await base44.auth.updateMe({
       orcid: orcid.trim(),
       orcid_institutions: institutions,
       default_institution: defaultInstitution,
-      locations,
+      locations: uniqueLocations,
       default_location: defaultLocation,
       // keep legacy field in sync
       location: defaultLocation,
