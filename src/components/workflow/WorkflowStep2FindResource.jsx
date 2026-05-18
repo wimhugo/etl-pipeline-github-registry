@@ -29,7 +29,9 @@ export default function WorkflowStep2FindResource() {
       const response = await base44.functions.invoke('resolvePid', { pid: pid.trim() });
       
       if (response.status !== 200) {
-        setError('Failed to resolve PID');
+        // Extract custom error message from response if available
+        const customMessage = response.data?.message || response.data?.error || 'Failed to resolve PID';
+        setError(customMessage);
         return;
       }
 
