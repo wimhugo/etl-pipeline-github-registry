@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Microscope, Link2, Type, File, Loader2, CheckCircle2, AlertCircle, FileJson, Shield, Zap } from 'lucide-react';
+import { Microscope, Link2, Type, File, Loader2, CheckCircle2, AlertCircle, FileJson, Shield, Zap, Info } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
@@ -372,7 +372,10 @@ export default function ObjectAnalysis() {
                         return (
                           <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
                             <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
-                            <span className="font-mono flex-1">{detectedTerm}</span>
+                            <div className="flex items-center gap-1 flex-1">
+                              <span className="font-mono">{detectedTerm}</span>
+                              <Info className="w-3 h-3 text-muted-foreground cursor-help" title={`Detected phrase: "${detectedTerm}"`} />
+                            </div>
                             {!dataLoaded ? (
                               <Badge variant="secondary" className="text-xs">Loading...</Badge>
                             ) : (
@@ -434,7 +437,10 @@ export default function ObjectAnalysis() {
                         return (
                           <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
                             <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
-                            <span className="font-mono flex-1">{detectedTerm}</span>
+                            <div className="flex items-center gap-1 flex-1">
+                              <span className="font-mono">{detectedTerm}</span>
+                              <Info className="w-3 h-3 text-muted-foreground cursor-help" title={`Detected phrase: "${detectedTerm}"`} />
+                            </div>
                             {!dataLoaded ? (
                               <Badge variant="secondary" className="text-xs">Loading...</Badge>
                             ) : (
