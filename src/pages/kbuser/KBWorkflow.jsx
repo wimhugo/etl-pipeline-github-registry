@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import WorkflowStep1UserContext from '@/components/workflow/WorkflowStep1UserContext';
 import WorkflowStep2FindResource from '@/components/workflow/WorkflowStep2FindResource';
+import WorkflowStep3IntendedUse from '@/components/workflow/WorkflowStep3IntendedUse';
 
 const WORKFLOWS = {
   licence: {
@@ -25,6 +26,7 @@ const WORKFLOWS = {
     steps: [
       { id: 'user-context', label: 'User Context' },
       { id: 'find',         label: 'Find Resource' },
+      { id: 'intended-use', label: 'Intended Use' },
       { id: 'match',        label: 'Match Policy',   placeholder: true },
       { id: 'apply',        label: 'Apply',          placeholder: true },
     ],
@@ -153,6 +155,9 @@ export default function KBWorkflow() {
         )}
         {steps[currentStep].id === 'find' && (
           <WorkflowStep2FindResource />
+        )}
+        {steps[currentStep].id === 'intended-use' && (
+          <WorkflowStep3IntendedUse workflowId={activeWorkflow} />
         )}
         {steps[currentStep].placeholder && steps[currentStep].id !== 'find' && (
           <div className="rounded-xl border border-border/50 bg-card flex flex-col items-center justify-center py-20 gap-3 text-center">
