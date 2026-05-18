@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { X, Loader2, RefreshCw, Building2, GraduationCap, CheckCircle2 } from 'lucide-react';
+import { X, Loader2, RefreshCw, Building2, GraduationCap, CheckCircle2, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import InstitutionVerificationBadge from '@/components/user/InstitutionVerificationBadge';
 
@@ -15,6 +15,7 @@ export default function UserProfilePanel({ onClose }) {
   const [orcid, setOrcid] = useState('');
   const [institutions, setInstitutions] = useState([]);
   const [defaultInstitution, setDefaultInstitution] = useState('');
+  const [location, setLocation] = useState(''); // ISO country code or name
   const [loadingOrcid, setLoadingOrcid] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [orcidError, setOrcidError] = useState('');
@@ -29,6 +30,7 @@ export default function UserProfilePanel({ onClose }) {
         setOrcid(freshUser.orcid || '');
         setInstitutions(freshUser.orcid_institutions || []);
         setDefaultInstitution(freshUser.default_institution || '');
+        setLocation(freshUser.location || '');
       }
     });
   }, []);
@@ -45,10 +47,15 @@ export default function UserProfilePanel({ onClose }) {
   const verifyInstitution = async (name) => {
     setVerifications(prev => ({ ...prev, [name]: { loading: true } }));
     const res = await base44.functions.invoke('verifyInstitution', { name });
+    const match = res.data?.match;
     setVerifications(prev => ({
       ...prev,
-      [name]: { loading: false, status: res.data?.status, match: res.data?.match }
+      [name]: { loading: false, status: res.data?.status, match }
     }));
+    // Use ROR country as fallback if ORCID didn't provide one
+    if (match?.country) {
+      setLocation(prev => prev || match.country);
+    }
   };
 
   const handleFetchOrcid = async () => {
@@ -57,6 +64,7 @@ export default function UserProfilePanel({ onClose }) {
     setOrcidError('');
     setInstitutions([]);
     setDefaultInstitution('');
+    setLocation('');
     setVerifications({});
     const res = await base44.functions.invoke('fetchOrcidAffiliations', { orcid: orcid.trim() });
     setLoadingOrcid(false);
@@ -68,7 +76,11 @@ export default function UserProfilePanel({ onClose }) {
       // Auto-select first employment as default
       const firstEmp = fetched.find(i => i.type === 'employment' && !i.end_year);
       setDefaultInstitution(firstEmp?.name || fetched[0]?.name || '');
-      // Verify all fetched institutions
+      // Set location from ORCID person record first
+      if (res.data?.orcid_country) {
+        setLocation(res.data.orcid_country);
+      }
+      // Verify all fetched institutions (ROR country used as fallback below)
       fetched.forEach(inst => verifyInstitution(inst.name));
     }
   };
@@ -80,6 +92,7 @@ export default function UserProfilePanel({ onClose }) {
       orcid: orcid.trim(),
       orcid_institutions: institutions,
       default_institution: defaultInstitution,
+      location: location.trim(),
     });
     setSavingProfile(false);
     setSaveSuccess(true);
@@ -183,6 +196,22 @@ export default function UserProfilePanel({ onClose }) {
           )}
 
           {/* Default institution summary */}
+          {/* Geographic location */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+              <MapPin className="w-3 h-3" /> Geographic Location
+            </label>
+            <p className="text-[11px] text-muted-foreground">
+              Auto-filled from ORCID or ROR. You can edit it manually.
+            </p>
+            <Input
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+              placeholder="e.g. Netherlands or NL"
+              className="h-8 text-sm flex-1"
+            />
+          </div>
+
           {defaultInstitution && (
             <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2.5 flex items-start gap-2">
               <CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />

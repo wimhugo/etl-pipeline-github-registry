@@ -54,6 +54,10 @@
     "default_institution": {
       "type": "string",
       "description": "Name of the default/primary institution"
+    },
+    "location": {
+      "type": "string",
+      "description": "Geographic location of the researcher (country name or ISO code), auto-filled from ORCID or ROR"
     }
   },
   "required": []
