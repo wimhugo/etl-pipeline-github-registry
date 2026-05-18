@@ -125,7 +125,23 @@ Deno.serve(async (req) => {
       const str1 = s1.toLowerCase().trim();
       const str2 = s2.toLowerCase().trim();
       if (str1 === str2) return 1.0;
-      if (str1.includes(str2) || str2.includes(str1)) return 0.8;
+      
+      // Boost score for substring matches (e.g., 'attribution' in 'Attribution Required')
+      if (str1.includes(str2) || str2.includes(str1)) {
+        // Higher score if the shorter word is at least 50% of the longer one
+        const ratio = Math.min(str1.length, str2.length) / Math.max(str1.length, str2.length);
+        if (ratio >= 0.5) return 0.95;
+        return 0.85;
+      }
+      
+      // Check for word overlap (multi-word phrases)
+      const words1 = str1.split(/\s+/);
+      const words2 = str2.split(/\s+/);
+      const commonWords = words1.filter(w => words2.includes(w));
+      if (commonWords.length > 0) {
+        const overlapRatio = commonWords.length / Math.max(words1.length, words2.length);
+        if (overlapRatio >= 0.5) return 0.9;
+      }
       
       // Levenshtein distance-based similarity
       const longer = str1.length > str2.length ? str1 : str2;
@@ -151,7 +167,7 @@ Deno.serve(async (req) => {
     };
     
     // Auto-match detected items with OpenREL items using fuzzy matching
-    const MATCH_THRESHOLD = 0.65;
+    const MATCH_THRESHOLD = 0.55;
     
     const matchedActions = detectedActions.map(detected => {
       let bestMatch = null;
