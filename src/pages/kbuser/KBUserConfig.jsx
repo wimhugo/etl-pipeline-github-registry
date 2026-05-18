@@ -409,6 +409,8 @@ export default function KBUserConfig() {
               mappingFile={form.badge_mapping_file}
               onMappingFileChange={(val) => setForm(f => ({ ...f, badge_mapping_file: val }))}
               showLoadFromGithub={true}
+              githubRepo={form.github_repo}
+              githubBranch={form.github_branch || 'main'}
             />
           </div>
           

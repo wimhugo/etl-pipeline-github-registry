@@ -146,7 +146,9 @@ export default function BadgeMappingTable({
   constraintOptions = [], 
   mappingFile, 
   onMappingFileChange,
-  showLoadFromGithub = true 
+  showLoadFromGithub = true,
+  githubRepo,
+  githubBranch = 'main'
 }) {
   const [editIdx, setEditIdx] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -173,17 +175,25 @@ export default function BadgeMappingTable({
     setLoadError(null);
     
     try {
-      const url = `https://raw.githubusercontent.com/wimhugo/openrel/main/.configs/badge_mapping.yaml?t=${Date.now()}`;
+      // Use mappingFile prop if available, otherwise default
+      const filePath = mappingFile || '.configs/badge_mapping.yaml';
+      const url = `https://raw.githubusercontent.com/${githubRepo || 'wimhugo/openrel'}/${githubBranch || 'main'}/${filePath}?t=${Date.now()}`;
+      
+      console.log('📥 Loading badge mapping from:', url);
       const response = await fetch(url, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
         }
       });
+      
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Failed to fetch badge mapping:', response.status, errorText);
         throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
       }
       const content = await response.text();
+      console.log('✅ Fetched badge mapping content');
       const parsedSections = parseYamlToSections(content);
       
       if (parsedSections.length > 0) {
@@ -192,8 +202,11 @@ export default function BadgeMappingTable({
         if (onChange) {
           onChange(parsedSections);
         }
+      } else {
+        throw new Error('No valid sections found in the file');
       }
     } catch (err) {
+      console.error('❌ Load error:', err);
       setLoadError(err.message);
     } finally {
       setLoadingFromGithub(false);
