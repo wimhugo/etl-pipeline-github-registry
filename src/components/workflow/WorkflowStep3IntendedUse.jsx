@@ -61,17 +61,17 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
   });
   const globalConfig = globalConfigs[0];
 
-  // Fetch badge mapping file from GitHub using the githubFiles function
+  // Fetch badge mapping file from GitHub raw URL
   const { data: badgeMappingFile, isLoading: isLoadingBadgeMapping, error: badgeMappingError } = useQuery({
     queryKey: ['badgeMappingFile'],
     queryFn: async () => {
-      const response = await base44.functions.invoke('githubFiles', {
-        action: 'getFile',
-        repo: 'wimhugo/openrel',
-        branch: 'main',
-        path: '.configs/badge_mapping.yaml'
-      });
-      return response.data;
+      const url = 'https://raw.githubusercontent.com/wimhugo/openrel/main/.configs/badge_mapping.yaml';
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+      }
+      const content = await response.text();
+      return { content };
     },
     retry: false,
   });
