@@ -62,13 +62,16 @@ export default function UserProfilePanel({ onClose }) {
     base44.auth.me().then(freshUser => {
       if (freshUser) {
         setOrcid(freshUser.orcid || '');
-        setInstitutions(freshUser.orcid_institutions || []);
+        const savedInstitutions = freshUser.orcid_institutions || [];
+        setInstitutions(savedInstitutions);
         setDefaultInstitution(freshUser.default_institution || '');
         // Support both old (string) and new (array) location storage
         const stored = freshUser.locations || [];
         const legacy = freshUser.location ? [{ value: freshUser.location, source: 'manual' }] : [];
         setLocations(stored.length ? stored : legacy);
         setDefaultLocation(freshUser.default_location || freshUser.location || '');
+        // Re-verify saved institutions so badges show on load
+        savedInstitutions.forEach(inst => verifyInstitution(inst.name));
       }
     });
   }, []);
