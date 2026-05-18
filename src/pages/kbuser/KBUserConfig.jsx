@@ -89,30 +89,44 @@ export default function KBUserConfig() {
 
   const subEntityFiles = form.kb_sub_entity_files || {};
   // Auto-detect constraints file if not explicitly set (same as dashboard)
-  const autoConstraintsFile = jsonFiles.find(f => f.name.toLowerCase().includes('constraint'))?.name;
+  const autoConstraintsFile = jsonFiles.find(f => f.name.toLowerCase().includes('constraint'))?.name || '';
   const constraintsFile = subEntityFiles.constraints || autoConstraintsFile;
   const dataBaseUrl = form.kb_search_data_url;
+  
+  // Debug logging
+  console.log('KBUserConfig render:', {
+    subEntityFiles,
+    autoConstraintsFile,
+    constraintsFile,
+    dataBaseUrl,
+    jsonFileCount: jsonFiles.length,
+  });
 
   // Fetch constraints file to extract labels for the dropdown
   const { data: constraintsData = [], isLoading: constraintsLoading, error: constraintsError } = useQuery({
-    queryKey: ['constraintsFile', constraintsFile, dataBaseUrl],
+    queryKey: ['constraintsFile', constraintsFile, dataBaseUrl, jsonFiles.length],
     queryFn: async () => {
       if (!constraintsFile || !dataBaseUrl) {
-        console.log('Skipping fetch - no constraintsFile or dataBaseUrl', { constraintsFile, dataBaseUrl });
+        console.log('⚠️ Skipping fetch - no constraintsFile or dataBaseUrl', { constraintsFile, dataBaseUrl });
         return [];
       }
       const url = `${dataBaseUrl}/${constraintsFile}`;
-      console.log('Fetching constraints from:', url);
+      console.log('📥 Fetching constraints from:', url);
       const res = await fetch(`${url}?_=${Date.now()}`);
       if (!res.ok) {
-        console.error('Failed to fetch constraints, status:', res.status);
+        console.error('❌ Failed to fetch constraints, status:', res.status);
         return [];
       }
       const data = await res.json();
-      console.log('Constraints data:', data);
-      // Extract labels from constraint objects
-      const labels = Array.isArray(data) ? data.map(c => c.label).filter(Boolean) : [];
-      console.log('Extracted labels:', labels);
+      console.log('📄 Constraints data structure:', Object.keys(data), 'constraints array length:', data.constraints?.length);
+      // Extract labels from constraint objects - handle both array and object with constraints key
+      let labels = [];
+      if (Array.isArray(data)) {
+        labels = data.map(c => c.label).filter(Boolean);
+      } else if (data.constraints && Array.isArray(data.constraints)) {
+        labels = data.constraints.map(c => c.label).filter(Boolean);
+      }
+      console.log('✅ Extracted labels:', labels);
       return labels;
     },
     enabled: !!constraintsFile && !!dataBaseUrl,
