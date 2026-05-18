@@ -79,7 +79,7 @@ export default function BadgeMappingTable({ rows = [], onChange }) {
   return (
     <div className="space-y-2">
       {/* Header */}
-      <div className="grid grid-cols-[1fr_1fr_120px_1fr_32px] gap-2 px-2 pb-1 border-b border-border/40">
+      <div className="grid grid-cols-[1.5fr_1.5fr_140px_2fr_32px] gap-3 px-3 pb-2 border-b border-border/40">
         {['Profile Badge', 'Context Badge', 'Badge Colour', 'Constraint Mapping', ''].map((h, i) => (
           <span key={i} className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{h}</span>
         ))}
@@ -87,13 +87,13 @@ export default function BadgeMappingTable({ rows = [], onChange }) {
 
       {/* Rows */}
       {rows.length === 0 && (
-        <p className="text-xs text-muted-foreground italic px-2 py-2">No mappings yet. Add a row below.</p>
+        <p className="text-xs text-muted-foreground italic px-3 py-2">No mappings yet. Add a row below.</p>
       )}
       {rows.map((row, idx) => (
         <div
           key={idx}
           className={cn(
-            "grid grid-cols-[1fr_1fr_120px_1fr_32px] gap-2 items-center px-2 py-1.5 rounded-md transition-colors",
+            "grid grid-cols-[1.5fr_1.5fr_140px_2fr_32px] gap-3 items-center px-3 py-2 rounded-md transition-colors",
             editIdx === idx ? "bg-muted/30" : "hover:bg-muted/20"
           )}
           onClick={() => setEditIdx(idx)}
