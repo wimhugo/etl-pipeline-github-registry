@@ -89,19 +89,31 @@ export default function KBUserConfig() {
 
   const subEntityFiles = form.kb_sub_entity_files || {};
   const constraintsFile = subEntityFiles.constraints;
+  const dataBaseUrl = parsed?.rawUrl || form.kb_search_data_url;
 
   // Fetch constraints file to extract labels for the dropdown
   const { data: constraintsData = [] } = useQuery({
-    queryKey: ['constraintsFile', constraintsFile, form.kb_search_data_url],
+    queryKey: ['constraintsFile', constraintsFile, dataBaseUrl],
     queryFn: async () => {
-      if (!constraintsFile || !form.kb_search_data_url) return [];
-      const res = await fetch(`${form.kb_search_data_url}/${constraintsFile}?_=${Date.now()}`);
-      if (!res.ok) return [];
+      if (!constraintsFile || !dataBaseUrl) {
+        console.log('Skipping fetch - no constraintsFile or dataBaseUrl', { constraintsFile, dataBaseUrl });
+        return [];
+      }
+      const url = `${dataBaseUrl}/${constraintsFile}`;
+      console.log('Fetching constraints from:', url);
+      const res = await fetch(`${url}?_=${Date.now()}`);
+      if (!res.ok) {
+        console.error('Failed to fetch constraints, status:', res.status);
+        return [];
+      }
       const data = await res.json();
+      console.log('Constraints data:', data);
       // Extract labels from constraint objects
-      return Array.isArray(data) ? data.map(c => c.label).filter(Boolean) : [];
+      const labels = Array.isArray(data) ? data.map(c => c.label).filter(Boolean) : [];
+      console.log('Extracted labels:', labels);
+      return labels;
     },
-    enabled: !!constraintsFile && !!form.kb_search_data_url,
+    enabled: !!constraintsFile && !!dataBaseUrl,
   });
 
   const setSubEntityFile = (hint, value) => {
