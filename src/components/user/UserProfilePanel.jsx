@@ -12,6 +12,24 @@ import {
 import { cn } from '@/lib/utils';
 import InstitutionVerificationBadge from '@/components/user/InstitutionVerificationBadge';
 
+// EU member states — ISO alpha-2 codes and common names (locn:adminUnitL1 context)
+const EU_MEMBERS = new Set([
+  'AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI','FR','GR','HR','HU',
+  'IE','IT','LT','LU','LV','MT','NL','PL','PT','RO','SE','SI','SK',
+  // common English names
+  'austria','belgium','bulgaria','croatia','cyprus','czechia','czech republic',
+  'denmark','estonia','finland','france','germany','greece','hungary','ireland',
+  'italy','latvia','lithuania','luxembourg','malta','netherlands','poland',
+  'portugal','romania','slovakia','slovenia','spain','sweden',
+]);
+
+function isEULocation(value) {
+  if (!value) return false;
+  const v = value.trim().toLowerCase();
+  // Match ISO-2 code or full name
+  return EU_MEMBERS.has(v) || EU_MEMBERS.has(v.toUpperCase());
+}
+
 // Collapsible section wrapper
 function Section({ title, icon: Icon, defaultOpen = false, badge, children }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -370,10 +388,18 @@ export default function UserProfilePanel({ onClose }) {
                         : "border-border/50 bg-muted/20 hover:border-border hover:bg-muted/40"
                     )}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
                       <span className="text-xs font-medium text-foreground">{loc.value}</span>
                       <span className="text-[10px] text-muted-foreground/60 capitalize">{loc.source}</span>
+                      {isEULocation(loc.value) && (
+                        <span
+                          title="EU member state — locn:adminUnitL1 (W3C Loc-n vocabulary)"
+                          className="inline-flex items-center gap-1 rounded-full border text-[9px] px-1.5 py-0 bg-blue-500/10 text-blue-400 border-blue-400/30 font-medium cursor-help"
+                        >
+                          🇪🇺 EU
+                        </span>
+                      )}
                     </div>
                     {defaultLocation === loc.value && (
                       <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
