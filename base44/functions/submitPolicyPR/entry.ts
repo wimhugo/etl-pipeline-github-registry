@@ -33,8 +33,25 @@ Deno.serve(async (req) => {
   // If file_path doesn't start with http, it's a relative path - use it as-is
   const filePath = file_path.startsWith('http') ? file_path : file_path;
 
+  // Clean file_path if it's a full URL
+  let cleanFilePath = file_path;
+  if (file_path.includes('github.com')) {
+    // Extract path from raw URL: https://raw.githubusercontent.com/owner/repo/branch/path -> path
+    const rawMatch = file_path.match(/raw\.githubusercontent\.com\/[^/]+\/[^/]+\/[^/]+\/(.+)$/);
+    if (rawMatch) {
+      cleanFilePath = rawMatch[1];
+    } else {
+      // Extract path from browser URL: https://github.com/owner/repo/tree/branch/path -> path
+      const browserMatch = file_path.match(/github\.com\/[^/]+\/[^/]+\/(?:tree|blob)\/[^/]+\/(.+)$/);
+      if (browserMatch) {
+        cleanFilePath = browserMatch[1];
+      }
+    }
+    console.log('Cleaned file_path from URL to:', cleanFilePath);
+  }
+
   // 1. Fetch the current file from GitHub API to get SHA and content (or detect if it doesn't exist)
-  const apiBase = `https://api.github.com/repos/${targetRepo}/contents/${file_path}`;
+  const apiBase = `https://api.github.com/repos/${targetRepo}/contents/${cleanFilePath}`;
   console.log('Fetching file from:', apiBase);
   const fileRes = await fetch(`${apiBase}?ref=${targetBranch}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
@@ -95,11 +112,11 @@ Deno.serve(async (req) => {
 
   // 4. Commit the updated file to the new branch
   console.log('Committing file to branch:', prBranch);
-  const commitRes = await fetch(apiBase, {
+  const commitRes = await fetch(`https://api.github.com/repos/${targetRepo}/contents/${cleanFilePath}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      message: message || `Update ${file_path}`,
+      message: message || `Update ${cleanFilePath}`,
       content: updatedContent,
       sha: sha || undefined,
       branch: prBranch,
@@ -118,8 +135,8 @@ Deno.serve(async (req) => {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      title: `[Update] ${file_path}`,
-      body: `Submitting update to "${file_path}" for review.\n\nChanges: ${message || 'Content update'}`,
+      title: `[Update] ${cleanFilePath}`,
+      body: `Submitting update to "${cleanFilePath}" for review.\n\nChanges: ${message || 'Content update'}`,
       head: prBranch,
       base: targetBranch,
     }),
