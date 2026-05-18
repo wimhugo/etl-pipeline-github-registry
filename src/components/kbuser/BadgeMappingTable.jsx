@@ -188,11 +188,20 @@ export default function BadgeMappingTable({
       const cleanPath = mappingFile.replace(/^\//, '');
       console.log('📥 Fetching via backend function:', { repo: githubRepo, branch: githubBranch, path: cleanPath });
       
+      // First, get the GitHub token from GlobalConfig
+      const configs = await base44.entities.GlobalConfig.filter({});
+      const githubToken = configs && configs.length > 0 ? configs[0].github_token : null;
+      
+      if (!githubToken) {
+        throw new Error('GitHub token not configured. Please set it in KB Manager Settings.');
+      }
+      
       const response = await base44.functions.invoke('githubFiles', {
         action: 'getFile',
         repo: githubRepo,
         branch: githubBranch,
-        path: cleanPath
+        path: cleanPath,
+        github_token: githubToken
       });
       
       if (!response.data || !response.data.content) {
