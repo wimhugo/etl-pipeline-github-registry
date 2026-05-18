@@ -53,8 +53,6 @@ function parseBadgeMappingYaml(yamlText) {
 export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
   const [selectedUses, setSelectedUses] = useState([]);
   const [expandedSections, setExpandedSections] = useState({});
-  const [yamlContent, setYamlContent] = useState(null);
-  const [parsedData, setParsedData] = useState(null);
 
   // Fetch badge mappings from GlobalConfig
   const { data: globalConfigs = [] } = useQuery({
@@ -63,30 +61,22 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
   });
   const globalConfig = globalConfigs[0];
 
-  // Fetch badge mapping file content from GitHub
-  useEffect(() => {
-    const fetchYamlContent = async () => {
-      if (!globalConfig?.badge_mapping_file || !globalConfig?.kb_search_data_url) {
-        return;
+  // Convert badge_mappings array to the expected format
+  const parsedData = globalConfig?.badge_mappings
+    ? {
+        sections: [
+          {
+            context: 'Intended Use',
+            items: globalConfig.badge_mappings
+              .filter(m => m.profileBadge && !m.profileBadge.toLowerCase().includes('verified'))
+              .map(m => ({
+                name: m.profileBadge,
+                profileBadges: [m.profileBadge]
+              }))
+          }
+        ]
       }
-      
-      try {
-        // Try to fetch from GitHub raw URL
-        const rawUrl = `${globalConfig.kb_search_data_url}/${globalConfig.badge_mapping_file}`;
-        const res = await fetch(rawUrl);
-        if (res.ok) {
-          const text = await res.text();
-          setYamlContent(text);
-          const parsed = parseBadgeMappingYaml(text);
-          setParsedData(parsed);
-        }
-      } catch (error) {
-        console.error('Failed to fetch badge mapping YAML:', error);
-      }
-    };
-
-    fetchYamlContent();
-  }, [globalConfig?.badge_mapping_file, globalConfig?.kb_search_data_url]);
+    : null;
 
   // Load saved selections from localStorage
   useEffect(() => {
@@ -141,17 +131,7 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
             Select the intended use(s) and ethics considerations based on your verified context badges.
           </p>
 
-          {!yamlContent && !parsedData ? (
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/40">
-              <AlertCircle className="w-5 h-5 text-muted-foreground shrink-0" />
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium">Loading badge mapping configuration...</p>
-                <p className="text-xs mt-1">
-                  Please ensure badge-mapping.yaml is configured in KB User Configuration.
-                </p>
-              </div>
-            </div>
-          ) : relevantSections.length === 0 ? (
+          {!parsedData || relevantSections.length === 0 ? (
             <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/40">
               <AlertCircle className="w-5 h-5 text-muted-foreground shrink-0" />
               <div className="text-sm text-muted-foreground">
