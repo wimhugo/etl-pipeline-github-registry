@@ -183,6 +183,9 @@ export default function KBUserConfig() {
   const handleSave = () => {
     saveMutation.mutate({
       ...form,
+      kb_sub_entity_files: form.kb_sub_entity_files || {},
+      badge_mapping_file: form.badge_mapping_file,
+      badge_mappings: form.badge_mappings,
       ...(parsed ? { kb_search_data_api_url: parsed.apiUrl, kb_search_data_url: parsed.rawUrl } : {}),
     });
   };
