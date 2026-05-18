@@ -55,8 +55,8 @@ export default function WorkflowStep2FindResource() {
     setExtractingLicense(true);
     setError(null);
 
-    // If no metadata available, show the toast about upcoming HTML extraction
-    if (!result?.metadata) {
+    // If no metadata available (or only URL), show the toast about upcoming HTML extraction
+    if (!result?.metadata || (Object.keys(result.metadata).length === 1 && result.metadata.url)) {
       toast({
         title: 'HTML-based license extraction coming soon',
         description: 'We will attempt to extract rights, access, and license data from the target URL HTML.',
