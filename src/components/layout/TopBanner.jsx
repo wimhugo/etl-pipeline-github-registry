@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useRole, ROLES, APP_CONTAINERS } from '@/lib/RoleContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -7,11 +7,13 @@ import { LogIn, LogOut, User } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import UserProfilePanel from '@/components/user/UserProfilePanel';
 
 export default function TopBanner() {
   const { activeRole, selectRole, activeContainer, selectContainer } = useRole();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const handleContainerSwitch = (c) => {
     selectContainer(c);
@@ -66,10 +68,17 @@ export default function TopBanner() {
       {/* User / Auth */}
       {user ? (
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground hidden sm:flex">
+          <button
+            onClick={() => setProfileOpen(true)}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors hidden sm:flex"
+            title="Open profile"
+          >
             <User className="w-3.5 h-3.5" />
             <span className="max-w-[120px] truncate">{user.full_name || user.email}</span>
-          </div>
+          </button>
+          <Button variant="ghost" size="icon" className="h-7 w-7 sm:hidden" onClick={() => setProfileOpen(true)} title="Open profile">
+            <User className="w-3.5 h-3.5" />
+          </Button>
           <Button variant="ghost" size="sm" onClick={handleLogout} className="h-7 px-2 text-xs gap-1">
             <LogOut className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Logout</span>
@@ -81,6 +90,8 @@ export default function TopBanner() {
           Login
         </Button>
       )}
+
+      {profileOpen && <UserProfilePanel onClose={() => setProfileOpen(false)} />}
     </div>
   );
 }

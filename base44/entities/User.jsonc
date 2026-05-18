@@ -12,6 +12,49 @@
       ],
       "default": "Contributor",
       "description": "User role determining feature access"
+    },
+    "orcid": {
+      "type": "string",
+      "description": "ORCID iD of the researcher (e.g. 0000-0002-1825-0097)"
+    },
+    "orcid_institutions": {
+      "type": "array",
+      "description": "List of institutions retrieved from ORCID",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "department": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "start_year": {
+            "type": "string"
+          },
+          "end_year": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "employment or education"
+          }
+        }
+      }
+    },
+    "default_institution": {
+      "type": "string",
+      "description": "Name of the default/primary institution"
     }
-  }
+  },
+  "required": []
 }
