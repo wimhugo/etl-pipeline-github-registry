@@ -36,14 +36,19 @@ export default function ObjectAnalysis() {
     const fetchOpenrelActions = async () => {
       try {
         const configs = await base44.entities.GlobalConfig.list();
+        console.log('GlobalConfig count:', configs?.length);
         if (configs && configs.length > 0) {
           const config = configs[0];
           const subEntityFiles = config.kb_sub_entity_files || {};
           const dataBaseUrl = config.kb_search_data_url;
+          console.log('subEntityFiles:', subEntityFiles);
+          console.log('dataBaseUrl:', dataBaseUrl);
           
           if (subEntityFiles.actions && dataBaseUrl) {
             const actionsUrl = `${dataBaseUrl}/${subEntityFiles.actions}`;
+            console.log('Fetching from:', actionsUrl);
             const actionsRes = await fetch(actionsUrl);
+            console.log('Response status:', actionsRes.status);
             if (actionsRes.ok) {
               const actionsData = await actionsRes.json();
               let actions = [];
@@ -53,14 +58,14 @@ export default function ObjectAnalysis() {
                 actions = actionsData.actions;
               }
               setOpenrelActions(actions);
+              console.log('Loaded actions:', actions.length);
             }
           }
         }
       } catch (e) {
-        console.log('Could not fetch OpenREL actions:', e.message);
+        console.log('Error fetching actions:', e.message);
       }
     };
-    
     fetchOpenrelActions();
   }, []);
 
@@ -306,13 +311,13 @@ export default function ObjectAnalysis() {
                           <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
                             <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
                             <span className="font-mono flex-1">{pattern}</span>
-                            {openrelActions.length > 0 && (
+                            {openrelActions.length > 0 ? (
                               <Select
                                 value={actionMappings[mappingKey] || ''}
                                 onValueChange={(value) => setActionMappings(prev => ({ ...prev, [mappingKey]: value }))}
                               >
-                                <SelectTrigger className="w-[180px] h-7 text-xs">
-                                  <SelectValue placeholder="Map to OpenREL Action" />
+                                <SelectTrigger className="w-[200px] h-8 text-xs">
+                                  <SelectValue placeholder="Map to Action" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {openrelActions.map((action, actionIdx) => (
@@ -322,6 +327,8 @@ export default function ObjectAnalysis() {
                                   ))}
                                 </SelectContent>
                               </Select>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">No OpenREL Actions loaded</Badge>
                             )}
                           </div>
                         );
