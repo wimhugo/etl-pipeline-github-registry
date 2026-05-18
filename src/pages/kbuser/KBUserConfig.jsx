@@ -88,6 +88,21 @@ export default function KBUserConfig() {
   }
 
   const subEntityFiles = form.kb_sub_entity_files || {};
+  const constraintsFile = subEntityFiles.constraints;
+
+  // Fetch constraints file to extract labels for the dropdown
+  const { data: constraintsData = [] } = useQuery({
+    queryKey: ['constraintsFile', constraintsFile, form.kb_search_data_url],
+    queryFn: async () => {
+      if (!constraintsFile || !form.kb_search_data_url) return [];
+      const res = await fetch(`${form.kb_search_data_url}/${constraintsFile}?_=${Date.now()}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      // Extract labels from constraint objects
+      return Array.isArray(data) ? data.map(c => c.label).filter(Boolean) : [];
+    },
+    enabled: !!constraintsFile && !!form.kb_search_data_url,
+  });
 
   const setSubEntityFile = (hint, value) => {
     setForm(f => ({
@@ -181,6 +196,7 @@ export default function KBUserConfig() {
           <BadgeMappingTable
             rows={form.badge_mappings || []}
             onChange={rows => setForm(f => ({ ...f, badge_mappings: rows }))}
+            constraintOptions={constraintsData}
           />
         </CardContent>
       </Card>

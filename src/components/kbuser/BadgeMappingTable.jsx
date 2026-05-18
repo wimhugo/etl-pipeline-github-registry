@@ -61,7 +61,7 @@ const CONTEXT_BADGE_OPTIONS = [
 
 const EMPTY_ROW = { profileBadge: '', contextBadge: '', colour: 'muted', constraintMapping: '' };
 
-export default function BadgeMappingTable({ rows = [], onChange }) {
+export default function BadgeMappingTable({ rows = [], onChange, constraintOptions = [] }) {
   const [editIdx, setEditIdx] = useState(null);
 
   const update = (idx, field, value) => {
@@ -135,13 +135,17 @@ export default function BadgeMappingTable({ rows = [], onChange }) {
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
-              <Input
+              <select
                 value={row.constraintMapping}
                 onChange={e => update(idx, 'constraintMapping', e.target.value)}
-                className="h-7 text-xs bg-muted/50"
-                placeholder="e.g. hei_researcher, eu_member"
+                className="h-7 text-xs rounded-md border border-input bg-muted/50 px-1.5 text-foreground"
                 onClick={e => e.stopPropagation()}
-              />
+              >
+                <option value="">— Select constraint —</option>
+                {constraintOptions.map(o => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
             </>
           ) : (
             <>
@@ -151,7 +155,7 @@ export default function BadgeMappingTable({ rows = [], onChange }) {
                 <span className={cn("w-4 h-4 rounded-full border", COLOUR_OPTIONS.find(o => o.value === row.colour)?.swatch || 'bg-muted-foreground')} />
                 <span className="text-xs text-foreground">{COLOUR_OPTIONS.find(o => o.value === row.colour)?.label || row.colour}</span>
               </div>
-              <span className="text-xs text-muted-foreground truncate">{row.constraintMapping || '—'}</span>
+              <span className="text-xs text-foreground truncate">{row.constraintMapping || '—'}</span>
             </>
           )}
           <Button
