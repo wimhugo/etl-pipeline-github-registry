@@ -6,29 +6,46 @@ import { base44 } from '@/api/base44Client';
 
 /**
  * Matching logic:
- * 1. For each selected scenario ID, find constraints where constraint.scenario === scenario.label (string match)
- * 2. Collect all matched constraint IDs
- * 3. Find policies where ALL collected constraint IDs appear in the policy's rules (permissions/prohibitions/duties)
+ * 1. For each selected scenario ID, find constraints where constraint.scenario matches the scenario
+ *    by label OR by id (since constraints may reference scenarios either way), and handles arrays.
+ * 2. Collect all matched constraint IDs (union across all selected scenarios)
+ * 3. Find policies that contain ANY of the required constraint IDs in their rules
+ *    (a policy matches if it references at least one constraint linked to the selected scenarios)
  */
+function normalizeStr(s) {
+  return String(s || '').trim().toLowerCase();
+}
+
 function runMatch(scenario, scenarioLabelMap, constraintsArray, policies) {
   const selectedIds = scenario.selected_scenario_ids || [];
 
-  // Step 1: collect constraint IDs linked to selected scenarios by label match
+  // Step 1: collect constraint IDs linked to selected scenarios
+  // Match by scenario id OR label (case-insensitive, trimmed)
   const requiredConstraintIds = new Set();
+  const matchedConstraints = []; // for debug display
+
   for (const sid of selectedIds) {
     const label = scenarioLabelMap[sid] || sid;
+    const normSid = normalizeStr(sid);
+    const normLabel = normalizeStr(label);
+
     for (const c of constraintsArray) {
       const cScenario = c.scenario || c.Scenario;
-      const scenarios = Array.isArray(cScenario) ? cScenario : (cScenario ? [String(cScenario)] : []);
-      if (scenarios.some(s => String(s).trim() === label.trim())) {
-        if (c.id) requiredConstraintIds.add(c.id);
+      const scenarioRefs = Array.isArray(cScenario) ? cScenario : (cScenario ? [cScenario] : []);
+      const matched = scenarioRefs.some(s => {
+        const ns = normalizeStr(s);
+        return ns === normLabel || ns === normSid;
+      });
+      if (matched && c.id) {
+        requiredConstraintIds.add(c.id);
+        matchedConstraints.push(c);
       }
     }
   }
 
-  if (requiredConstraintIds.size === 0) return { matches: [], requiredConstraintIds: [] };
+  if (requiredConstraintIds.size === 0) return { matches: [], requiredConstraintIds: [], matchedConstraints: [] };
 
-  // Step 2: find policies that contain ALL required constraint IDs in their rules
+  // Step 2: find policies that contain AT LEAST ONE of the required constraint IDs
   function policyConstraintIds(policy) {
     const ids = new Set();
     for (const ruleType of ['permission', 'permissions', 'prohibition', 'prohibitions', 'obligation', 'obligations', 'duty', 'duties']) {
@@ -49,10 +66,10 @@ function runMatch(scenario, scenarioLabelMap, constraintsArray, policies) {
 
   const matches = policies.filter(p => {
     const pIds = new Set([...policyConstraintIds(p)].map(normalizeId));
-    return [...requiredConstraintIds].every(id => pIds.has(normalizeId(id)));
+    return [...requiredConstraintIds].some(id => pIds.has(normalizeId(id)));
   });
 
-  return { matches, requiredConstraintIds: [...requiredConstraintIds] };
+  return { matches, requiredConstraintIds: [...requiredConstraintIds], matchedConstraints };
 }
 
 export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, constraintsArray = [], policies = [], dataReady = false, onEdit, onClone, onDelete, onSaved }) {
@@ -197,16 +214,31 @@ export default function UserScenarioCard({ scenario, scenarioLabelMap = {}, cons
               </div>
               {matchResult.requiredConstraintIds.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic">No constraints found for selected scenarios — check your constraints file configuration.</p>
-              ) : matchResult.matches.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic">No policies match all required constraints.</p>
               ) : (
-                <div className="flex flex-col gap-1">
-                  {matchResult.matches.map(p => (
-                    <span key={p.id} className="inline-flex items-center rounded border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs text-foreground/90 w-fit">
-                      {p.label || p.id}
-                    </span>
-                  ))}
-                </div>
+                <>
+                  {/* Matched constraints (debug / transparency) */}
+                  <div className="mb-2">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Matched Constraints</p>
+                    <div className="flex flex-col gap-1">
+                      {matchResult.matchedConstraints.map(c => (
+                        <span key={c.id} className="inline-flex items-center rounded border border-border/50 bg-muted/30 px-2.5 py-1 text-[11px] font-mono text-muted-foreground w-fit">
+                          {c.label ? `${c.label} (${c.id})` : c.id}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {matchResult.matches.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">No policies reference these constraints.</p>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {matchResult.matches.map(p => (
+                        <span key={p.id} className="inline-flex items-center rounded border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs text-foreground/90 w-fit">
+                          {p.label || p.id}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
