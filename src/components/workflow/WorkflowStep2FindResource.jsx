@@ -3,12 +3,14 @@ import { base44 } from '@/api/base44Client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Loader2, Search, AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Search, AlertCircle, CheckCircle2, ExternalLink, FileText, Lock, Unlock, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function WorkflowStep2FindResource() {
   const [pid, setPid] = useState('');
   const [loading, setLoading] = useState(false);
+  const [extractingLicense, setExtractingLicense] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
@@ -28,14 +30,42 @@ export default function WorkflowStep2FindResource() {
         return;
       }
 
-      setResult({
+      const resolvedData = {
         pid: pid.trim(),
-        redirectURL: response.data.redirectURL
-      });
+        redirectURL: response.data.redirectURL,
+        metadata: response.data.metadata
+      };
+
+      setResult(resolvedData);
     } catch (err) {
       setError(err.message || 'Failed to resolve PID');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExtractLicense = async () => {
+    if (!result?.metadata) return;
+
+    setExtractingLicense(true);
+    setError(null);
+
+    try {
+      const response = await base44.functions.invoke('extractLicenseInfo', { metadata: result.metadata });
+      
+      if (response.status !== 200) {
+        setError('Failed to extract license information');
+        return;
+      }
+
+      setResult(prev => ({
+        ...prev,
+        licenseInfo: response.data
+      }));
+    } catch (err) {
+      setError(err.message || 'Failed to extract license information');
+    } finally {
+      setExtractingLicense(false);
     }
   };
 
@@ -79,27 +109,128 @@ export default function WorkflowStep2FindResource() {
           )}
 
           {result && (
-            <div className="space-y-3 p-4 rounded-lg bg-accent/10 border border-accent/20">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-accent shrink-0 mt-0.5" />
-                <div className="flex-1 space-y-2">
-                  <p className="font-medium text-sm text-foreground">PID Resolved</p>
-                  <div className="space-y-1.5 text-xs">
-                    <p className="text-muted-foreground">
-                      <span className="font-medium text-foreground">PID:</span> {result.pid}
-                    </p>
-                    <a
-                      href={result.redirectURL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-primary hover:underline"
-                    >
-                      View Resource
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+            <div className="space-y-3">
+              <div className="p-4 rounded-lg bg-accent/10 border border-accent/20">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+                  <div className="flex-1 space-y-2">
+                    <p className="font-medium text-sm text-foreground">PID Resolved</p>
+                    <div className="space-y-1.5 text-xs">
+                      <p className="text-muted-foreground">
+                        <span className="font-medium text-foreground">PID:</span> {result.pid}
+                      </p>
+                      <a
+                        href={result.redirectURL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-primary hover:underline"
+                      >
+                        View Resource
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              {!result.licenseInfo && (
+                <Button
+                  onClick={handleExtractLicense}
+                  disabled={extractingLicense}
+                  variant="outline"
+                  className="w-full gap-2"
+                >
+                  {extractingLicense && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <FileText className="w-4 h-4" />
+                  {extractingLicense ? 'Extracting...' : 'Extract License & Rights'}
+                </Button>
+              )}
+
+              {result.licenseInfo && (
+                <Card className="bg-card border-border/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-primary" />
+                      License & Access Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={result.licenseInfo.confidence === 'high' ? 'default' : result.licenseInfo.confidence === 'medium' ? 'secondary' : 'destructive'}>
+                        Confidence: {result.licenseInfo.confidence}
+                      </Badge>
+                    </div>
+
+                    {result.licenseInfo.license.name && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground">License</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-foreground">{result.licenseInfo.license.name}</span>
+                          {result.licenseInfo.license.url && (
+                            <a
+                              href={result.licenseInfo.license.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline inline-flex items-center gap-1"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {result.licenseInfo.accessConditions && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                          <Lock className="w-3 h-3" /> Access Conditions
+                        </p>
+                        <p className="text-sm text-foreground">{result.licenseInfo.accessConditions}</p>
+                      </div>
+                    )}
+
+                    {result.licenseInfo.usageRights && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                          <Unlock className="w-3 h-3" /> Usage Rights
+                        </p>
+                        <p className="text-sm text-foreground">{result.licenseInfo.usageRights}</p>
+                      </div>
+                    )}
+
+                    {result.licenseInfo.restrictions?.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground">Restrictions</p>
+                        <ul className="text-sm text-foreground list-disc list-inside space-y-0.5">
+                          {result.licenseInfo.restrictions.map((restriction, idx) => (
+                            <li key={idx}>{restriction}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {result.licenseInfo.embargoInfo?.hasEmbargo && (
+                      <div className="space-y-1 p-2 rounded bg-muted/30">
+                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                          <Clock className="w-3 h-3" /> Embargo
+                        </p>
+                        {result.licenseInfo.embargoInfo.embargoDate && (
+                          <p className="text-sm">Ends: {result.licenseInfo.embargoInfo.embargoDate}</p>
+                        )}
+                        {result.licenseInfo.embargoInfo.embargoReason && (
+                          <p className="text-sm text-muted-foreground">{result.licenseInfo.embargoInfo.embargoReason}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {result.licenseInfo.notes && (
+                      <div className="text-xs text-muted-foreground italic">
+                        {result.licenseInfo.notes}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
         </CardContent>

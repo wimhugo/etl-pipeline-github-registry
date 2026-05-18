@@ -36,7 +36,8 @@ Deno.serve(async (req) => {
         
         return Response.json({ 
             redirectURL: data.url,
-            pid: data.pid
+            pid: data.pid,
+            metadata: data
         });
     } catch (error) {
         return Response.json({ error: error.message }, { status: 500 });
