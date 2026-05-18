@@ -175,10 +175,31 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
     }));
   };
 
-  // Filter out "User" context, keep only "Intended Use" and "Ethics Considerations"
+  // Filter sections
+  const userSection = parsedData?.sections.find(s => s.context === 'User');
   const relevantSections = parsedData?.sections.filter(
     s => s.context !== 'User' && (s.context === 'Intended Use' || s.context === 'Ethics Considerations')
   ) || [];
+
+  // Build summary badges for selected intended uses
+  const selectedBadges = React.useMemo(() => {
+    if (!relevantSections.length || !selectedUses.length) return [];
+    
+    const badges = [];
+    relevantSections.forEach(section => {
+      section.items.forEach(item => {
+        if (selectedUses.includes(item.name)) {
+          // Add a badge for each selected item
+          badges.push({
+            label: item.name,
+            type: 'selected',
+            colour: 'primary'
+          });
+        }
+      });
+    });
+    return badges;
+  }, [selectedUses, relevantSections]);
 
   return (
     <div className="space-y-4">
@@ -187,38 +208,64 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
           <CardTitle className="text-base">Reuse Context</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Verified Context Summary */}
-          <div className="rounded-lg border border-border/40 bg-muted/30 p-4">
-            <div className="flex items-center gap-2 mb-3">
+          {/* Summary Section */}
+          <div className="rounded-lg border border-border/40 bg-muted/30 p-4 space-y-3">
+            <div className="flex items-center gap-2">
               <FileJson className="w-4 h-4 text-muted-foreground" />
-              <Label className="text-sm font-semibold text-foreground">Verified Context</Label>
+              <Label className="text-sm font-semibold text-foreground">Summary</Label>
             </div>
-            {verifiedContextBadges.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {verifiedContextBadges.map((badge, idx) => {
-                  const colourClass = {
-                    'accent': 'bg-accent/15 text-accent border-accent/40',
-                    'primary': 'bg-primary/15 text-primary border-primary/40',
-                    'chart-3': 'bg-chart-3/15 text-chart-3 border-chart-3/40',
-                    'chart-4': 'bg-chart-4/15 text-chart-4 border-chart-4/40',
-                    'chart-5': 'bg-chart-5/15 text-chart-5 border-chart-5/40',
-                    'destructive': 'bg-destructive/15 text-destructive border-destructive/40',
-                    'muted': 'bg-muted/40 text-muted-foreground border-border/50',
-                  }[badge.colour] || 'bg-muted/40 text-muted-foreground border-border/50';
-                  
-                  return (
+            
+            {/* Verified Context Badges */}
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Your Context</p>
+              {verifiedContextBadges.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {verifiedContextBadges.map((badge, idx) => {
+                    const colourClass = {
+                      'accent': 'bg-accent/15 text-accent border-accent/40',
+                      'primary': 'bg-primary/15 text-primary border-primary/40',
+                      'chart-3': 'bg-chart-3/15 text-chart-3 border-chart-3/40',
+                      'chart-4': 'bg-chart-4/15 text-chart-4 border-chart-4/40',
+                      'chart-5': 'bg-chart-5/15 text-chart-5 border-chart-5/40',
+                      'destructive': 'bg-destructive/15 text-destructive border-destructive/40',
+                      'muted': 'bg-muted/40 text-muted-foreground border-border/50',
+                    }[badge.colour] || 'bg-muted/40 text-muted-foreground border-border/50';
+                    
+                    return (
+                      <Badge
+                        key={idx}
+                        variant="outline"
+                        className={cn("text-xs px-2.5 py-1 border", colourClass)}
+                      >
+                        {badge.label}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">Complete step 1 to populate your context.</p>
+              )}
+            </div>
+            
+            {/* Selected Intended Uses Badges */}
+            {selectedBadges.length > 0 && (
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Selected Uses</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedBadges.map((badge, idx) => (
                     <Badge
                       key={idx}
                       variant="outline"
-                      className={cn("text-xs px-2.5 py-1 border", colourClass)}
+                      className={cn(
+                        "text-xs px-2.5 py-1 border",
+                        badge.colour === 'primary' ? 'bg-primary/15 text-primary border-primary/40' : 'bg-muted/40 text-muted-foreground border-border/50'
+                      )}
                     >
                       {badge.label}
                     </Badge>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            ) : (
-              <p className="text-xs text-muted-foreground italic">No verified context badges. Complete step 1 to populate your context.</p>
             )}
           </div>
 
