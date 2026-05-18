@@ -173,6 +173,8 @@ export default function UserProfilePanel({ onClose }) {
   const handleSave = async () => {
     setSavingProfile(true);
     setSaveSuccess(false);
+    // Persist ROR verification result for the primary institution
+    const primaryVerif = defaultInstitution ? verifications[defaultInstitution] : null;
     await base44.auth.updateMe({
       orcid: orcid.trim(),
       orcid_institutions: institutions,
@@ -182,6 +184,9 @@ export default function UserProfilePanel({ onClose }) {
       // keep legacy field in sync
       location: defaultLocation,
       research_contexts: researchContexts,
+      // persist verification so workflow step can display it without re-querying ROR
+      primary_institution_status: primaryVerif?.status || null,
+      primary_institution_ror: primaryVerif?.match || null,
     });
     setSavingProfile(false);
     setSaveSuccess(true);
