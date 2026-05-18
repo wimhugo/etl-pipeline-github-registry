@@ -19,14 +19,16 @@ export default function UserProfilePanel({ onClose }) {
   const [orcidError, setOrcidError] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Load existing profile data
+  // Load fresh profile data from API when panel opens
   useEffect(() => {
-    if (user) {
-      setOrcid(user.orcid || '');
-      setInstitutions(user.orcid_institutions || []);
-      setDefaultInstitution(user.default_institution || '');
-    }
-  }, [user]);
+    base44.auth.me().then(freshUser => {
+      if (freshUser) {
+        setOrcid(freshUser.orcid || '');
+        setInstitutions(freshUser.orcid_institutions || []);
+        setDefaultInstitution(freshUser.default_institution || '');
+      }
+    });
+  }, []);
 
   // Close on outside click
   useEffect(() => {
