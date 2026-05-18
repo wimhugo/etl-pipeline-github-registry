@@ -107,12 +107,23 @@ export default function UserProfilePanel({ onClose }) {
 
   const addLocation = (value, source = 'orcid') => {
     if (!value) return;
+    // Normalise to uppercase ISO-2 code if it looks like one (1-3 chars)
+    const normalised = value.trim().length <= 3 ? value.trim().toUpperCase() : value.trim();
     setLocations(prev => {
-      const exists = prev.find(l => l.value === value);
-      if (exists) return prev;
-      const updated = [...prev, { value, source }];
-      // Auto-select first if nothing selected yet
-      setDefaultLocation(dl => dl || value);
+      const existing = prev.find(l => l.value === normalised);
+      if (existing) {
+        // Merge source if not already listed
+        if (!existing.sources?.includes(source)) {
+          return prev.map(l =>
+            l.value === normalised
+              ? { ...l, sources: [...(l.sources || [l.source]), source] }
+              : l
+          );
+        }
+        return prev;
+      }
+      const updated = [...prev, { value: normalised, source, sources: [source] }];
+      setDefaultLocation(dl => dl || normalised);
       return updated;
     });
   };
@@ -125,9 +136,9 @@ export default function UserProfilePanel({ onClose }) {
       ...prev,
       [name]: { loading: false, status: res.data?.status, match }
     }));
-    // Use ROR country as fallback if no ORCID location set yet
-    if (match?.country) {
-      addLocation(match.country, 'ror');
+    // Use ROR country_code (ISO alpha-2) as location — merges with ORCID if same code
+    if (match?.country_code) {
+      addLocation(match.country_code, 'ror');
     }
   };
 
@@ -391,7 +402,9 @@ export default function UserProfilePanel({ onClose }) {
                     <div className="flex items-center gap-2 flex-wrap">
                       <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
                       <span className="text-xs font-medium text-foreground">{loc.value}</span>
-                      <span className="text-[10px] text-muted-foreground/60 capitalize">{loc.source}</span>
+                      <span className="text-[10px] text-muted-foreground/60 capitalize">
+                        {(loc.sources || [loc.source]).join(' + ')}
+                      </span>
                       {isEULocation(loc.value) && (
                         <span
                           title="EU member state — locn:adminUnitL1 (W3C Loc-n vocabulary)"
