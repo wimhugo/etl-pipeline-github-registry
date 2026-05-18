@@ -158,10 +158,20 @@ export default function KBUserConfig() {
         `- profileBadge: "${row.profileBadge || ''}"\n  contextBadge: "${row.contextBadge || ''}"\n  colour: ${row.colour || 'muted'}\n  constraintMapping: "${row.constraintMapping || ''}"`
       ).join('\n');
       
+      console.log('Submitting PR with:', {
+        file_path: data.badge_mapping_file,
+        file_content: yamlContent,
+        message: 'Update badge mappings',
+        repo: form.github_repo,
+        branch: form.github_branch,
+      });
+      
       const res = await base44.functions.invoke('submitPolicyPR', {
         file_path: data.badge_mapping_file,
         file_content: yamlContent,
         message: 'Update badge mappings',
+        repo: form.github_repo,
+        branch: form.github_branch,
       });
       return res;
     },
@@ -172,6 +182,7 @@ export default function KBUserConfig() {
       });
     },
     onError: (error) => {
+      console.error('PR creation error:', error);
       toast({ 
         title: 'Failed to Create PR', 
         description: error.message || 'An unexpected error occurred.',
