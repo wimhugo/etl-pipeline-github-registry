@@ -9,13 +9,21 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const EU_MEMBERS = new Set([
+const EU_CODES = new Set([
   'AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI','FR','GR','HR','HU',
   'IE','IT','LT','LU','LV','MT','NL','PL','PT','RO','SE','SI','SK',
 ]);
+const EU_NAMES = new Set([
+  'austria','belgium','bulgaria','croatia','cyprus','czechia','czech republic',
+  'denmark','estonia','finland','france','germany','greece','hungary','ireland',
+  'italy','latvia','lithuania','luxembourg','malta','netherlands','the netherlands',
+  'poland','portugal','romania','slovakia','slovenia','spain','sweden',
+]);
 
-function isEU(code) {
-  return EU_MEMBERS.has((code || '').trim().toUpperCase());
+function isEU(value) {
+  if (!value) return false;
+  const v = value.trim();
+  return EU_CODES.has(v.toUpperCase()) || EU_NAMES.has(v.toLowerCase());
 }
 
 // Collapsible section
@@ -89,10 +97,13 @@ export default function WorkflowStep1UserContext({ workflowId }) {
   const loadProfile = useCallback(async (showSpinner = false) => {
     if (showSpinner) setRefreshing(true);
     else setLoading(true);
-    // Fetch fresh user data directly from the User entity (bypasses auth.me() cache)
+    // auth.me() returns flattened custom fields; force fresh fetch by calling it
+    // then also fetch from User entity to get the very latest saved data
     const users = await base44.entities.User.list();
-    const freshUser = users.find(u => u.email === user?.email) || users[0];
-    setProfile(freshUser);
+    const rawUser = users.find(u => u.email === user?.email) || users[0];
+    // Custom fields are stored inside rawUser.data — flatten them onto the profile object
+    const freshProfile = rawUser ? { ...rawUser, ...(rawUser.data || {}) } : null;
+    setProfile(freshProfile);
     setOverrides({});
     setRefreshing(false);
     setLoading(false);
@@ -121,9 +132,11 @@ export default function WorkflowStep1UserContext({ workflowId }) {
   const rorMatch = profile?.primary_institution_ror;
   const isVerifiedResearcher = verifiedStatus === 'verified_education' || verifiedStatus === 'verified_research';
   const isHEI = verifiedStatus === 'verified_education';
-  // EU: check default location, all stored locations, and ROR country_code
+  // EU: check default location, all stored locations, ROR country, and ORCID institution countries
   const rorCountry = rorMatch?.country_code || '';
-  const isEUMember = isEU(location) || isEU(rorCountry) || (locations || []).some(l => isEU(l.value));
+  const primaryInst = institutions.find(i => i.name === institution);
+  const instCountry = primaryInst?.country || '';
+  const isEUMember = isEU(location) || isEU(rorCountry) || isEU(instCountry) || (locations || []).some(l => isEU(l.value));
 
   const RESEARCH_CONTEXT_OPTIONS = [
     'Publicly Funded Research',
