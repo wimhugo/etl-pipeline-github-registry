@@ -159,8 +159,11 @@ export default function KBUserConfig() {
       ).join('\n');
       
       // Derive repo/branch from the folder URL if not in form
-      const repoFromUrl = folderUrl.match(/github\.com\/([^/]+\/[^/]+)\//)?.[1];
+      const repoMatch = folderUrl.match(/github\.com\/([^/]+\/[^/]+)\//);
+      const repoFromUrl = repoMatch ? repoMatch[1] : null;
       const branchFromUrl = folderUrl.match(/\/tree\/([^/]+)\//)?.[1] || 'main';
+      
+      console.log('Derived from URL:', { repoFromUrl, branchFromUrl, folderUrl, repoMatch });
       
       const payload = {
         file_path: data.badge_mapping_file,

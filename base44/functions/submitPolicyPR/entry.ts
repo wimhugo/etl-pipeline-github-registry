@@ -12,8 +12,17 @@ Deno.serve(async (req) => {
   // Use global config for repo/branch if not provided
   const globalConfigs = await base44.entities.GlobalConfig.list();
   const globalConfig = globalConfigs[0];
-  const targetRepo = repo || globalConfig?.github_repo;
+  let targetRepo = repo || globalConfig?.github_repo;
   const targetBranch = branch || globalConfig?.github_branch || 'main';
+
+  // Clean repo value if it's a full URL
+  if (targetRepo?.includes('github.com')) {
+    const match = targetRepo.match(/github\.com\/([^/]+\/[^/]+)(?:\/|$)/);
+    if (match) {
+      targetRepo = match[1];
+      console.log('Cleaned repo from URL to:', targetRepo);
+    }
+  }
 
   console.log('SubmitPolicyPR params:', { file_path, file_content, message, repo, branch, targetRepo, targetBranch });
 
