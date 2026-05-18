@@ -9,11 +9,6 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Only administrators can use this feature
-    if (user.role !== 'Administrator') {
-      return Response.json({ error: 'Forbidden: Administrator access required' }, { status: 403 });
-    }
-
     const { inputType, objectUrl, textContent, fileUrl } = await req.json();
 
     let content = '';
