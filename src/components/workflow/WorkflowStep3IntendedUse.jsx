@@ -15,7 +15,6 @@ function parseBadgeMappingYaml(yamlText) {
   const lines = yamlText.split('\n');
   const result = { sections: [] };
   let currentSection = null;
-  let currentItem = null;
   
   for (const line of lines) {
     // Skip empty lines and comments
@@ -24,31 +23,27 @@ function parseBadgeMappingYaml(yamlText) {
     const indent = line.search(/\S/);
     const trimmed = line.trim();
     
-    // Top-level context blocks (indent 0)
-    if (indent === 0 && trimmed.startsWith('context:')) {
-      const contextValue = trimmed.replace(/context:\s*["']?([^"']+)["']?/, '$1').trim();
+    // Top-level context blocks (indent 0, starts with -context:)
+    if (indent === 0 && trimmed.startsWith('-context:')) {
+      const contextValue = trimmed.replace(/-?\s*context:\s*["']?([^"']+)["']?/, '$1').trim();
       currentSection = {
         context: contextValue,
         items: []
       };
       result.sections.push(currentSection);
-      currentItem = null;
     }
-    // Second-level items (indent 2)
-    else if (indent === 2 && trimmed.startsWith('-') && currentSection) {
-      const itemLine = trimmed.substring(1).trim();
-      if (itemLine.startsWith('name:')) {
-        currentItem = {
-          name: itemLine.replace(/name:\s*["']?([^"']+)["']?/, '$1').trim(),
-          profileBadges: []
-        };
-        currentSection.items.push(currentItem);
-      }
-    }
-    // Third-level profile badges (indent 4)
-    else if (indent === 4 && trimmed.startsWith('- profileBadge:') && currentItem) {
-      const badgeValue = trimmed.replace(/-?\s*profileBadge:\s*["']?([^"']+)["']?/, '$1').trim();
-      currentItem.profileBadges.push(badgeValue);
+    // Items under context (indent 2, starts with - profileBadge:)
+    else if (indent === 2 && trimmed.startsWith('- profileBadge:') && currentSection) {
+      // Parse the profileBadge line
+      const profileBadge = trimmed.replace(/-?\s*profileBadge:\s*["']?([^"']+)["']?/, '$1').trim();
+      
+      // Create a new item with the profileBadge
+      const newItem = {
+        name: profileBadge,
+        profileBadges: [profileBadge]
+      };
+      
+      currentSection.items.push(newItem);
     }
   }
   
