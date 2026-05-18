@@ -113,14 +113,14 @@ export default function ObjectAnalysis() {
             }
           }
           
-          setActionsLoaded(true);
+          setDataLoaded(true);
         } else {
           console.log('No GlobalConfig found');
-          setActionsLoaded(true);
+          setDataLoaded(true);
         }
       } catch (e) {
         console.log('Error fetching OpenREL data:', e.message);
-        setActionsLoaded(true);
+        setDataLoaded(true);
       }
     };
     fetchOpenrelData();
@@ -371,7 +371,7 @@ export default function ObjectAnalysis() {
                           <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
                             <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
                             <span className="font-mono flex-1">{detectedTerm}</span>
-                            {!actionsLoaded ? (
+                            {!dataLoaded ? (
                               <Badge variant="secondary" className="text-xs">Loading...</Badge>
                             ) : (
                               <Select
@@ -433,7 +433,7 @@ export default function ObjectAnalysis() {
                           <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
                             <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
                             <span className="font-mono flex-1">{detectedTerm}</span>
-                            {!actionsLoaded ? (
+                            {!dataLoaded ? (
                               <Badge variant="secondary" className="text-xs">Loading...</Badge>
                             ) : (
                               <Select
@@ -441,13 +441,13 @@ export default function ObjectAnalysis() {
                                 onValueChange={(value) => setActionMappings(prev => ({ ...prev, [mappingKey]: value }))}
                               >
                                 <SelectTrigger className="w-[200px] h-8 text-xs">
-                                  <SelectValue placeholder={openrelActions.length > 0 ? "Map to Constraint" : "No constraints configured"} />
+                                  <SelectValue placeholder={openrelConstraints.length > 0 ? "Map to Constraint" : "No constraints configured"} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {openrelActions.length > 0 ? (
-                                    openrelActions.map((action, actionIdx) => (
-                                      <SelectItem key={actionIdx} value={action.label}>
-                                        {action.label}
+                                  {openrelConstraints.length > 0 ? (
+                                    openrelConstraints.map((constraint, constraintIdx) => (
+                                      <SelectItem key={constraintIdx} value={constraint.label}>
+                                        {constraint.label}
                                       </SelectItem>
                                     ))
                                   ) : (
