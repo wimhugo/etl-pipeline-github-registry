@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Loader2, ShieldCheck, Building2, MapPin,
-  FlaskConical, User, Info, ChevronDown, ChevronRight
+  FlaskConical, User, Info, ChevronDown, ChevronRight, RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -18,24 +19,27 @@ function isEU(code) {
 }
 
 // Collapsible section
-function Section({ icon: Icon, title, badge, defaultOpen = true, children }) {
+function Section({ icon: Icon, title, badge, defaultOpen = true, headerExtra, children }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="rounded-lg border border-border/50 overflow-hidden">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 bg-muted/30 hover:bg-muted/50 transition-colors text-left"
-      >
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center bg-muted/30 hover:bg-muted/50 transition-colors">
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="flex-1 flex items-center gap-2 px-3.5 py-2.5 text-left flex-wrap min-w-0"
+        >
           {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
           <span className="text-xs font-semibold text-foreground">{title}</span>
           {badge}
-        </div>
-        {open
-          ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-          : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-        }
-      </button>
+        </button>
+        {headerExtra}
+        <button onClick={() => setOpen(o => !o)} className="px-3 py-2.5 shrink-0">
+          {open
+            ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+            : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+          }
+        </button>
+      </div>
       {open && (
         <div className="px-3.5 py-3 border-t border-border/40">
           {children}
@@ -79,14 +83,20 @@ export default function WorkflowStep1UserContext({ workflowId }) {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [overrides, setOverrides] = useState({});
 
-  useEffect(() => {
-    base44.auth.me().then(u => {
-      setProfile(u);
-      setLoading(false);
-    });
+  const loadProfile = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setRefreshing(true);
+    const u = await base44.auth.me();
+    setProfile(u);
+    // Reset overrides so they re-derive from fresh profile
+    setOverrides({});
+    if (showSpinner) setRefreshing(false);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { loadProfile(); }, [loadProfile]);
 
   if (loading) {
     return (
@@ -109,7 +119,9 @@ export default function WorkflowStep1UserContext({ workflowId }) {
   const rorMatch = profile?.primary_institution_ror;
   const isVerifiedResearcher = verifiedStatus === 'verified_education' || verifiedStatus === 'verified_research';
   const isHEI = verifiedStatus === 'verified_education';
-  const isEUMember = isEU(location);
+  // EU: check default location, all stored locations, and ROR country_code
+  const rorCountry = rorMatch?.country_code || '';
+  const isEUMember = isEU(location) || isEU(rorCountry) || (locations || []).some(l => isEU(l.value));
 
   const RESEARCH_CONTEXT_OPTIONS = [
     'Publicly Funded Research',
@@ -128,7 +140,22 @@ export default function WorkflowStep1UserContext({ workflowId }) {
       </div>
 
       {/* Verified Context */}
-      <Section icon={ShieldCheck} title="Verified Context" defaultOpen={true}>
+      <Section
+        icon={ShieldCheck}
+        title="Verified Context"
+        defaultOpen={true}
+        headerExtra={
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 ml-auto mr-1 shrink-0"
+            onClick={e => { e.stopPropagation(); loadProfile(true); }}
+            title="Refresh profile"
+          >
+            <RefreshCw className={cn("w-3 h-3", refreshing && "animate-spin")} />
+          </Button>
+        }
+      >
         <div className="flex flex-wrap gap-2">
           {/* Researcher */}
           <SignalPill
