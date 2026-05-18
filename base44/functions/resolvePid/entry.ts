@@ -39,9 +39,25 @@ Deno.serve(async (req) => {
                 // Not JSON, use the raw text
             }
             
+            // Try basic resolve without metadata to get the target URL
+            const basicUrl = `https://api.pidmr.argo.grnet.gr/v1/metaresolvers/resolve?pid=${encodeURIComponent(pid)}&format=json`;
+            const basicResponse = await fetch(basicUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+            });
+            
+            let targetUrl = null;
+            if (basicResponse.ok) {
+                const basicData = await basicResponse.json();
+                targetUrl = basicData.url || basicData.redirectUrl;
+            }
+            
             return Response.json({ 
                 error: 'Failed to resolve PID', 
-                message: errorMessage 
+                message: errorMessage,
+                targetUrl: targetUrl
             }, { status: resolveResponse.status });
         }
 

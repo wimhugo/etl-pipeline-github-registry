@@ -31,8 +31,11 @@ export default function WorkflowStep2FindResource() {
       if (response.status !== 200) {
         // Extract custom error message from response if available
         const customMessage = response.data?.message || response.data?.error || 'Failed to resolve PID';
+        const targetUrl = response.data?.targetUrl;
         setError(customMessage);
-        setLoading(false);
+        if (targetUrl) {
+          setResult({ pid: pid.trim(), redirectURL: targetUrl, metadataOnly: true, error: true });
+        }
         return;
       }
 
@@ -139,11 +142,24 @@ export default function WorkflowStep2FindResource() {
           {error && (
             <div className="flex items-start gap-3 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
               <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-              <p className="text-sm text-destructive">{error}</p>
+              <div className="space-y-1">
+                <p className="text-sm text-destructive">{error}</p>
+                {result && result.redirectURL && (
+                  <a
+                    href={result.redirectURL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    View resource (metadata not available)
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
             </div>
           )}
 
-          {result && (
+          {result && !result.error && (
             <div className="space-y-3">
               <div className="p-4 rounded-lg bg-accent/10 border border-accent/20">
                 <div className="flex items-start gap-3">
