@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useRole } from '@/lib/RoleContext';
 import { useProject } from '@/lib/ProjectContext';
-import { Menu, X, LayoutDashboard, FolderOpen, Database, GitBranch, CheckSquare, FileText, Layers, RefreshCw, BookOpen, PenTool, Link2, FileEdit, Box, Eye, Settings2, Search, Pencil, Shuffle, BookMarked, Sliders, SlidersHorizontal } from 'lucide-react';
+import { Menu, X, LayoutDashboard, FolderOpen, Database, GitBranch, CheckSquare, FileText, Layers, RefreshCw, BookOpen, PenTool, Link2, FileEdit, Box, Eye, Settings2, Search, Pencil, Shuffle, BookMarked, Sliders, SlidersHorizontal, Workflow } from 'lucide-react';
 
 const ICON_MAP = {
   'Dashboard':            LayoutDashboard,
@@ -27,6 +27,7 @@ const ICON_MAP = {
   'Compose':              BookMarked,
   'Preferences':          Sliders,
   'Configuration':        SlidersHorizontal,
+  'Workflow':             Workflow,
 };
 
 export default function Sidebar() {
