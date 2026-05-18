@@ -36,6 +36,26 @@ const PROFILE_BADGE_OPTIONS = [
   'Commercial Application of Results',
 ];
 
+// Context badges from "Verified Context" section in WorkflowStep1UserContext (includes positive/negative states)
+const CONTEXT_BADGE_OPTIONS = [
+  // Researcher verification status
+  'verified_education',
+  'verified_research',
+  'researcher_unverified',
+  // Institution type
+  'hei_institution',
+  'research_org',
+  'not_hei_research_org',
+  // EU membership
+  'eu_member',
+  'non_eu',
+  'eu_unknown',
+  // Research context (internal keys)
+  'publicly_funded_research',
+  'commercial_research',
+  'commercial_application_of_results',
+];
+
 const EMPTY_ROW = { profileBadge: '', contextBadge: '', colour: 'muted', constraintMapping: '' };
 
 export default function BadgeMappingTable({ rows = [], onChange }) {
@@ -91,13 +111,17 @@ export default function BadgeMappingTable({ rows = [], onChange }) {
                   <option key={o} value={o}>{o}</option>
                 ))}
               </select>
-              <Input
+              <select
                 value={row.contextBadge}
                 onChange={e => update(idx, 'contextBadge', e.target.value)}
-                className="h-7 text-xs bg-muted/50"
-                placeholder="e.g. verified_education"
+                className="h-7 text-xs rounded-md border border-input bg-muted/50 px-1.5 text-foreground"
                 onClick={e => e.stopPropagation()}
-              />
+              >
+                <option value="">— Select context —</option>
+                {CONTEXT_BADGE_OPTIONS.map(o => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
               <select
                 value={row.colour}
                 onChange={e => update(idx, 'colour', e.target.value)}
