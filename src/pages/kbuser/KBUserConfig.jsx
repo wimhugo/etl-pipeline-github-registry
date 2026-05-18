@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, Loader2, FileJson, Database, AlertCircle, Tag } from 'lucide-react';
+import { Save, Loader2, FileJson, Database, AlertCircle, Tag, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import BadgeMappingTable from '@/components/kbuser/BadgeMappingTable';
 
 const SUB_ENTITY_HINTS = ['actions', 'constraints', 'agents', 'sources', 'scenarios', 'template', 'states'];
@@ -49,6 +50,7 @@ export default function KBUserConfig() {
   const { toast } = useToast();
   const [form, setForm] = useState({});
   const [folderUrl, setFolderUrl] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const { data: globalConfigs = [] } = useQuery({
     queryKey: ['globalConfig'],
@@ -387,13 +389,40 @@ export default function KBUserConfig() {
           {constraintsError && (
             <p className="text-xs text-destructive">Failed to load constraints: {constraintsError.message}</p>
           )}
-          <BadgeMappingTable
-            rows={form.badge_mappings || []}
-            onChange={rows => setForm(f => ({ ...f, badge_mappings: rows }))}
-            constraintOptions={constraintsData}
-            mappingFile={form.badge_mapping_file}
-            onMappingFileChange={(val) => setForm(f => ({ ...f, badge_mapping_file: val }))}
-          />
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Badge Mappings Table</Label>
+            <BadgeMappingTable
+              rows={form.badge_mappings || []}
+              onChange={rows => setForm(f => ({ ...f, badge_mappings: rows }))}
+              constraintOptions={constraintsData}
+              mappingFile={form.badge_mapping_file}
+              onMappingFileChange={(val) => setForm(f => ({ ...f, badge_mapping_file: val }))}
+            />
+          </div>
+          
+          {/* YAML Preview */}
+          {form.badge_mappings && form.badge_mappings.length > 0 && (
+            <Collapsible open={previewOpen} onOpenChange={setPreviewOpen} className="mt-4">
+              <div className="flex items-center gap-2">
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs">
+                    {previewOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    <FileJson className="w-3 h-3" />
+                    YAML Preview {form.badge_mapping_file && `(${form.badge_mapping_file})`}
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent>
+                <div className="mt-2 rounded-lg border border-border/40 bg-muted/30 overflow-hidden">
+                  <pre className="p-3 text-xs font-mono text-foreground overflow-x-auto max-h-96 overflow-y-auto">
+                    {form.badge_mappings.map(row => 
+                      `- profileBadge: "${row.profileBadge || ''}"\n  contextBadge: "${row.contextBadge || ''}"\n  colour: ${row.colour || 'muted'}\n  constraintMapping: "${row.constraintMapping || ''}"`
+                    ).join('\n\n')}
+                  </pre>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
         </CardContent>
       </Card>
     </div>

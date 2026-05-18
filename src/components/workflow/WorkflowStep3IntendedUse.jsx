@@ -5,11 +5,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { FileJson, ChevronDown, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { getColourClass } from '@/components/kbuser/BadgeMappingTable';
 
 export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
   const [selectedUses, setSelectedUses] = useState([]);
@@ -21,25 +19,6 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
   });
   const globalConfig = globalConfigs[0];
   const badgeMappings = globalConfig?.badge_mappings || [];
-
-  // Fetch badge mapping file content from GitHub if available
-  const { data: badgeMappingFileContent, isLoading: fileLoading, error: fileError } = useQuery({
-    queryKey: ['badgeMappingFile', globalConfig?.badge_mapping_file],
-    queryFn: async () => {
-      if (!globalConfig?.badge_mapping_file || !globalConfig?.kb_search_data_url) {
-        return null;
-      }
-      
-      // Try to fetch from GitHub raw URL
-      const rawUrl = `${globalConfig.kb_search_data_url}/${globalConfig.badge_mapping_file}`;
-      const res = await fetch(rawUrl);
-      if (!res.ok) {
-        throw new Error('Failed to fetch badge mapping file');
-      }
-      return await res.text();
-    },
-    enabled: !!globalConfig?.badge_mapping_file && !!globalConfig?.kb_search_data_url,
-  });
 
   // Load saved selections from localStorage
   useEffect(() => {
@@ -89,10 +68,7 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
     <div className="space-y-4">
       <Card className="bg-card border-border/50">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <FileJson className="w-4 h-4 text-primary" />
-            Intended Use
-          </CardTitle>
+          <CardTitle className="text-base">Intended Use</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
@@ -148,40 +124,6 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
                 ))}
               </div>
             </div>
-          )}
-
-          {/* Collapsible Badge Mapping File Preview */}
-          {globalConfig?.badge_mapping_file && (
-            <Collapsible className="mt-6">
-              <div className="flex items-center gap-2 mb-2">
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs">
-                    <ChevronDown className="w-3 h-3" />
-                    <FileJson className="w-3 h-3" />
-                    {globalConfig.badge_mapping_file}
-                  </Button>
-                </CollapsibleTrigger>
-                {fileLoading && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
-              </div>
-              <CollapsibleContent>
-                <div className="rounded-lg border border-border/40 bg-muted/30 overflow-hidden">
-                  {fileError ? (
-                    <div className="p-3 text-xs text-destructive">
-                      <AlertCircle className="w-3 h-3 inline mr-1" />
-                      Failed to load file: {fileError.message}
-                    </div>
-                  ) : badgeMappingFileContent ? (
-                    <pre className="p-3 text-xs font-mono text-foreground overflow-x-auto max-h-64 overflow-y-auto">
-                      {badgeMappingFileContent}
-                    </pre>
-                  ) : (
-                    <div className="p-3 text-xs text-muted-foreground italic">
-                      File not yet pushed to GitHub. Save mappings first.
-                    </div>
-                  )}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
           )}
         </CardContent>
       </Card>

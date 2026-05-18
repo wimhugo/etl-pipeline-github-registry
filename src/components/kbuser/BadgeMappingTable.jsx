@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, FileJson } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const COLOUR_OPTIONS = [
   { label: 'Green',   value: 'accent',      swatch: 'bg-accent',              cls: 'bg-accent/15 text-accent border-accent/40' },
@@ -63,6 +64,7 @@ const EMPTY_ROW = { profileBadge: '', contextBadge: '', colour: 'muted', constra
 
 export default function BadgeMappingTable({ rows = [], onChange, constraintOptions = [], mappingFile, onMappingFileChange }) {
   const [editIdx, setEditIdx] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const update = (idx, field, value) => {
     const updated = rows.map((r, i) => i === idx ? { ...r, [field]: value } : r);
@@ -77,6 +79,17 @@ export default function BadgeMappingTable({ rows = [], onChange, constraintOptio
   const removeRow = (idx) => {
     onChange(rows.filter((_, i) => i !== idx));
     setEditIdx(null);
+  };
+
+  // Generate YAML preview from current table values
+  const generateYamlPreview = () => {
+    if (!rows || rows.length === 0) {
+      return '# No mappings defined';
+    }
+    
+    return rows.map(row => 
+      `- profileBadge: "${row.profileBadge || ''}"\n  contextBadge: "${row.contextBadge || ''}"\n  colour: ${row.colour || 'muted'}\n  constraintMapping: "${row.constraintMapping || ''}"`
+    ).join('\n\n');
   };
 
   return (
