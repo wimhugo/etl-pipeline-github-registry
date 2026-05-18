@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { X, Loader2, RefreshCw, Building2, GraduationCap, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import InstitutionVerificationBadge from '@/components/user/InstitutionVerificationBadge';
 
 export default function UserProfilePanel({ onClose }) {
   const { user } = useAuth();
@@ -18,6 +19,8 @@ export default function UserProfilePanel({ onClose }) {
   const [savingProfile, setSavingProfile] = useState(false);
   const [orcidError, setOrcidError] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  // Map of institution name -> { status, match, loading }
+  const [verifications, setVerifications] = useState({});
 
   // Load fresh profile data from API when panel opens
   useEffect(() => {
@@ -39,12 +42,22 @@ export default function UserProfilePanel({ onClose }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
+  const verifyInstitution = async (name) => {
+    setVerifications(prev => ({ ...prev, [name]: { loading: true } }));
+    const res = await base44.functions.invoke('verifyInstitution', { name });
+    setVerifications(prev => ({
+      ...prev,
+      [name]: { loading: false, status: res.data?.status, match: res.data?.match }
+    }));
+  };
+
   const handleFetchOrcid = async () => {
     if (!orcid.trim()) return;
     setLoadingOrcid(true);
     setOrcidError('');
     setInstitutions([]);
     setDefaultInstitution('');
+    setVerifications({});
     const res = await base44.functions.invoke('fetchOrcidAffiliations', { orcid: orcid.trim() });
     setLoadingOrcid(false);
     if (res.data?.error) {
@@ -55,6 +68,8 @@ export default function UserProfilePanel({ onClose }) {
       // Auto-select first employment as default
       const firstEmp = fetched.find(i => i.type === 'employment' && !i.end_year);
       setDefaultInstitution(firstEmp?.name || fetched[0]?.name || '');
+      // Verify all fetched institutions
+      fetched.forEach(inst => verifyInstitution(inst.name));
     }
   };
 
@@ -142,6 +157,7 @@ export default function UserProfilePanel({ onClose }) {
                       inst={inst}
                       selected={defaultInstitution === inst.name}
                       onSelect={() => setDefaultInstitution(inst.name)}
+                      verification={verifications[inst.name]}
                     />
                   ))}
                 </div>
@@ -158,6 +174,7 @@ export default function UserProfilePanel({ onClose }) {
                       inst={inst}
                       selected={defaultInstitution === inst.name}
                       onSelect={() => setDefaultInstitution(inst.name)}
+                      verification={verifications[inst.name]}
                     />
                   ))}
                 </div>
@@ -193,7 +210,7 @@ export default function UserProfilePanel({ onClose }) {
   );
 }
 
-function InstitutionRow({ inst, selected, onSelect }) {
+function InstitutionRow({ inst, selected, onSelect, verification }) {
   const years = [inst.start_year, inst.end_year].filter(Boolean).join('–') || null;
   return (
     <button
@@ -219,6 +236,13 @@ function InstitutionRow({ inst, selected, onSelect }) {
         {inst.city && <span className="text-[10px] text-muted-foreground/70">{[inst.city, inst.country].filter(Boolean).join(', ')}</span>}
         {!inst.end_year && inst.start_year && (
           <Badge className="text-[9px] px-1.5 py-0 bg-accent/15 text-accent border-accent/30 font-normal">current</Badge>
+        )}
+        {verification && (
+          <InstitutionVerificationBadge
+            status={verification.status}
+            match={verification.match}
+            loading={verification.loading}
+          />
         )}
       </div>
     </button>
