@@ -89,10 +89,10 @@ export default function KBUserConfig() {
 
   const subEntityFiles = form.kb_sub_entity_files || {};
   const constraintsFile = subEntityFiles.constraints;
-  const dataBaseUrl = parsed?.rawUrl || form.kb_search_data_url;
+  const dataBaseUrl = form.kb_search_data_url;
 
   // Fetch constraints file to extract labels for the dropdown
-  const { data: constraintsData = [] } = useQuery({
+  const { data: constraintsData = [], isLoading: constraintsLoading, error: constraintsError } = useQuery({
     queryKey: ['constraintsFile', constraintsFile, dataBaseUrl],
     queryFn: async () => {
       if (!constraintsFile || !dataBaseUrl) {
@@ -274,6 +274,14 @@ export default function KBUserConfig() {
           <p className="text-xs text-muted-foreground">
             Map user profile verification statuses to context badge labels, standardise badge colours, and indicate which constraint keys apply to each badge.
           </p>
+          {constraintsLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading constraint labels…
+            </div>
+          )}
+          {constraintsError && (
+            <p className="text-xs text-destructive">Failed to load constraints: {constraintsError.message}</p>
+          )}
           <BadgeMappingTable
             rows={form.badge_mappings || []}
             onChange={rows => setForm(f => ({ ...f, badge_mappings: rows }))}
