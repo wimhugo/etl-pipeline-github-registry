@@ -1,14 +1,47 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, ChevronDown, ChevronRight, FileJson } from 'lucide-react';
+import {
+  Loader2, AlertCircle, ChevronDown, ChevronRight, FileJson,
+  Target, Scale, Info
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
+// Collapsible section (matches WorkflowStep1UserContext)
+function Section({ icon: Icon, title, badge, defaultOpen = true, headerExtra, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-lg border border-border/50 overflow-hidden">
+      <div className="flex items-center bg-muted/30 hover:bg-muted/50 transition-colors">
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="flex-1 flex items-center gap-2 px-3.5 py-2.5 text-left flex-wrap min-w-0"
+        >
+          {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+          <span className="text-xs font-semibold text-foreground">{title}</span>
+          {badge}
+        </button>
+        {headerExtra}
+        <button onClick={() => setOpen(o => !o)} className="px-3 py-2.5 shrink-0">
+          {open
+            ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+            : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+          }
+        </button>
+      </div>
+      {open && (
+        <div className="px-3.5 py-3 border-t border-border/40">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Simple YAML parser for badge-mapping.yaml structure
 function parseBadgeMappingYaml(yamlText) {
@@ -17,13 +50,11 @@ function parseBadgeMappingYaml(yamlText) {
   let currentSection = null;
   
   for (const line of lines) {
-    // Skip empty lines and comments
     if (!line.trim() || line.trim().startsWith('#')) continue;
     
     const indent = line.search(/\S/);
     const trimmed = line.trim();
     
-    // Top-level context blocks (indent 0, starts with -context:)
     if (indent === 0 && trimmed.startsWith('-context:')) {
       const contextValue = trimmed.replace(/-?\s*context:\s*["']?([^"']+)["']?/, '$1').trim();
       currentSection = {
@@ -32,17 +63,12 @@ function parseBadgeMappingYaml(yamlText) {
       };
       result.sections.push(currentSection);
     }
-    // Items under context (indent 2, starts with - profileBadge:)
     else if (indent === 2 && trimmed.startsWith('- profileBadge:') && currentSection) {
-      // Parse the profileBadge line
       const profileBadge = trimmed.replace(/-?\s*profileBadge:\s*["']?([^"']+)["']?/, '$1').trim();
-      
-      // Create a new item with the profileBadge
       const newItem = {
         name: profileBadge,
         profileBadges: [profileBadge]
       };
-      
       currentSection.items.push(newItem);
     }
   }
@@ -52,7 +78,6 @@ function parseBadgeMappingYaml(yamlText) {
 
 export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
   const [selectedUses, setSelectedUses] = useState([]);
-  const [expandedSections, setExpandedSections] = useState({});
   const [userContext, setUserContext] = useState(null);
 
   // Fetch badge mappings from GlobalConfig
@@ -75,12 +100,11 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
   }, []);
 
   // Build verified context badges from user context
-  const verifiedContextBadges = React.useMemo(() => {
+  const verifiedContextBadges = useMemo(() => {
     if (!userContext) return [];
     
     const badges = [];
     
-    // Researcher verification
     if (userContext.verifiedEducation) {
       badges.push({ label: 'Verified HEI Researcher', contextBadge: 'verified_education', colour: 'accent' });
     }
@@ -88,21 +112,18 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
       badges.push({ label: 'Verified Researcher', contextBadge: 'verified_research', colour: 'accent' });
     }
     
-    // Institution type
     if (userContext.institutionType === 'Higher Education Institution') {
       badges.push({ label: 'Higher Education Institution', contextBadge: 'hei_institution', colour: 'primary' });
     } else if (userContext.institutionType === 'Research Organization') {
       badges.push({ label: 'Research Organization', contextBadge: 'research_org', colour: 'primary' });
     }
     
-    // EU membership
     if (userContext.euMember === true) {
       badges.push({ label: 'EU Member', contextBadge: 'eu_member', colour: 'chart-3' });
     } else if (userContext.euMember === false) {
       badges.push({ label: 'Non-EU', contextBadge: 'non_eu', colour: 'muted' });
     }
     
-    // Research context
     if (userContext.researchContext) {
       if (userContext.researchContext.publiclyFunded) {
         badges.push({ label: 'Publicly Funded Research', contextBadge: 'publicly_funded_research', colour: 'chart-4' });
@@ -156,23 +177,14 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
         ? prev.filter(k => k !== useKey)
         : [...prev, useKey];
       
-      // Save to localStorage
       localStorage.setItem(`workflow_${workflowId}_intendedUses`, JSON.stringify(updated));
       
-      // Notify parent of completion if needed
       if (onComplete) {
         onComplete({ intendedUses: updated });
       }
       
       return updated;
     });
-  };
-
-  const toggleSection = (sectionKey) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [sectionKey]: !prev[sectionKey]
-    }));
   };
 
   // Filter sections
@@ -182,14 +194,13 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
   ) || [];
 
   // Build summary badges for selected intended uses
-  const selectedBadges = React.useMemo(() => {
+  const selectedBadges = useMemo(() => {
     if (!relevantSections.length || !selectedUses.length) return [];
     
     const badges = [];
     relevantSections.forEach(section => {
       section.items.forEach(item => {
         if (selectedUses.includes(item.name)) {
-          // Add a badge for each selected item
           badges.push({
             label: item.name,
             type: 'selected',
@@ -202,198 +213,205 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
   }, [selectedUses, relevantSections]);
 
   return (
-    <div className="space-y-4">
-      <Card className="bg-card border-border/50">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Reuse Context</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Summary Section */}
-          <div className="rounded-lg border border-border/40 bg-muted/30 p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <FileJson className="w-4 h-4 text-muted-foreground" />
-              <Label className="text-sm font-semibold text-foreground">Summary</Label>
-            </div>
-            
-            {/* Verified Context Badges */}
-            <div>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Your Context</p>
-              {verifiedContextBadges.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {verifiedContextBadges.map((badge, idx) => {
-                    const colourClass = {
-                      'accent': 'bg-accent/15 text-accent border-accent/40',
-                      'primary': 'bg-primary/15 text-primary border-primary/40',
-                      'chart-3': 'bg-chart-3/15 text-chart-3 border-chart-3/40',
-                      'chart-4': 'bg-chart-4/15 text-chart-4 border-chart-4/40',
-                      'chart-5': 'bg-chart-5/15 text-chart-5 border-chart-5/40',
-                      'destructive': 'bg-destructive/15 text-destructive border-destructive/40',
-                      'muted': 'bg-muted/40 text-muted-foreground border-border/50',
-                    }[badge.colour] || 'bg-muted/40 text-muted-foreground border-border/50';
-                    
-                    return (
-                      <Badge
-                        key={idx}
-                        variant="outline"
-                        className={cn("text-xs px-2.5 py-1 border", colourClass)}
-                      >
-                        {badge.label}
-                      </Badge>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground italic">Complete step 1 to populate your context.</p>
-              )}
-            </div>
-            
-            {/* Selected Intended Uses Badges */}
-            {selectedBadges.length > 0 && (
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Selected Uses</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedBadges.map((badge, idx) => (
+    <div className="space-y-3">
+      {/* Intro */}
+      <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5 flex items-start gap-2">
+        <Info className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Select intended uses and ethics considerations based on your verified context. Your selections are saved automatically.
+        </p>
+      </div>
+
+      {/* Summary Section */}
+      <Section icon={FileJson} title="Summary" defaultOpen={true}>
+        <div className="space-y-3">
+          {/* Verified Context Badges */}
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Your Context</p>
+            {verifiedContextBadges.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {verifiedContextBadges.map((badge, idx) => {
+                  const colourClass = {
+                    'accent': 'bg-accent/15 text-accent border-accent/40',
+                    'primary': 'bg-primary/15 text-primary border-primary/40',
+                    'chart-3': 'bg-chart-3/15 text-chart-3 border-chart-3/40',
+                    'chart-4': 'bg-chart-4/15 text-chart-4 border-chart-4/40',
+                    'chart-5': 'bg-chart-5/15 text-chart-5 border-chart-5/40',
+                    'destructive': 'bg-destructive/15 text-destructive border-destructive/40',
+                    'muted': 'bg-muted/40 text-muted-foreground border-border/50',
+                  }[badge.colour] || 'bg-muted/40 text-muted-foreground border-border/50';
+                  
+                  return (
                     <Badge
                       key={idx}
                       variant="outline"
-                      className={cn(
-                        "text-xs px-2.5 py-1 border",
-                        badge.colour === 'primary' ? 'bg-primary/15 text-primary border-primary/40' : 'bg-muted/40 text-muted-foreground border-border/50'
-                      )}
+                      className={cn("text-xs px-2.5 py-1 border", colourClass)}
                     >
                       {badge.label}
                     </Badge>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">Complete step 1 to populate your context.</p>
             )}
           </div>
-
-          <p className="text-sm text-muted-foreground">
-            Select the intended use(s) and ethics considerations based on your verified context badges.
-          </p>
-
-          {isLoadingBadgeMapping ? (
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/40">
-              <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium">Loading badge mapping configuration...</p>
-              </div>
-            </div>
-          ) : badgeMappingError ? (
-            <div className="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/20">
-              <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-              <div className="text-sm text-destructive">
-                <p className="font-medium">Failed to load badge mapping</p>
-                <p className="text-xs mt-1">
-                  {badgeMappingError.message?.includes('Bad credentials') 
-                    ? 'GitHub token is invalid or not configured. Please contact your administrator.'
-                    : badgeMappingError.message || 'Unable to fetch from GitHub.'}
-                </p>
-              </div>
-            </div>
-          ) : !parsedData || relevantSections.length === 0 ? (
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/40">
-              <AlertCircle className="w-5 h-5 text-muted-foreground shrink-0" />
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium">No badge mapping found</p>
-                <p className="text-xs mt-1">
-                  The file .configs/badge_mapping.yaml was not found or is empty.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {relevantSections.map((section, sectionIdx) => {
-                const sectionKey = `${section.context}-${sectionIdx}`;
-                const isExpanded = expandedSections[sectionKey] !== false; // Default expanded
-                const sectionLabel = section.context === 'Intended Use' ? 'Intended Use' : 'Ethics Considerations';
-                
-                return (
-                  <div key={sectionKey} className="rounded-lg border border-border/40 overflow-hidden">
-                    {/* Section Header */}
-                    <div
-                      className="flex items-center justify-between px-4 py-3 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => toggleSection(sectionKey)}
-                    >
-                      <div className="flex items-center gap-2">
-                        {isExpanded ? (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                        )}
-                        <Label className="text-sm font-semibold text-foreground">{sectionLabel}</Label>
-                        <Badge variant="outline" className="text-xs">
-                          {section.items.reduce((sum, item) => sum + item.profileBadges.length, 0)} items
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Section Content */}
-                    <Collapsible open={isExpanded}>
-                      <CollapsibleContent className="data-[state=open]:animate-none">
-                        <div className="p-4 space-y-3 bg-card">
-                          {section.items.map((item, itemIdx) => (
-                            <div
-                              key={`${sectionKey}-item-${itemIdx}`}
-                              className="flex items-start gap-3 p-3 rounded-lg border border-border/40 hover:bg-muted/20 transition-colors"
-                            >
-                              <Checkbox
-                                checked={selectedUses.includes(item.name)}
-                                onCheckedChange={() => handleToggle(item.name)}
-                                className="mt-0.5"
-                              />
-                              <div className="flex-1">
-                                <Label className="text-sm font-medium text-foreground cursor-pointer">
-                                  {item.name}
-                                </Label>
-                                {item.profileBadges.length > 0 && (
-                                  <div className="flex flex-wrap gap-1.5 mt-2">
-                                    {item.profileBadges.map((badge, badgeIdx) => (
-                                      <Badge
-                                        key={badgeIdx}
-                                        variant="secondary"
-                                        className="text-[10px] px-2 py-0.5"
-                                      >
-                                        {badge}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </div>
-                );
-              })}
-
-              <div className="flex items-center justify-between pt-2">
-                <Label className="text-sm font-medium">
-                  {selectedUses.length} selected
-                </Label>
-                {selectedUses.length > 0 && (
-                  <Button
+          
+          {/* Selected Intended Uses Badges */}
+          {selectedBadges.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Selected Uses</p>
+              <div className="flex flex-wrap gap-2">
+                {selectedBadges.map((badge, idx) => (
+                  <Badge
+                    key={idx}
                     variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedUses([]);
-                      localStorage.removeItem(`workflow_${workflowId}_intendedUses`);
-                      if (onComplete) {
-                        onComplete({ intendedUses: [] });
-                      }
-                    }}
+                    className={cn(
+                      "text-xs px-2.5 py-1 border",
+                      badge.colour === 'primary' ? 'bg-primary/15 text-primary border-primary/40' : 'bg-muted/40 text-muted-foreground border-border/50'
+                    )}
                   >
-                    Clear All
-                  </Button>
-                )}
+                    {badge.label}
+                  </Badge>
+                ))}
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Section>
+
+      {/* Loading / Error States */}
+      {isLoadingBadgeMapping ? (
+        <Section icon={Target} title="Intended Use" defaultOpen={false}>
+          <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/40">
+            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium">Loading badge mapping configuration...</p>
+            </div>
+          </div>
+        </Section>
+      ) : badgeMappingError ? (
+        <Section icon={Target} title="Intended Use" defaultOpen={false}>
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+            <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+            <div className="text-sm text-destructive">
+              <p className="font-medium">Failed to load badge mapping</p>
+              <p className="text-xs mt-1">
+                {badgeMappingError.message?.includes('Bad credentials') 
+                  ? 'GitHub token is invalid or not configured. Please contact your administrator.'
+                  : badgeMappingError.message || 'Unable to fetch from GitHub.'}
+              </p>
+            </div>
+          </div>
+        </Section>
+      ) : !parsedData || relevantSections.length === 0 ? (
+        <Section icon={Target} title="Intended Use" defaultOpen={false}>
+          <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/40">
+            <AlertCircle className="w-5 h-5 text-muted-foreground shrink-0" />
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium">No badge mapping found</p>
+              <p className="text-xs mt-1">
+                The file .configs/badge_mapping.yaml was not found or is empty.
+              </p>
+            </div>
+          </div>
+        </Section>
+      ) : (
+        <>
+          {/* Intended Use Section */}
+          {relevantSections.map((section, sectionIdx) => {
+            const sectionKey = `${section.context}-${sectionIdx}`;
+            const sectionLabel = section.context === 'Intended Use' ? 'Intended Use' : 'Ethics Considerations';
+            const SectionIcon = section.context === 'Intended Use' ? Target : Scale;
+            
+            return (
+              <Section key={sectionKey} icon={SectionIcon} title={sectionLabel} defaultOpen={sectionIdx === 0}>
+                <div className="space-y-3">
+                  {section.items.map((item, itemIdx) => (
+                    <label
+                      key={`${sectionKey}-item-${itemIdx}`}
+                      className="flex items-start gap-3 p-3 rounded-lg border border-border/40 hover:bg-muted/20 transition-colors cursor-pointer group"
+                    >
+                      <Checkbox
+                        checked={selectedUses.includes(item.name)}
+                        onCheckedChange={() => handleToggle(item.name)}
+                        className="mt-0.5 shrink-0"
+                      />
+                      <div className="flex-1">
+                        <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">
+                          {item.name}
+                        </span>
+                        {item.profileBadges.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {item.profileBadges.map((badge, badgeIdx) => (
+                              <Badge
+                                key={badgeIdx}
+                                variant="secondary"
+                                className="text-[10px] px-2 py-0.5"
+                              >
+                                {badge}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Selection count */}
+                <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/40">
+                  <Label className="text-xs font-medium">
+                    {selectedUses.filter(k => 
+                      section.items.some(item => item.name === k)
+                    ).length} selected in this section
+                  </Label>
+                  {selectedUses.some(k => 
+                    section.items.some(item => item.name === k)
+                  ) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const sectionKeys = section.items.map(item => item.name);
+                        const updated = selectedUses.filter(k => !sectionKeys.includes(k));
+                        setSelectedUses(updated);
+                        localStorage.setItem(`workflow_${workflowId}_intendedUses`, JSON.stringify(updated));
+                        if (onComplete) {
+                          onComplete({ intendedUses: updated });
+                        }
+                      }}
+                      className="h-7 text-xs"
+                    >
+                      Clear Section
+                    </Button>
+                  )}
+                </div>
+              </Section>
+            );
+          })}
+
+          {/* Clear All */}
+          {selectedUses.length > 0 && (
+            <div className="flex items-center justify-end pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedUses([]);
+                  localStorage.removeItem(`workflow_${workflowId}_intendedUses`);
+                  if (onComplete) {
+                    onComplete({ intendedUses: [] });
+                  }
+                }}
+                className="h-8 text-xs"
+              >
+                Clear All Selections
+              </Button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
