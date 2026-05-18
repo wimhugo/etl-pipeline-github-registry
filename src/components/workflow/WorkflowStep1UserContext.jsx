@@ -220,14 +220,7 @@ export default function WorkflowStep1UserContext({ workflowId }) {
             Complete and save your profile to populate these signals.
           </p>
         )}
-        {rorMatch?.name && (
-          <p className="mt-2 text-[10px] text-muted-foreground">
-            Institution verified via ROR: <span className="text-foreground">{rorMatch.name}</span>
-            {rorMatch.id && (
-              <> · <a href={`https://ror.org/${rorMatch.id}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">view</a></>
-            )}
-          </p>
-        )}
+
       </Section>
 
       {/* Identity */}
