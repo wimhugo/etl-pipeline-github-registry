@@ -28,18 +28,6 @@ export default function WorkflowStep2FindResource() {
     try {
       const response = await base44.functions.invoke('resolvePid', { pid: pid.trim() });
       
-      if (response.status !== 200) {
-        // Extract custom error message from response if available
-        const customMessage = response.data?.message || response.data?.error || 'Failed to resolve PID';
-        const targetUrl = response.data?.targetUrl;
-        setError(customMessage);
-        if (targetUrl) {
-          setResult({ pid: pid.trim(), redirectURL: targetUrl, metadataOnly: true });
-        }
-        setLoading(false);
-        return;
-      }
-
       const resolvedData = {
         pid: pid.trim(),
         redirectURL: response.data.redirectURL,
@@ -48,7 +36,15 @@ export default function WorkflowStep2FindResource() {
 
       setResult(resolvedData);
     } catch (err) {
-      setError(err.message || 'Failed to resolve PID');
+      // Extract error details from the response
+      const responseData = err.response?.data;
+      const customMessage = responseData?.message || responseData?.error || err.message || 'Failed to resolve PID';
+      const targetUrl = responseData?.targetUrl;
+      
+      setError(customMessage);
+      if (targetUrl) {
+        setResult({ pid: pid.trim(), redirectURL: targetUrl });
+      }
     } finally {
       setLoading(false);
     }
