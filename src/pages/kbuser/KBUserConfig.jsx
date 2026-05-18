@@ -88,7 +88,9 @@ export default function KBUserConfig() {
   }
 
   const subEntityFiles = form.kb_sub_entity_files || {};
-  const constraintsFile = subEntityFiles.constraints;
+  // Auto-detect constraints file if not explicitly set (same as dashboard)
+  const autoConstraintsFile = jsonFiles.find(f => f.name.toLowerCase().includes('constraint'))?.name;
+  const constraintsFile = subEntityFiles.constraints || autoConstraintsFile;
   const dataBaseUrl = form.kb_search_data_url;
 
   // Fetch constraints file to extract labels for the dropdown
