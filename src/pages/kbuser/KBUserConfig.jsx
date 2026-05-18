@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, Loader2, FileJson, Database, AlertCircle } from 'lucide-react';
+import { Save, Loader2, FileJson, Database, AlertCircle, Tag } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import BadgeMappingTable from '@/components/kbuser/BadgeMappingTable';
 
 const SUB_ENTITY_HINTS = ['actions', 'constraints', 'agents', 'sources', 'scenarios', 'template', 'states'];
 
@@ -163,6 +164,24 @@ export default function KBUserConfig() {
               <p className="text-xs font-mono text-foreground/60 break-all">Raw: {parsed.rawUrl}</p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Badge Mapping */}
+      <Card className="bg-card border-border/50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <Tag className="w-4 h-4" /> Badge Mapping
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Map user profile verification statuses to context badge labels, standardise badge colours, and indicate which constraint keys apply to each badge.
+          </p>
+          <BadgeMappingTable
+            rows={form.badge_mappings || []}
+            onChange={rows => setForm(f => ({ ...f, badge_mappings: rows }))}
+          />
         </CardContent>
       </Card>
 

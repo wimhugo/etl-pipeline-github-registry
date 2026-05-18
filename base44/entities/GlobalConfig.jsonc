@@ -51,6 +51,31 @@
       "additionalProperties": {
         "type": "string"
       }
+    },
+    "badge_mappings": {
+      "type": "array",
+      "description": "Mapping table between profile badges, context badges, colours, and constraint keys",
+      "items": {
+        "type": "object",
+        "properties": {
+          "profileBadge": {
+            "type": "string",
+            "description": "Human-readable label shown in the User Profile (e.g. 'Verified HEI Researcher')"
+          },
+          "contextBadge": {
+            "type": "string",
+            "description": "Internal context/verification status key (e.g. 'verified_education')"
+          },
+          "colour": {
+            "type": "string",
+            "description": "Badge colour token (e.g. 'accent', 'primary', 'eu-blue')"
+          },
+          "constraintMapping": {
+            "type": "string",
+            "description": "Comma-separated constraint keys applicable to this badge (e.g. 'hei_researcher, eu_member')"
+          }
+        }
+      }
     }
   },
   "required": []
