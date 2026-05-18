@@ -106,7 +106,7 @@ export default function BadgeMappingTable({ rows = [], onChange, constraintOptio
               <select
                 value={row.profileBadge}
                 onChange={e => update(idx, 'profileBadge', e.target.value)}
-                className="h-7 text-xs rounded-md border border-input bg-muted/50 px-1.5 text-foreground"
+                className="h-8 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
                 onClick={e => e.stopPropagation()}
               >
                 <option value="">— Select badge —</option>
@@ -117,7 +117,7 @@ export default function BadgeMappingTable({ rows = [], onChange, constraintOptio
               <select
                 value={row.contextBadge}
                 onChange={e => update(idx, 'contextBadge', e.target.value)}
-                className="h-7 text-xs rounded-md border border-input bg-muted/50 px-1.5 text-foreground"
+                className="h-8 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
                 onClick={e => e.stopPropagation()}
               >
                 <option value="">— Select context —</option>
@@ -128,7 +128,7 @@ export default function BadgeMappingTable({ rows = [], onChange, constraintOptio
               <select
                 value={row.colour}
                 onChange={e => update(idx, 'colour', e.target.value)}
-                className="h-7 text-xs rounded-md border border-input bg-muted/50 px-1.5 text-foreground"
+                className="h-8 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
                 onClick={e => e.stopPropagation()}
               >
                 {COLOUR_OPTIONS.map(o => (
@@ -138,7 +138,7 @@ export default function BadgeMappingTable({ rows = [], onChange, constraintOptio
               <select
                 value={row.constraintMapping}
                 onChange={e => update(idx, 'constraintMapping', e.target.value)}
-                className="h-7 text-xs rounded-md border border-input bg-muted/50 px-1.5 text-foreground"
+                className="h-8 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
                 onClick={e => e.stopPropagation()}
               >
                 <option value="">— Select constraint —</option>
@@ -149,13 +149,13 @@ export default function BadgeMappingTable({ rows = [], onChange, constraintOptio
             </>
           ) : (
             <>
-              <span className="text-xs text-foreground truncate">{row.profileBadge || <span className="text-muted-foreground italic">—</span>}</span>
-              <span className="text-xs text-muted-foreground font-mono truncate">{row.contextBadge || '—'}</span>
-              <div className="flex items-center gap-2">
-                <span className={cn("w-4 h-4 rounded-full border", COLOUR_OPTIONS.find(o => o.value === row.colour)?.swatch || 'bg-muted-foreground')} />
+              <div className="h-8 flex items-center"><span className="text-xs text-foreground truncate">{row.profileBadge || <span className="text-muted-foreground italic">—</span>}</span></div>
+              <div className="h-8 flex items-center"><span className="text-xs text-muted-foreground font-mono truncate">{row.contextBadge || '—'}</span></div>
+              <div className="h-8 flex items-center gap-2">
+                <span className={cn("w-4 h-4 rounded-full border shrink-0", COLOUR_OPTIONS.find(o => o.value === row.colour)?.swatch || 'bg-muted-foreground')} />
                 <span className="text-xs text-foreground">{COLOUR_OPTIONS.find(o => o.value === row.colour)?.label || row.colour}</span>
               </div>
-              <span className="text-xs text-foreground truncate">{row.constraintMapping || '—'}</span>
+              <div className="h-8 flex items-center"><span className="text-xs text-foreground truncate">{row.constraintMapping || '—'}</span></div>
             </>
           )}
           <Button
