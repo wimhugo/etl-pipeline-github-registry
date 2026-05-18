@@ -5,13 +5,16 @@ import { Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const COLOUR_OPTIONS = [
-  { label: 'Green (Accent)',  value: 'accent',      cls: 'bg-accent/15 text-accent border-accent/40' },
-  { label: 'Blue (Primary)',  value: 'primary',     cls: 'bg-primary/15 text-primary border-primary/40' },
-  { label: 'EU Blue',         value: 'eu-blue',     cls: 'bg-blue-500/15 text-blue-400 border-blue-400/40' },
-  { label: 'Purple (Chart3)', value: 'chart-3',     cls: 'bg-chart-3/15 text-chart-3 border-chart-3/40' },
-  { label: 'Yellow (Chart4)', value: 'chart-4',     cls: 'bg-chart-4/15 text-chart-4 border-chart-4/40' },
-  { label: 'Red (Destructive)', value: 'destructive', cls: 'bg-destructive/15 text-destructive border-destructive/40' },
-  { label: 'Grey (Muted)',    value: 'muted',       cls: 'bg-muted/40 text-muted-foreground border-border/50' },
+  { label: 'Green',   value: 'accent',      swatch: 'bg-accent',              cls: 'bg-accent/15 text-accent border-accent/40' },
+  { label: 'Blue',    value: 'primary',     swatch: 'bg-primary',             cls: 'bg-primary/15 text-primary border-primary/40' },
+  { label: 'Sky',     value: 'eu-blue',     swatch: 'bg-blue-500',            cls: 'bg-blue-500/15 text-blue-400 border-blue-400/40' },
+  { label: 'Purple',  value: 'chart-3',     swatch: 'bg-chart-3',             cls: 'bg-chart-3/15 text-chart-3 border-chart-3/40' },
+  { label: 'Yellow',  value: 'chart-4',     swatch: 'bg-chart-4',             cls: 'bg-chart-4/15 text-chart-4 border-chart-4/40' },
+  { label: 'Red',     value: 'destructive', swatch: 'bg-destructive',         cls: 'bg-destructive/15 text-destructive border-destructive/40' },
+  { label: 'Grey',    value: 'muted',       swatch: 'bg-muted-foreground',    cls: 'bg-muted/40 text-muted-foreground border-border/50' },
+  { label: 'Orange',  value: 'chart-5',     swatch: 'bg-chart-5',             cls: 'bg-chart-5/15 text-chart-5 border-chart-5/40' },
+  { label: 'Teal',    value: 'teal',        swatch: 'bg-teal-500',            cls: 'bg-teal-500/15 text-teal-400 border-teal-400/40' },
+  { label: 'Pink',    value: 'pink',        swatch: 'bg-pink-500',            cls: 'bg-pink-500/15 text-pink-400 border-pink-400/40' },
 ];
 
 export function getColourClass(value) {
@@ -144,9 +147,10 @@ export default function BadgeMappingTable({ rows = [], onChange }) {
             <>
               <span className="text-xs text-foreground truncate">{row.profileBadge || <span className="text-muted-foreground italic">—</span>}</span>
               <span className="text-xs text-muted-foreground font-mono truncate">{row.contextBadge || '—'}</span>
-              <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium w-fit", getColourClass(row.colour))}>
-                {COLOUR_OPTIONS.find(o => o.value === row.colour)?.label || row.colour}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={cn("w-4 h-4 rounded-full border", COLOUR_OPTIONS.find(o => o.value === row.colour)?.swatch || 'bg-muted-foreground')} />
+                <span className="text-xs text-foreground">{COLOUR_OPTIONS.find(o => o.value === row.colour)?.label || row.colour}</span>
+              </div>
               <span className="text-xs text-muted-foreground truncate">{row.constraintMapping || '—'}</span>
             </>
           )}
