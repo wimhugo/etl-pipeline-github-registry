@@ -190,10 +190,10 @@ export default function WorkflowStep1UserContext({ workflowId }) {
             activeClass="bg-accent/10 text-accent border-accent/30"
             icon={<ShieldCheck className="w-3 h-3" />}
           />
-          {/* HEI */}
+          {/* HEI / Research Org */}
           <SignalPill
-            active={isHEI}
-            label={isHEI ? 'Higher Education Institution' : 'Not HEI'}
+            active={isHEI || verifiedStatus === 'verified_research'}
+            label={isHEI ? 'Higher Education Institution' : verifiedStatus === 'verified_research' ? 'Research Org' : 'Not HEI/Research Org'}
             activeClass="bg-primary/10 text-primary border-primary/30"
             icon={<Building2 className="w-3 h-3" />}
           />
