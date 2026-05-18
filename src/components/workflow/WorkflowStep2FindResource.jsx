@@ -32,6 +32,7 @@ export default function WorkflowStep2FindResource() {
         // Extract custom error message from response if available
         const customMessage = response.data?.message || response.data?.error || 'Failed to resolve PID';
         setError(customMessage);
+        setLoading(false);
         return;
       }
 

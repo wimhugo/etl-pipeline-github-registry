@@ -47,7 +47,6 @@ Deno.serve(async (req) => {
 
         const resolveData = await resolveResponse.json();
         
-        // PIDMR returns both the target URL and metadata regardless of PID type
         const targetUrl = resolveData.url || resolveData.redirectUrl;
         const metadata = resolveData.metadata || resolveData;
         
