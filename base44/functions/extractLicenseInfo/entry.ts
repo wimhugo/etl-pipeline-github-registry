@@ -20,11 +20,14 @@ Deno.serve(async (req) => {
 Metadata:
 ${JSON.stringify(metadata, null, 2)}
 
-Identify:
-1. License information (name, URL, type)
-2. Access conditions or restrictions
-3. Usage rights or permissions
-4. Any embargo or time-based restrictions
+IMPORTANT: Look for a "rightsList" array in the metadata. If present, extract each item's "rights" and "rightsUri" fields into the rightsList output field.
+
+Priority order for extraction:
+1. FIRST: Check for "rightsList" array - extract all items with their "rights" and "rightsUri" fields
+2. For license URL: Use "rightsUri" from rightsList items (especially those with "rights" containing license-like terms)
+3. For access conditions: Use "rights" text from rightsList items that mention access, restrictions, or terms
+4. For usage rights: Use "rights" text from rightsList items that mention permissions or usage
+5. Also check other metadata fields for embargo info, dates, or additional context
 
 Return ONLY a JSON object with this exact structure:
 {
@@ -36,6 +39,7 @@ Return ONLY a JSON object with this exact structure:
   "accessConditions": string | null,
   "usageRights": string | null,
   "restrictions": string[] | [],
+  "rightsList": array of objects with "rights" and "rightsUri" fields (extract directly from metadata if present),
   "embargoInfo": {
     "hasEmbargo": boolean,
     "embargoDate": string | null,
@@ -64,6 +68,16 @@ Return ONLY a JSON object with this exact structure:
                         type: "array",
                         items: { type: "string" }
                     },
+                    rightsList: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            properties: {
+                                rights: { type: "string" },
+                                rightsUri: { type: "string" }
+                            }
+                        }
+                    },
                     embargoInfo: {
                         type: "object",
                         properties: {
@@ -78,7 +92,7 @@ Return ONLY a JSON object with this exact structure:
                     },
                     notes: { type: "string" }
                 },
-                required: ["license", "accessConditions", "usageRights", "restrictions", "embargoInfo", "confidence"]
+                required: ["license", "accessConditions", "usageRights", "restrictions", "rightsList", "embargoInfo", "confidence"]
             }
         });
 
