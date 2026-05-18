@@ -66,6 +66,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Invalid input type. Must be "url", "text", or "file"' }, { status: 400 });
     }
 
+    const contentLower = content.toLowerCase();
+    
     // STEP 1: Detect patterns in content WITHOUT any reference to OpenREL files
     const detectedActions = [];
     const detectedConstraints = [];
@@ -148,8 +150,6 @@ Deno.serve(async (req) => {
       detectedPatterns: [],
       summary: '',
     };
-
-    const contentLower = content.toLowerCase();
     
     // Check for JSON-LD context with ODRL
     if (content.includes('"@context"') && (content.includes('odrl') || content.includes('ODRL'))) {
