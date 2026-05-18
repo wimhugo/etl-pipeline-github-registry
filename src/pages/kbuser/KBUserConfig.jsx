@@ -158,21 +158,21 @@ export default function KBUserConfig() {
         `- profileBadge: "${row.profileBadge || ''}"\n  contextBadge: "${row.contextBadge || ''}"\n  colour: ${row.colour || 'muted'}\n  constraintMapping: "${row.constraintMapping || ''}"`
       ).join('\n');
       
-      console.log('Submitting PR with:', {
-        file_path: data.badge_mapping_file,
-        file_content: yamlContent,
-        message: 'Update badge mappings',
-        repo: form.github_repo,
-        branch: form.github_branch,
-      });
+      // Derive repo/branch from the folder URL if not in form
+      const repoFromUrl = folderUrl.match(/github\.com\/([^/]+\/[^/]+)\//)?.[1];
+      const branchFromUrl = folderUrl.match(/\/tree\/([^/]+)\//)?.[1] || 'main';
       
-      const res = await base44.functions.invoke('submitPolicyPR', {
+      const payload = {
         file_path: data.badge_mapping_file,
         file_content: yamlContent,
         message: 'Update badge mappings',
-        repo: form.github_repo,
-        branch: form.github_branch,
-      });
+        repo: form.github_repo || repoFromUrl,
+        branch: form.github_branch || branchFromUrl,
+      };
+      
+      console.log('Submitting PR with payload:', payload);
+      
+      const res = await base44.functions.invoke('submitPolicyPR', payload);
       return res;
     },
     onSuccess: (data) => {
@@ -192,12 +192,18 @@ export default function KBUserConfig() {
   });
 
   const handleSave = () => {
+    // Extract github_repo and github_branch from the parsed URL
+    const githubInfo = parsed ? {
+      github_repo: folderUrl.match(/github\.com\/([^/]+)\/([^/]+)\//)?.slice(1, 3).join('/'),
+      github_branch: folderUrl.match(/\/tree\/([^/]+)\//)?.[1] || 'main',
+    } : {};
+    
     saveMutation.mutate({
       ...form,
       kb_sub_entity_files: form.kb_sub_entity_files || {},
       badge_mapping_file: form.badge_mapping_file,
       badge_mappings: form.badge_mappings,
-      ...(parsed ? { kb_search_data_api_url: parsed.apiUrl, kb_search_data_url: parsed.rawUrl } : {}),
+      ...(parsed ? { kb_search_data_api_url: parsed.apiUrl, kb_search_data_url: parsed.rawUrl, ...githubInfo } : {}),
     });
   };
 

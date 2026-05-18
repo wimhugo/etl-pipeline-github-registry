@@ -21,6 +21,9 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'No repository specified and no global config found' }, { status: 400 });
   }
 
+  // If file_path doesn't start with http, it's a relative path - use it as-is
+  const filePath = file_path.startsWith('http') ? file_path : file_path;
+
   // 1. Fetch the current file from GitHub API to get SHA and content (or detect if it doesn't exist)
   const apiBase = `https://api.github.com/repos/${targetRepo}/contents/${file_path}`;
   console.log('Fetching file from:', apiBase);
