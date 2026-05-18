@@ -163,10 +163,16 @@ export default function KBUserConfig() {
 
   const prMutation = useMutation({
     mutationFn: async (data) => {
-      // Convert badge mappings to YAML format
-      const yamlContent = data.badge_mappings.map(row => 
-        `- profileBadge: "${row.profileBadge || ''}"\n  contextBadge: "${row.contextBadge || ''}"\n  colour: ${row.colour || 'muted'}\n  constraintMapping: "${row.constraintMapping || ''}"`
-      ).join('\n');
+      // Convert badge mappings (sections) to YAML format
+      const yamlContent = (data.badge_mappings || []).map(section => {
+        let yaml = `- context: "${section.name || 'User'}"\n`;
+        if (section.rows && section.rows.length > 0) {
+          yaml += section.rows.map(row => 
+            ` \- profileBadge: "${row.profileBadge || ''}"\n  contextBadge: "${row.contextBadge || ''}"\n  colour: ${row.colour || 'muted'}\n  constraintMapping: "${row.constraintMapping || ''}"`
+          ).join('\n');
+        }
+        return yaml;
+      }).join('\n');
       
       // Derive repo/branch from the folder URL if not in form
       const repoMatch = folderUrl.match(/github\.com\/([^/]+\/[^/]+)\//);
@@ -393,7 +399,7 @@ export default function KBUserConfig() {
             <Label className="text-xs text-muted-foreground">Badge Mappings Table</Label>
             <BadgeMappingTable
               rows={form.badge_mappings || []}
-              onChange={rows => setForm(f => ({ ...f, badge_mappings: rows }))}
+              onChange={sections => setForm(f => ({ ...f, badge_mappings: sections }))}
               constraintOptions={constraintsData}
               mappingFile={form.badge_mapping_file}
               onMappingFileChange={(val) => setForm(f => ({ ...f, badge_mapping_file: val }))}
@@ -417,13 +423,9 @@ export default function KBUserConfig() {
                 <div className="mt-2 rounded-lg border border-border/40 bg-muted/30 overflow-hidden">
                   <pre className="p-3 text-xs font-mono text-foreground overflow-x-auto max-h-96 overflow-y-auto whitespace-pre-wrap">
                     {(() => {
-                      // Generate multi-section YAML preview
-                      const sections = [
-                        { name: 'User', rows: form.badge_mappings },
-                        // Add more sections as needed
-                      ];
-                      return sections.map(section => {
-                        let yaml = `- context: "${section.name}"\n`;
+                      // form.badge_mappings is now an array of sections
+                      return (form.badge_mappings || []).map(section => {
+                        let yaml = `- context: "${section.name || 'User'}"\n`;
                         if (section.rows && section.rows.length > 0) {
                           yaml += section.rows.map(row => 
                             ` \- profileBadge: "${row.profileBadge || ''}"\n  contextBadge: "${row.contextBadge || ''}"\n  colour: ${row.colour || 'muted'}\n  constraintMapping: "${row.constraintMapping || ''}"`

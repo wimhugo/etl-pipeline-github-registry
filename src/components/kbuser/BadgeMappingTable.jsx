@@ -150,16 +150,15 @@ export default function BadgeMappingTable({
 }) {
   const [editIdx, setEditIdx] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [sections, setSections] = useState([{ name: 'User', rows: rows }]);
+  const [sections, setSections] = useState(() => {
+    // Initialize from rows prop if it's an array of sections, otherwise default to User section
+    if (Array.isArray(rows) && rows.length > 0 && rows[0]?.name !== undefined) {
+      return rows;
+    }
+    return [{ name: 'User', rows: Array.isArray(rows) ? rows : [] }];
+  });
   const [loadingFromGithub, setLoadingFromGithub] = useState(false);
   const [loadError, setLoadError] = useState(null);
-  
-  // Initialize sections from rows prop
-  useEffect(() => {
-    if (rows && rows.length > 0 && sections.length === 1 && sections[0].name === 'User') {
-      setSections([{ name: 'User', rows }]);
-    }
-  }, [rows]);
 
   const loadFromGithub = async () => {
     setLoadingFromGithub(true);
@@ -176,9 +175,9 @@ export default function BadgeMappingTable({
       
       if (parsedSections.length > 0) {
         setSections(parsedSections);
-        // Notify parent of the first section's rows (backward compatibility)
-        if (onChange && parsedSections[0].rows) {
-          onChange(parsedSections[0].rows);
+        // Notify parent of all sections
+        if (onChange) {
+          onChange(parsedSections);
         }
       }
     } catch (err) {
@@ -199,20 +198,35 @@ export default function BadgeMappingTable({
   const updateSectionRows = (sectionIdx, newRows) => {
     const updated = sections.map((s, i) => i === sectionIdx ? { ...s, rows: newRows } : s);
     setSections(updated);
-    // Notify parent of changes (for backward compatibility, use first section)
-    if (onChange && updated[0]?.rows) {
-      onChange(updated[0].rows);
+    // Notify parent of all sections changes
+    if (onChange) {
+      onChange(updated);
     }
   };
 
   const addSection = () => {
     const newSection = { name: 'New Section', rows: [] };
-    setSections([...sections, newSection]);
+    const updated = [...sections, newSection];
+    setSections(updated);
+    if (onChange) {
+      onChange(updated);
+    }
   };
 
   const updateSectionName = (sectionIdx, newName) => {
     const updated = sections.map((s, i) => i === sectionIdx ? { ...s, name: newName } : s);
     setSections(updated);
+    if (onChange) {
+      onChange(updated);
+    }
+  };
+
+  const removeSection = (sectionIdx) => {
+    const updated = sections.filter((_, i) => i !== sectionIdx);
+    setSections(updated);
+    if (onChange) {
+      onChange(updated);
+    }
   };
 
   return (
@@ -261,13 +275,7 @@ export default function BadgeMappingTable({
               variant="ghost"
               size="sm"
               className="h-6 text-xs gap-1.5"
-              onClick={() => {
-                const updated = sections.filter((_, i) => i !== sectionIdx);
-                setSections(updated);
-                if (onChange && updated[0]?.rows) {
-                  onChange(updated[0].rows);
-                }
-              }}
+              onClick={() => removeSection(sectionIdx)}
             >
               <Trash2 className="w-3 h-3" /> Remove Section
             </Button>
