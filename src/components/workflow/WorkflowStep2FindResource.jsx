@@ -59,7 +59,7 @@ export default function WorkflowStep2FindResource() {
     if (!result?.metadata) {
       toast({
         title: 'HTML-based license extraction coming soon',
-        description: 'We will extract rights, access, and license data from the target URL HTML.',
+        description: 'We will attempt to extract rights, access, and license data from the target URL HTML.',
         duration: 5000
       });
       setExtractingLicense(false);
