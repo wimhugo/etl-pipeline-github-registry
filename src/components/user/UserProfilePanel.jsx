@@ -50,6 +50,7 @@ export default function UserProfilePanel({ onClose }) {
   // Multiple locations: [{ value, source }]; defaultLocation is the selected one
   const [locations, setLocations] = useState([]);
   const [defaultLocation, setDefaultLocation] = useState('');
+  const [researchContexts, setResearchContexts] = useState([]);
   const [loadingOrcid, setLoadingOrcid] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [orcidError, setOrcidError] = useState('');
@@ -70,6 +71,7 @@ export default function UserProfilePanel({ onClose }) {
         const legacy = freshUser.location ? [{ value: freshUser.location, source: 'manual' }] : [];
         setLocations(stored.length ? stored : legacy);
         setDefaultLocation(freshUser.default_location || freshUser.location || '');
+        setResearchContexts(freshUser.research_contexts || []);
         // Re-verify saved institutions so badges show on load
         savedInstitutions.forEach(inst => verifyInstitution(inst.name));
       }
@@ -150,6 +152,7 @@ export default function UserProfilePanel({ onClose }) {
       default_location: defaultLocation,
       // keep legacy field in sync
       location: defaultLocation,
+      research_contexts: researchContexts,
     });
     setSavingProfile(false);
     setSaveSuccess(true);
@@ -319,6 +322,29 @@ export default function UserProfilePanel({ onClose }) {
                 )}
               </>
             )}
+          </Section>
+
+          {/* Section 4: Research Context */}
+          <Section title="Research Context" icon={FlaskConical} defaultOpen={researchContexts.length > 0}>
+            <p className="text-[11px] text-muted-foreground">Select all that apply to your research activities.</p>
+            <div className="space-y-2">
+              {['Publicly Funded Research', 'Commercial Research', 'Commercial Application of Results'].map(option => {
+                const checked = researchContexts.includes(option);
+                return (
+                  <label key={option} className="flex items-center gap-2.5 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => setResearchContexts(prev =>
+                        checked ? prev.filter(v => v !== option) : [...prev, option]
+                      )}
+                      className="w-3.5 h-3.5 rounded accent-primary cursor-pointer"
+                    />
+                    <span className="text-xs text-foreground group-hover:text-primary transition-colors">{option}</span>
+                  </label>
+                );
+              })}
+            </div>
           </Section>
 
           {/* Section 3: Geographic Locations */}
