@@ -175,6 +175,8 @@ export default function BadgeMappingTable({
     setLoadError(null);
     
     try {
+      console.log('🔍 Load params:', { mappingFile, githubRepo, githubBranch });
+      
       if (!mappingFile) {
         throw new Error('Badge Mapping File Path not configured. Please set it above.');
       }
@@ -182,7 +184,9 @@ export default function BadgeMappingTable({
         throw new Error('GitHub repository not configured. Please set the GitHub Folder URL above.');
       }
       
-      const url = `https://raw.githubusercontent.com/${githubRepo}/${githubBranch}/${mappingFile}?t=${Date.now()}`;
+      // Ensure path doesn't start with /
+      const cleanPath = mappingFile.replace(/^\//, '');
+      const url = `https://raw.githubusercontent.com/${githubRepo}/${githubBranch}/${cleanPath}?t=${Date.now()}`;
       
       console.log('📥 Loading badge mapping from:', url);
       const response = await fetch(url, {
