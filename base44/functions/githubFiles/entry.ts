@@ -8,15 +8,17 @@ Deno.serve(async (req) => {
   const body = await req.json();
   const { action, repo, branch = 'main', path, content, message, sha, github_token } = body;
 
-  // Try to get token from request first, then from GlobalConfig, then from env
+  // Use token from request if provided, otherwise use service role to fetch from GlobalConfig
   let token = github_token;
   if (!token) {
     try {
-      const base44Config = createClientFromRequest(req);
-      const configs = await base44Config.entities.GlobalConfig.filter({});
+      // Use service role to ensure we can read GlobalConfig
+      const configs = await base44.asServiceRole.entities.GlobalConfig.filter({});
       if (configs && configs.length > 0 && configs[0].github_token) {
         token = configs[0].github_token;
-        console.log('✅ Using GitHub token from GlobalConfig');
+        console.log('✅ Using GitHub token from GlobalConfig (first 8 chars):', token.substring(0, 8) + '...');
+      } else {
+        console.log('⚠️ No GitHub token found in GlobalConfig');
       }
     } catch (e) {
       console.log('⚠️ Could not fetch GlobalConfig:', e.message);
