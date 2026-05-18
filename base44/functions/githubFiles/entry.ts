@@ -45,6 +45,8 @@ Deno.serve(async (req) => {
     'Content-Type': 'application/json',
     'User-Agent': 'OpenREL-App',
   };
+  console.log('🔑 Token length:', token.length);
+  console.log('🔑 Token starts with "ghp_" or "github_pat_"?:', token.startsWith('ghp_') ? 'ghp_ (classic)' : token.startsWith('github_pat_') ? 'github_pat_ (fine-grained)' : 'unknown prefix');
 
   if (action === 'listRepos') {
     const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', { headers });
