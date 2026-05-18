@@ -93,7 +93,8 @@ export default function WorkflowStep1UserContext({ workflowId }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [overrides, setOverrides] = useState({});
-  const [rorVerification, setRorVerification] = useState(null); // live ROR lookup result
+  const [rorCache, setRorCache] = useState({}); // name -> { status, match }
+  const [verifyingInstitution, setVerifyingInstitution] = useState(false);
 
   const loadProfile = useCallback(async (showSpinner = false) => {
     if (showSpinner) setRefreshing(true);
@@ -103,17 +104,19 @@ export default function WorkflowStep1UserContext({ workflowId }) {
     const freshProfile = await base44.auth.me();
     setProfile(freshProfile);
     setOverrides({});
-    setRorVerification(null);
 
-    // If primary_institution_status not yet saved, look it up live from ROR
+    // Seed the ROR cache: use saved data first, then live lookup if missing
     const savedStatus = freshProfile?.primary_institution_status;
     const institutionName = freshProfile?.default_institution;
+    const newCache = {};
+    if (savedStatus && institutionName) {
+      newCache[institutionName] = { status: savedStatus, match: freshProfile?.primary_institution_ror || null };
+    }
+    setRorCache(newCache);
+
     if (!savedStatus && institutionName) {
       const res = await base44.functions.invoke('verifyInstitution', { name: institutionName });
-      setRorVerification(res.data || null);
-    } else if (savedStatus) {
-      // Already saved — reconstruct the same shape from stored fields
-      setRorVerification({ status: savedStatus, match: freshProfile?.primary_institution_ror || null });
+      setRorCache(c => ({ ...c, [institutionName]: res.data || {} }));
     }
 
     setRefreshing(false);
@@ -121,6 +124,18 @@ export default function WorkflowStep1UserContext({ workflowId }) {
   }, [user?.email]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
+
+  // When the active institution changes (via override), look it up in ROR if not cached
+  useEffect(() => {
+    if (!profile) return;
+    const activeInstitution = overrides.institution ?? profile?.default_institution ?? '';
+    if (!activeInstitution || rorCache[activeInstitution]) return;
+    setVerifyingInstitution(true);
+    base44.functions.invoke('verifyInstitution', { name: activeInstitution }).then(res => {
+      setRorCache(c => ({ ...c, [activeInstitution]: res.data || {} }));
+      setVerifyingInstitution(false);
+    });
+  }, [overrides.institution, profile]);
 
   if (loading) {
     return (
@@ -138,7 +153,8 @@ export default function WorkflowStep1UserContext({ workflowId }) {
   const institutions = profile?.orcid_institutions || [];
   const locations = profile?.locations || [];
 
-  // Signals derived from live ROR lookup (rorVerification) — covers both fresh lookup and saved data
+  // Signals derived from ROR cache for the currently active institution
+  const rorVerification = rorCache[institution] || null;
   const verifiedStatus = rorVerification?.status;
   const rorMatch = rorVerification?.match;
   const isVerifiedResearcher = verifiedStatus === 'verified_education' || verifiedStatus === 'verified_research';
@@ -246,15 +262,18 @@ export default function WorkflowStep1UserContext({ workflowId }) {
           <div className="space-y-2">
             <div className="flex items-start gap-2 flex-wrap">
               <p className="text-xs text-foreground">{institution}</p>
-              {isVerifiedResearcher && (
-                <span className={cn(
-                  "inline-flex items-center gap-1 rounded-full border text-[9px] px-1.5 py-0 font-medium",
-                  isHEI ? "bg-primary/10 text-primary border-primary/30" : "bg-accent/10 text-accent border-accent/30"
-                )}>
-                  <ShieldCheck className="w-2.5 h-2.5" />
-                  {isHEI ? 'HEI' : 'Research Org'}
-                </span>
-              )}
+              {verifyingInstitution
+                ? <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                : isVerifiedResearcher && (
+                  <span className={cn(
+                    "inline-flex items-center gap-1 rounded-full border text-[9px] px-1.5 py-0 font-medium",
+                    isHEI ? "bg-primary/10 text-primary border-primary/30" : "bg-accent/10 text-accent border-accent/30"
+                  )}>
+                    <ShieldCheck className="w-2.5 h-2.5" />
+                    {isHEI ? 'HEI' : 'Research Org'}
+                  </span>
+                )
+              }
             </div>
             {(() => {
               const inst = institutions.find(i => i.name === institution);
