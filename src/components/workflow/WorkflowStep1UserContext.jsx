@@ -137,6 +137,42 @@ export default function WorkflowStep1UserContext({ workflowId }) {
     });
   }, [overrides.institution, profile]);
 
+  // Save user context to localStorage for step 3
+  useEffect(() => {
+    if (!profile || loading) return;
+    
+    const orcid = overrides.orcid ?? profile?.orcid ?? '';
+    const institution = overrides.institution ?? profile?.default_institution ?? '';
+    const location = overrides.location ?? profile?.default_location ?? '';
+    const contexts = overrides.research_contexts ?? profile?.research_contexts ?? [];
+    const institutions = profile?.orcid_institutions || [];
+    const locations = profile?.locations || [];
+    
+    const rorVerification = rorCache[institution] || null;
+    const verifiedStatus = rorVerification?.status;
+    const rorMatch = rorVerification?.match;
+    const isVerifiedResearcher = verifiedStatus === 'verified_education' || verifiedStatus === 'verified_research';
+    const isHEI = verifiedStatus === 'verified_education';
+    const rorCountry = rorMatch?.country_code || '';
+    const primaryInst = institutions.find(i => i.name === institution);
+    const instCountry = primaryInst?.country || '';
+    const isEUMember = isEU(location) || isEU(rorCountry) || isEU(instCountry) || (locations || []).some(l => isEU(l.value));
+    
+    const contextData = {
+      verifiedEducation: isHEI,
+      verifiedResearch: verifiedStatus === 'verified_research',
+      institutionType: isHEI ? 'Higher Education Institution' : (verifiedStatus === 'verified_research' ? 'Research Organization' : null),
+      euMember: isEUMember,
+      location: location,
+      researchContext: {
+        publiclyFunded: contexts.includes('Publicly Funded Research'),
+        commercial: contexts.includes('Commercial Research'),
+        commercialApplication: contexts.includes('Commercial Application of Results'),
+      }
+    };
+    localStorage.setItem('workflow_user_context', JSON.stringify(contextData));
+  }, [profile, loading, overrides, rorCache]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-32">

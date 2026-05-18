@@ -188,12 +188,12 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Verified Context Summary */}
-          {verifiedContextBadges.length > 0 && (
-            <div className="rounded-lg border border-border/40 bg-muted/30 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <FileJson className="w-4 h-4 text-muted-foreground" />
-                <Label className="text-sm font-semibold text-foreground">Verified Context</Label>
-              </div>
+          <div className="rounded-lg border border-border/40 bg-muted/30 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <FileJson className="w-4 h-4 text-muted-foreground" />
+              <Label className="text-sm font-semibold text-foreground">Verified Context</Label>
+            </div>
+            {verifiedContextBadges.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {verifiedContextBadges.map((badge, idx) => {
                   const colourClass = {
@@ -217,8 +217,10 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
                   );
                 })}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-xs text-muted-foreground italic">No verified context badges. Complete step 1 to populate your context.</p>
+            )}
+          </div>
 
           <p className="text-sm text-muted-foreground">
             Select the intended use(s) and ethics considerations based on your verified context badges.
