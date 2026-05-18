@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Microscope, Link2, Type, File, Loader2, CheckCircle2, AlertCircle, FileJson, Shield, Zap } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
 
@@ -17,6 +18,8 @@ export default function ObjectAnalysis() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [error, setError] = useState(null);
+  const [openrelActions, setOpenrelActions] = useState([]);
+  const [actionMappings, setActionMappings] = useState({});
 
   // Check for URL parameter on mount
   useEffect(() => {
@@ -26,6 +29,39 @@ export default function ObjectAnalysis() {
       setObjectUrl(urlParam);
       setInputType('url');
     }
+  }, []);
+
+  // Fetch OpenREL Actions from GlobalConfig on mount
+  useEffect(() => {
+    const fetchOpenrelActions = async () => {
+      try {
+        const configs = await base44.asServiceRole.entities.GlobalConfig.filter({});
+        if (configs && configs.length > 0) {
+          const config = configs[0];
+          const subEntityFiles = config.kb_sub_entity_files || {};
+          const dataBaseUrl = config.kb_search_data_url;
+          
+          if (subEntityFiles.actions && dataBaseUrl) {
+            const actionsUrl = `${dataBaseUrl}/${subEntityFiles.actions}`;
+            const actionsRes = await fetch(actionsUrl);
+            if (actionsRes.ok) {
+              const actionsData = await actionsRes.json();
+              let actions = [];
+              if (Array.isArray(actionsData)) {
+                actions = actionsData;
+              } else if (actionsData.actions && Array.isArray(actionsData.actions)) {
+                actions = actionsData.actions;
+              }
+              setOpenrelActions(actions);
+            }
+          }
+        }
+      } catch (e) {
+        console.log('Could not fetch OpenREL actions:', e.message);
+      }
+    };
+    
+    fetchOpenrelActions();
   }, []);
 
   const handleAnalyse = async () => {
@@ -259,15 +295,37 @@ export default function ObjectAnalysis() {
                   </Badge>
                 </div>
                 {analysisResult.hasActions && (
-                  <div className="ml-6 space-y-1">
+                  <div className="ml-6 space-y-2">
                     {analysisResult.detectedPatterns
                       .filter(p => p.includes('Configured Action:') || p.includes('Potential Action:'))
-                      .map((pattern, idx) => (
-                        <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
-                          <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
-                          <span className="font-mono">{pattern}</span>
-                        </div>
-                      ))}
+                      .map((pattern, idx) => {
+                        const detectedTerm = pattern.replace(/^(Configured Action: |Potential Action: )/, '');
+                        const mappingKey = `action-${idx}-${detectedTerm}`;
+                        
+                        return (
+                          <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
+                            <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
+                            <span className="font-mono flex-1">{pattern}</span>
+                            {openrelActions.length > 0 && (
+                              <Select
+                                value={actionMappings[mappingKey] || ''}
+                                onValueChange={(value) => setActionMappings(prev => ({ ...prev, [mappingKey]: value }))}
+                              >
+                                <SelectTrigger className="w-[180px] h-7 text-xs">
+                                  <SelectValue placeholder="Map to OpenREL Action" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {openrelActions.map((action, actionIdx) => (
+                                    <SelectItem key={actionIdx} value={action.label}>
+                                      {action.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
+                        );
+                      })}
                     {analysisResult.detectedPatterns.filter(p => p.includes('Configured Action:') || p.includes('Potential Action:')).length === 0 && (
                       <p className="text-xs text-muted-foreground italic">Generic action language detected</p>
                     )}
