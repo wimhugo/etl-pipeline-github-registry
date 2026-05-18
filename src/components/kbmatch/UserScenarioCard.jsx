@@ -52,8 +52,13 @@ function runMatch(scenario, scenarioLabelMap, constraintsArray, policies) {
       for (const rule of policy[ruleType] || []) {
         const constraints = Array.isArray(rule.constraint) ? rule.constraint : (rule.constraint ? [rule.constraint] : []);
         for (const c of constraints) {
-          const cid = c['@id'] || c.id || c.uid;
-          if (cid) ids.add(cid);
+          // c may be a string id, or an object with @id / id / uid
+          if (typeof c === 'string') {
+            ids.add(c);
+          } else {
+            const cid = c['@id'] || c.id || c.uid;
+            if (cid) ids.add(cid);
+          }
         }
       }
     }
