@@ -120,23 +120,79 @@ Deno.serve(async (req) => {
       console.log('Could not load OpenREL files:', e.message);
     }
     
-    // Auto-match detected items with OpenREL items
+    // Fuzzy matching helper - returns similarity score (0-1)
+    const similarity = (s1, s2) => {
+      const str1 = s1.toLowerCase().trim();
+      const str2 = s2.toLowerCase().trim();
+      if (str1 === str2) return 1.0;
+      if (str1.includes(str2) || str2.includes(str1)) return 0.8;
+      
+      // Levenshtein distance-based similarity
+      const longer = str1.length > str2.length ? str1 : str2;
+      const shorter = str1.length > str2.length ? str2 : str1;
+      if (longer.length === 0) return 1.0;
+      
+      const costs = new Array(shorter.length + 1);
+      for (let i = 0; i <= shorter.length; i++) costs[i] = i;
+      
+      for (let i = 1; i <= longer.length; i++) {
+        let prev = costs[0];
+        costs[0] = i;
+        for (let j = 1; j <= shorter.length; j++) {
+          const curr = costs[j];
+          const cost = longer[i-1] === shorter[j-1] ? 0 : 1;
+          costs[j] = Math.min(Math.min(costs[j-1] + 1, costs[j] + 1), prev + cost);
+          prev = curr;
+        }
+      }
+      
+      const distance = costs[shorter.length];
+      return 1 - (distance / longer.length);
+    };
+    
+    // Auto-match detected items with OpenREL items using fuzzy matching
+    const MATCH_THRESHOLD = 0.75;
+    
     const matchedActions = detectedActions.map(detected => {
-      const matched = openrelActions.find(openrel => {
+      let bestMatch = null;
+      let bestScore = 0;
+      
+      for (const openrel of openrelActions) {
         const label = (openrel.label || '').toLowerCase();
-        const detectedLower = detected.toLowerCase();
-        return label === detectedLower || label.includes(detectedLower) || detectedLower.includes(label);
-      });
-      return { detected, matchedLabel: matched?.label || '', matchedId: matched?.id || '' };
+        const score = similarity(detected.toLowerCase(), label);
+        if (score > bestScore && score >= MATCH_THRESHOLD) {
+          bestScore = score;
+          bestMatch = openrel;
+        }
+      }
+      
+      return { 
+        detected, 
+        matchedLabel: bestMatch?.label || '', 
+        matchedId: bestMatch?.id || '',
+        matchScore: bestScore
+      };
     });
     
     const matchedConstraints = detectedConstraints.map(detected => {
-      const matched = openrelConstraints.find(openrel => {
+      let bestMatch = null;
+      let bestScore = 0;
+      
+      for (const openrel of openrelConstraints) {
         const label = (openrel.label || '').toLowerCase();
-        const detectedLower = detected.toLowerCase();
-        return label === detectedLower || label.includes(detectedLower) || detectedLower.includes(label);
-      });
-      return { detected, matchedLabel: matched?.label || '', matchedId: matched?.id || '' };
+        const score = similarity(detected.toLowerCase(), label);
+        if (score > bestScore && score >= MATCH_THRESHOLD) {
+          bestScore = score;
+          bestMatch = openrel;
+        }
+      }
+      
+      return { 
+        detected, 
+        matchedLabel: bestMatch?.label || '', 
+        matchedId: bestMatch?.id || '',
+        matchScore: bestScore
+      };
     });
 
     // Analyze content for OpenREL/ODRL rules, actions, and constraints
