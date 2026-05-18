@@ -15,10 +15,30 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Metadata is required and must be an object' }, { status: 400 });
         }
 
+        // If metadata only contains a URL, fetch the actual metadata from that URL
+        let actualMetadata = metadata;
+        if (Object.keys(metadata).length === 1 && metadata.url) {
+            try {
+                const urlResponse = await fetch(metadata.url, {
+                    headers: {
+                        'Accept': 'application/json',
+                    },
+                });
+                
+                if (urlResponse.ok) {
+                    const urlData = await urlResponse.json();
+                    actualMetadata = urlData;
+                }
+            } catch (fetchError) {
+                // If fetching fails, continue with the original metadata (just the URL)
+                console.log('Failed to fetch metadata from URL:', fetchError.message);
+            }
+        }
+
         const prompt = `Analyze the following JSON metadata and extract any license, access conditions, or rights information.
 
 Metadata:
-${JSON.stringify(metadata, null, 2)}
+${JSON.stringify(actualMetadata, null, 2)}
 
 IMPORTANT: Look for a "rightsList" array in the metadata. If present, extract each item's "rights" and "rightsUri" fields into the rightsList output field.
 
