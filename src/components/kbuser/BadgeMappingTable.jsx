@@ -18,6 +18,24 @@ export function getColourClass(value) {
   return COLOUR_OPTIONS.find(o => o.value === value)?.cls || COLOUR_OPTIONS[6].cls;
 }
 
+// All badge labels sourced from WorkflowStep1UserContext (SignalPill) and UserProfilePanel
+const PROFILE_BADGE_OPTIONS = [
+  // Researcher / institution verification (from SignalPill & UserProfilePanel)
+  'Verified HEI Researcher',
+  'Verified Researcher',
+  'Verified HEI',
+  'Verified Research Org',
+  // Institution type signals
+  'Higher Education Institution',
+  'Research Org',
+  // EU membership
+  'EU Member',
+  // Research context checkboxes
+  'Publicly Funded Research',
+  'Commercial Research',
+  'Commercial Application of Results',
+];
+
 const EMPTY_ROW = { profileBadge: '', contextBadge: '', colour: 'muted', constraintMapping: '' };
 
 export default function BadgeMappingTable({ rows = [], onChange }) {
@@ -62,13 +80,17 @@ export default function BadgeMappingTable({ rows = [], onChange }) {
         >
           {editIdx === idx ? (
             <>
-              <Input
+              <select
                 value={row.profileBadge}
                 onChange={e => update(idx, 'profileBadge', e.target.value)}
-                className="h-7 text-xs bg-muted/50"
-                placeholder="e.g. Verified HEI Researcher"
+                className="h-7 text-xs rounded-md border border-input bg-muted/50 px-1.5 text-foreground"
                 onClick={e => e.stopPropagation()}
-              />
+              >
+                <option value="">— Select badge —</option>
+                {PROFILE_BADGE_OPTIONS.map(o => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
               <Input
                 value={row.contextBadge}
                 onChange={e => update(idx, 'contextBadge', e.target.value)}
