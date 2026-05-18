@@ -103,49 +103,57 @@ export default function BadgeMappingTable({ rows = [], onChange, constraintOptio
         >
           {editIdx === idx ? (
             <>
-              <select
-                value={row.profileBadge}
-                onChange={e => update(idx, 'profileBadge', e.target.value)}
-                className="h-8 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
-                onClick={e => e.stopPropagation()}
-              >
-                <option value="">— Select badge —</option>
-                {PROFILE_BADGE_OPTIONS.map(o => (
-                  <option key={o} value={o}>{o}</option>
-                ))}
-              </select>
-              <select
-                value={row.contextBadge}
-                onChange={e => update(idx, 'contextBadge', e.target.value)}
-                className="h-8 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
-                onClick={e => e.stopPropagation()}
-              >
-                <option value="">— Select context —</option>
-                {CONTEXT_BADGE_OPTIONS.map(o => (
-                  <option key={o} value={o}>{o}</option>
-                ))}
-              </select>
-              <select
-                value={row.colour}
-                onChange={e => update(idx, 'colour', e.target.value)}
-                className="h-8 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
-                onClick={e => e.stopPropagation()}
-              >
-                {COLOUR_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-              <select
-                value={row.constraintMapping}
-                onChange={e => update(idx, 'constraintMapping', e.target.value)}
-                className="h-8 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
-                onClick={e => e.stopPropagation()}
-              >
-                <option value="">— Select constraint —</option>
-                {constraintOptions.map(o => (
-                  <option key={o} value={o}>{o}</option>
-                ))}
-              </select>
+              <div className="h-8 flex items-center">
+                <select
+                  value={row.profileBadge}
+                  onChange={e => update(idx, 'profileBadge', e.target.value)}
+                  className="w-full h-7 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <option value="">— Select badge —</option>
+                  {PROFILE_BADGE_OPTIONS.map(o => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="h-8 flex items-center">
+                <select
+                  value={row.contextBadge}
+                  onChange={e => update(idx, 'contextBadge', e.target.value)}
+                  className="w-full h-7 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <option value="">— Select context —</option>
+                  {CONTEXT_BADGE_OPTIONS.map(o => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="h-8 flex items-center">
+                <select
+                  value={row.colour}
+                  onChange={e => update(idx, 'colour', e.target.value)}
+                  className="w-full h-7 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
+                  onClick={e => e.stopPropagation()}
+                >
+                  {COLOUR_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="h-8 flex items-center">
+                <select
+                  value={row.constraintMapping}
+                  onChange={e => update(idx, 'constraintMapping', e.target.value)}
+                  className="w-full h-7 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <option value="">— Select constraint —</option>
+                  {constraintOptions.map(o => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </select>
+              </div>
             </>
           ) : (
             <>
