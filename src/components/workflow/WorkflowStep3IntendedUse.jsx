@@ -218,7 +218,7 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
       <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5 flex items-start gap-2">
         <Info className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
         <p className="text-[11px] text-muted-foreground leading-relaxed">
-          Select intended uses and ethics considerations based on your verified context. Your selections are saved automatically.
+          Select intended uses and ethics considerations based on your intended reuse context. Your selections are saved automatically.
         </p>
       </div>
 
