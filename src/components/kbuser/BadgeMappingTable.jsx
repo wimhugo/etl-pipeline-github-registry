@@ -208,8 +208,8 @@ export default function BadgeMappingTable({
         throw new Error('File not found or empty');
       }
       
-      // Content is base64 encoded
-      const content = atob(response.data.content);
+      // Content is already decoded by backend function
+      const content = response.data.content;
       console.log('✅ Fetched badge mapping content');
       const parsedSections = parseYamlToSections(content);
       
