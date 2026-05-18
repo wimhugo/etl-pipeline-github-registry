@@ -213,38 +213,85 @@ export default function ObjectAnalysis() {
             </CardContent>
           </Card>
 
-          {/* Detection Results */}
+          {/* Detection Results - Detailed */}
           <Card className="bg-card border-border/50">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium">Detection Results</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">OpenREL/ODRL Rules</span>
+            <CardContent className="space-y-4">
+              {/* Rules Section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">OpenREL/ODRL Rules</span>
+                  </div>
+                  <Badge variant={analysisResult.hasRules ? "default" : "secondary"}>
+                    {analysisResult.hasRules ? 'Detected' : 'Not Found'}
+                  </Badge>
                 </div>
-                <Badge variant={analysisResult.hasRules ? "default" : "secondary"}>
-                  {analysisResult.hasRules ? 'Detected' : 'Not Found'}
-                </Badge>
+                {analysisResult.hasRules && (
+                  <div className="ml-6 space-y-1">
+                    {analysisResult.detectedPatterns
+                      .filter(p => p.includes('ODRL term:') || p.includes('OpenREL term:') || p.includes('JSON-LD'))
+                      .map((pattern, idx) => (
+                        <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
+                          <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
+                          <span className="font-mono">{pattern}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">Actions</span>
+
+              {/* Actions Section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">Actions</span>
+                  </div>
+                  <Badge variant={analysisResult.hasActions ? "default" : "secondary"}>
+                    {analysisResult.hasActions ? 'Detected' : 'Not Found'}
+                  </Badge>
                 </div>
-                <Badge variant={analysisResult.hasActions ? "default" : "secondary"}>
-                  {analysisResult.hasActions ? 'Detected' : 'Not Found'}
-                </Badge>
+                {analysisResult.hasActions && (
+                  <div className="ml-6 space-y-1">
+                    {analysisResult.detectedPatterns
+                      .filter(p => p.includes('Configured Action:') || p.includes('Action/Permission'))
+                      .map((pattern, idx) => (
+                        <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
+                          <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
+                          <span className="font-mono">{pattern}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                <div className="flex items-center gap-2">
-                  <FileJson className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">Constraints</span>
+
+              {/* Constraints Section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileJson className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">Constraints</span>
+                  </div>
+                  <Badge variant={analysisResult.hasConstraints ? "default" : "secondary"}>
+                    {analysisResult.hasConstraints ? 'Detected' : 'Not Found'}
+                  </Badge>
                 </div>
-                <Badge variant={analysisResult.hasConstraints ? "default" : "secondary"}>
-                  {analysisResult.hasConstraints ? 'Detected' : 'Not Found'}
-                </Badge>
+                {analysisResult.hasConstraints && (
+                  <div className="ml-6 space-y-1">
+                    {analysisResult.detectedPatterns
+                      .filter(p => p.includes('Configured Constraint:') || p.includes('Constraint patterns'))
+                      .map((pattern, idx) => (
+                        <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
+                          <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
+                          <span className="font-mono">{pattern}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
