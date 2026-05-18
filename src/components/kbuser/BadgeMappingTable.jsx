@@ -189,7 +189,7 @@ export default function BadgeMappingTable({
       console.log('📥 Fetching via backend function:', { repo: githubRepo, branch: githubBranch, path: cleanPath });
       
       const response = await base44.functions.invoke('githubFiles', {
-        action: 'get_file',
+        action: 'getFile',
         repo: githubRepo,
         branch: githubBranch,
         path: cleanPath
