@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -53,6 +53,7 @@ function parseBadgeMappingYaml(yamlText) {
 export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
   const [selectedUses, setSelectedUses] = useState([]);
   const [expandedSections, setExpandedSections] = useState({});
+  const [userContext, setUserContext] = useState(null);
 
   // Fetch badge mappings from GlobalConfig
   const { data: globalConfigs = [] } = useQuery({
@@ -60,6 +61,62 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
     queryFn: () => base44.entities.GlobalConfig.list(),
   });
   const globalConfig = globalConfigs[0];
+
+  // Load user context from localStorage (set in step 1)
+  useEffect(() => {
+    const savedContext = localStorage.getItem('workflow_user_context');
+    if (savedContext) {
+      try {
+        setUserContext(JSON.parse(savedContext));
+      } catch (e) {
+        console.error('Failed to parse saved user context:', e);
+      }
+    }
+  }, []);
+
+  // Build verified context badges from user context
+  const verifiedContextBadges = React.useMemo(() => {
+    if (!userContext) return [];
+    
+    const badges = [];
+    
+    // Researcher verification
+    if (userContext.verifiedEducation) {
+      badges.push({ label: 'Verified HEI Researcher', contextBadge: 'verified_education', colour: 'accent' });
+    }
+    if (userContext.verifiedResearch) {
+      badges.push({ label: 'Verified Researcher', contextBadge: 'verified_research', colour: 'accent' });
+    }
+    
+    // Institution type
+    if (userContext.institutionType === 'Higher Education Institution') {
+      badges.push({ label: 'Higher Education Institution', contextBadge: 'hei_institution', colour: 'primary' });
+    } else if (userContext.institutionType === 'Research Organization') {
+      badges.push({ label: 'Research Organization', contextBadge: 'research_org', colour: 'primary' });
+    }
+    
+    // EU membership
+    if (userContext.euMember === true) {
+      badges.push({ label: 'EU Member', contextBadge: 'eu_member', colour: 'chart-3' });
+    } else if (userContext.euMember === false) {
+      badges.push({ label: 'Non-EU', contextBadge: 'non_eu', colour: 'muted' });
+    }
+    
+    // Research context
+    if (userContext.researchContext) {
+      if (userContext.researchContext.publiclyFunded) {
+        badges.push({ label: 'Publicly Funded Research', contextBadge: 'publicly_funded_research', colour: 'chart-4' });
+      }
+      if (userContext.researchContext.commercial) {
+        badges.push({ label: 'Commercial Research', contextBadge: 'commercial_research', colour: 'chart-5' });
+      }
+      if (userContext.researchContext.commercialApplication) {
+        badges.push({ label: 'Commercial Application', contextBadge: 'commercial_application_of_results', colour: 'destructive' });
+      }
+    }
+    
+    return badges;
+  }, [userContext]);
 
   // Fetch badge mapping file from GitHub raw URL
   const { data: badgeMappingFile, isLoading: isLoadingBadgeMapping, error: badgeMappingError } = useQuery({
@@ -127,9 +184,42 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
     <div className="space-y-4">
       <Card className="bg-card border-border/50">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Intended Use</CardTitle>
+          <CardTitle className="text-base">Reuse Context</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Verified Context Summary */}
+          {verifiedContextBadges.length > 0 && (
+            <div className="rounded-lg border border-border/40 bg-muted/30 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <FileJson className="w-4 h-4 text-muted-foreground" />
+                <Label className="text-sm font-semibold text-foreground">Verified Context</Label>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {verifiedContextBadges.map((badge, idx) => {
+                  const colourClass = {
+                    'accent': 'bg-accent/15 text-accent border-accent/40',
+                    'primary': 'bg-primary/15 text-primary border-primary/40',
+                    'chart-3': 'bg-chart-3/15 text-chart-3 border-chart-3/40',
+                    'chart-4': 'bg-chart-4/15 text-chart-4 border-chart-4/40',
+                    'chart-5': 'bg-chart-5/15 text-chart-5 border-chart-5/40',
+                    'destructive': 'bg-destructive/15 text-destructive border-destructive/40',
+                    'muted': 'bg-muted/40 text-muted-foreground border-border/50',
+                  }[badge.colour] || 'bg-muted/40 text-muted-foreground border-border/50';
+                  
+                  return (
+                    <Badge
+                      key={idx}
+                      variant="outline"
+                      className={cn("text-xs px-2.5 py-1 border", colourClass)}
+                    >
+                      {badge.label}
+                    </Badge>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <p className="text-sm text-muted-foreground">
             Select the intended use(s) and ethics considerations based on your verified context badges.
           </p>

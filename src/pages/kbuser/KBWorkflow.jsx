@@ -26,7 +26,7 @@ const WORKFLOWS = {
     steps: [
       { id: 'user-context', label: 'User Context' },
       { id: 'find',         label: 'Find Resource' },
-      { id: 'intended-use', label: 'Intended Use' },
+      { id: 'reuse-context', label: 'Reuse Context' },
       { id: 'match',        label: 'Match Policy',   placeholder: true },
       { id: 'apply',        label: 'Apply',          placeholder: true },
     ],
@@ -156,7 +156,7 @@ export default function KBWorkflow() {
         {steps[currentStep].id === 'find' && (
           <WorkflowStep2FindResource />
         )}
-        {steps[currentStep].id === 'intended-use' && (
+        {steps[currentStep].id === 'reuse-context' && (
           <WorkflowStep3IntendedUse workflowId={activeWorkflow} />
         )}
         {steps[currentStep].placeholder && steps[currentStep].id !== 'find' && (
