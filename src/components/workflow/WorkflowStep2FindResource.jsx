@@ -161,17 +161,6 @@ export default function WorkflowStep2FindResource() {
               <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
               <div className="space-y-1">
                 <p className="text-sm text-destructive">{error}</p>
-                {result?.redirectURL && (
-                  <a
-                    href={result.redirectURL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-                  >
-                    View resource (metadata not available)
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
               </div>
             </div>
           )}
