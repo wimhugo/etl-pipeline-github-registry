@@ -5,44 +5,54 @@ Deno.serve(async (req) => {
   const user = await base44.auth.me();
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { policy, policyFileUrl, repo, branch, filePath } = await req.json();
+  const { file_path, file_content, message, repo, branch } = await req.json();
   const token = Deno.env.get('GITHUB_TOKEN');
   if (!token) return Response.json({ error: 'GITHUB_TOKEN not set' }, { status: 500 });
 
-  // 1. Fetch the current file from GitHub API to get SHA and content
-  const apiBase = `https://api.github.com/repos/${repo}/contents/${filePath}`;
-  const fileRes = await fetch(`${apiBase}?ref=${branch}`, {
+  // Use global config for repo/branch if not provided
+  const globalConfigs = await base44.entities.GlobalConfig.list();
+  const globalConfig = globalConfigs[0];
+  const targetRepo = repo || globalConfig?.github_repo;
+  const targetBranch = branch || globalConfig?.github_branch || 'main';
+
+  if (!targetRepo) {
+    return Response.json({ error: 'No repository specified and no global config found' }, { status: 400 });
+  }
+
+  // 1. Fetch the current file from GitHub API to get SHA and content (or detect if it doesn't exist)
+  const apiBase = `https://api.github.com/repos/${targetRepo}/contents/${file_path}`;
+  const fileRes = await fetch(`${apiBase}?ref=${targetBranch}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   });
-  if (!fileRes.ok) {
+  
+  let sha = null;
+  let existingContent = null;
+  
+  if (fileRes.ok) {
+    const fileJson = await fileRes.json();
+    sha = fileJson.sha;
+    existingContent = JSON.parse(atob(fileJson.content.replace(/\n/g, '')));
+  } else if (fileRes.status !== 404) {
     const err = await fileRes.text();
     return Response.json({ error: `Failed to fetch file: ${err}` }, { status: 500 });
   }
-  const fileJson = await fileRes.json();
-  const sha = fileJson.sha;
-  const decoded = JSON.parse(atob(fileJson.content.replace(/\n/g, '')));
 
-  // 2. Append the new policy (with status set to pending)
-  const pendingPolicy = { ...policy, status: 'openrel:status/pending' };
-  const policiesArray = decoded.policies || (Array.isArray(decoded) ? decoded : []);
-  policiesArray.push(pendingPolicy);
-  if (decoded.policies !== undefined) {
-    decoded.policies = policiesArray;
-  }
-  const updatedContent = btoa(unescape(encodeURIComponent(JSON.stringify(Array.isArray(decoded) ? policiesArray : decoded, null, 2))));
+  // 2. Prepare the file content
+  const updatedContent = btoa(unescape(encodeURIComponent(file_content)));
 
   // 3. Create a new branch for the PR
-  // Get the SHA of the base branch tip
-  const refRes = await fetch(`https://api.github.com/repos/${repo}/git/ref/heads/${branch}`, {
+  const refRes = await fetch(`https://api.github.com/repos/${targetRepo}/git/ref/heads/${targetBranch}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   });
   if (!refRes.ok) return Response.json({ error: 'Failed to get branch ref' }, { status: 500 });
   const refJson = await refRes.json();
   const baseSha = refJson.object.sha;
 
-  const prBranch = `policy-draft-${policy.id.replace(/[^a-zA-Z0-9_-]/g, '-')}-${Date.now()}`;
+  const timestamp = Date.now();
+  const safeName = file_path.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/\.json$/, '');
+  const prBranch = `update-${safeName}-${timestamp}`;
 
-  const branchRes = await fetch(`https://api.github.com/repos/${repo}/git/refs`, {
+  const branchRes = await fetch(`https://api.github.com/repos/${targetRepo}/git/refs`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ ref: `refs/heads/${prBranch}`, sha: baseSha }),
@@ -57,9 +67,9 @@ Deno.serve(async (req) => {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      message: `Add draft policy: ${policy.label}`,
+      message: message || `Update ${file_path}`,
       content: updatedContent,
-      sha,
+      sha: sha || undefined,
       branch: prBranch,
     }),
   });
@@ -69,14 +79,14 @@ Deno.serve(async (req) => {
   }
 
   // 5. Open the pull request
-  const prRes = await fetch(`https://api.github.com/repos/${repo}/pulls`, {
+  const prRes = await fetch(`https://api.github.com/repos/${targetRepo}/pulls`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      title: `[Policy Draft] ${policy.label}`,
-      body: `Submitting draft policy "${policy.label}" (${policy.id}) for review.\n\nDerived from: ${policy.derived_from || 'N/A'}`,
+      title: `[Update] ${file_path}`,
+      body: `Submitting update to "${file_path}" for review.\n\nChanges: ${message || 'Content update'}`,
       head: prBranch,
-      base: branch,
+      base: targetBranch,
     }),
   });
   if (!prRes.ok) {

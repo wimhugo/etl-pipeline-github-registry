@@ -61,7 +61,7 @@ const CONTEXT_BADGE_OPTIONS = [
 
 const EMPTY_ROW = { profileBadge: '', contextBadge: '', colour: 'muted', constraintMapping: '' };
 
-export default function BadgeMappingTable({ rows = [], onChange, constraintOptions = [] }) {
+export default function BadgeMappingTable({ rows = [], onChange, constraintOptions = [], mappingFile, onMappingFileChange }) {
   const [editIdx, setEditIdx] = useState(null);
 
   const update = (idx, field, value) => {

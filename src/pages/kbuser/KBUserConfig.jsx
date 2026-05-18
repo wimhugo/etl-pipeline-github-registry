@@ -150,11 +150,33 @@ export default function KBUserConfig() {
     },
   });
 
+  const prMutation = useMutation({
+    mutationFn: async (data) => {
+      const res = await base44.functions.invoke('submitPolicyPR', {
+        file_path: data.badge_mapping_file,
+        file_content: JSON.stringify({ badge_mappings: data.badge_mappings }, null, 2),
+        message: 'Update badge mappings',
+      });
+      return res;
+    },
+    onSuccess: () => {
+      toast({ title: 'Pull Request Created', description: 'Badge mappings saved to GitHub.' });
+    },
+  });
+
   const handleSave = () => {
+    // Save to GlobalConfig
     saveMutation.mutate({
       ...form,
       ...(parsed ? { kb_search_data_api_url: parsed.apiUrl, kb_search_data_url: parsed.rawUrl } : {}),
     });
+    // Create PR if file path is provided
+    if (form.badge_mapping_file) {
+      prMutation.mutate({
+        badge_mapping_file: form.badge_mapping_file,
+        badge_mappings: form.badge_mappings,
+      });
+    }
   };
 
   return (
@@ -290,6 +312,18 @@ export default function KBUserConfig() {
           <p className="text-xs text-muted-foreground">
             Map user profile verification statuses to context badge labels, standardise badge colours, and indicate which constraint keys apply to each badge.
           </p>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Badge Mapping File Path</Label>
+            <Input
+              className="bg-muted/50 text-sm font-mono"
+              placeholder="e.g., .openrel/config/badge-mappings.json"
+              value={form.badge_mapping_file || ''}
+              onChange={e => setForm(f => ({ ...f, badge_mapping_file: e.target.value }))}
+            />
+            <p className="text-xs text-muted-foreground">
+              GitHub path where badge mappings will be stored. Leave empty to store in GlobalConfig only.
+            </p>
+          </div>
           {constraintsLoading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" /> Loading constraint labels…
@@ -302,6 +336,8 @@ export default function KBUserConfig() {
             rows={form.badge_mappings || []}
             onChange={rows => setForm(f => ({ ...f, badge_mappings: rows }))}
             constraintOptions={constraintsData}
+            mappingFile={form.badge_mapping_file}
+            onMappingFileChange={(val) => setForm(f => ({ ...f, badge_mapping_file: val }))}
           />
         </CardContent>
       </Card>
