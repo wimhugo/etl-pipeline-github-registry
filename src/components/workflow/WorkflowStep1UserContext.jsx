@@ -99,10 +99,8 @@ export default function WorkflowStep1UserContext({ workflowId }) {
     if (showSpinner) setRefreshing(true);
     else setLoading(true);
 
-    const users = await base44.entities.User.list();
-    const rawUser = users.find(u => u.email === user?.email) || users[0];
-    // Custom fields are stored inside rawUser.data — flatten them
-    const freshProfile = rawUser ? { ...rawUser, ...(rawUser.data || {}) } : null;
+    // base44.auth.me() returns all custom fields already flattened — most reliable source
+    const freshProfile = await base44.auth.me();
     setProfile(freshProfile);
     setOverrides({});
     setRorVerification(null);
