@@ -88,13 +88,15 @@ export default function WorkflowStep1UserContext({ workflowId }) {
 
   const loadProfile = useCallback(async (showSpinner = false) => {
     if (showSpinner) setRefreshing(true);
-    const u = await base44.auth.me();
-    setProfile(u);
-    // Reset overrides so they re-derive from fresh profile
+    else setLoading(true);
+    // Fetch fresh user data directly from the User entity (bypasses auth.me() cache)
+    const users = await base44.entities.User.list();
+    const freshUser = users.find(u => u.email === user?.email) || users[0];
+    setProfile(freshUser);
     setOverrides({});
-    if (showSpinner) setRefreshing(false);
+    setRefreshing(false);
     setLoading(false);
-  }, []);
+  }, [user?.email]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
 
