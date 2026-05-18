@@ -110,7 +110,8 @@ export default function ObjectAnalysis() {
                 constraints = constraintsData.constraints;
                 console.log('Constraints has .constraints key, count:', constraints.length);
               }
-              // Store constraints in a separate state if needed
+              setOpenrelConstraints(constraints);
+              console.log('Final constraints array:', constraints.length);
             }
           }
           
