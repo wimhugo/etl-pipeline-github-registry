@@ -189,6 +189,15 @@ export default function UserProfilePanel({ onClose }) {
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-primary mb-0.5">Primary Institution</p>
                 <p className="text-xs text-foreground">{defaultInstitution}</p>
+                {verifications[defaultInstitution] && (
+                  <div className="mt-1">
+                    <InstitutionVerificationBadge
+                      status={verifications[defaultInstitution].status}
+                      match={verifications[defaultInstitution].match}
+                      loading={verifications[defaultInstitution].loading}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}
