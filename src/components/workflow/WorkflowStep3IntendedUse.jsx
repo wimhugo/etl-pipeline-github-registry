@@ -62,22 +62,18 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
   const globalConfig = globalConfigs[0];
 
   // Fetch badge mapping file from GitHub using the githubFiles function
-  const { data: badgeMappingFile, isLoading: isLoadingBadgeMapping } = useQuery({
+  const { data: badgeMappingFile, isLoading: isLoadingBadgeMapping, error: badgeMappingError } = useQuery({
     queryKey: ['badgeMappingFile'],
     queryFn: async () => {
-      try {
-        const response = await base44.functions.invoke('githubFiles', {
-          operation: 'getFile',
-          repo: 'wimhugo/openrel',
-          branch: 'main',
-          path: '.configs/badge_mapping.yaml'
-        });
-        return response.data;
-      } catch (error) {
-        console.error('Failed to fetch badge mapping from GitHub:', error);
-        return null;
-      }
+      const response = await base44.functions.invoke('githubFiles', {
+        action: 'getFile',
+        repo: 'wimhugo/openrel',
+        branch: 'main',
+        path: '.configs/badge_mapping.yaml'
+      });
+      return response.data;
     },
+    retry: false,
   });
 
   // Parse the YAML content from GitHub
@@ -145,13 +141,25 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
                 <p className="font-medium">Loading badge mapping configuration...</p>
               </div>
             </div>
+          ) : badgeMappingError ? (
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+              <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+              <div className="text-sm text-destructive">
+                <p className="font-medium">Failed to load badge mapping</p>
+                <p className="text-xs mt-1">
+                  {badgeMappingError.message?.includes('Bad credentials') 
+                    ? 'GitHub token is invalid or not configured. Please contact your administrator.'
+                    : badgeMappingError.message || 'Unable to fetch from GitHub.'}
+                </p>
+              </div>
+            </div>
           ) : !parsedData || relevantSections.length === 0 ? (
             <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/40">
               <AlertCircle className="w-5 h-5 text-muted-foreground shrink-0" />
               <div className="text-sm text-muted-foreground">
                 <p className="font-medium">No badge mapping found</p>
                 <p className="text-xs mt-1">
-                  Please configure the badge_mapping_file path in KB User Configuration.
+                  The file .configs/badge_mapping.yaml was not found or is empty.
                 </p>
               </div>
             </div>
