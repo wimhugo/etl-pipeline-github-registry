@@ -45,10 +45,25 @@ Deno.serve(async (req) => {
             },
         });
 
+        // If DataCite doesn't have this PID (404), return basic info with warning
+        if (metadataResponse.status === 404) {
+            return Response.json({ 
+                redirectURL: targetUrl,
+                pid: pid,
+                metadata: {
+                    id: pid,
+                    url: targetUrl,
+                    note: "Metadata not available from DataCite for this PID type"
+                },
+                warning: "This PID is not registered in DataCite. Limited metadata available."
+            });
+        }
+
+        // For other errors, return error response
         if (!metadataResponse.ok) {
             const errorText = await metadataResponse.text();
             return Response.json({ 
-                error: 'Failed to fetch metadata', 
+                error: 'Failed to fetch metadata from DataCite', 
                 details: errorText || metadataResponse.statusText 
             }, { status: metadataResponse.status });
         }
