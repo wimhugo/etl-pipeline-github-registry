@@ -222,63 +222,25 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
         </p>
       </div>
 
-      {/* Summary Section */}
-      <Section icon={FileJson} title="Summary" defaultOpen={true}>
-        <div className="space-y-3">
-          {/* Verified Context Badges */}
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Your Context</p>
-            {verifiedContextBadges.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {verifiedContextBadges.map((badge, idx) => {
-                  const colourClass = {
-                    'accent': 'bg-accent/15 text-accent border-accent/40',
-                    'primary': 'bg-primary/15 text-primary border-primary/40',
-                    'chart-3': 'bg-chart-3/15 text-chart-3 border-chart-3/40',
-                    'chart-4': 'bg-chart-4/15 text-chart-4 border-chart-4/40',
-                    'chart-5': 'bg-chart-5/15 text-chart-5 border-chart-5/40',
-                    'destructive': 'bg-destructive/15 text-destructive border-destructive/40',
-                    'muted': 'bg-muted/40 text-muted-foreground border-border/50',
-                  }[badge.colour] || 'bg-muted/40 text-muted-foreground border-border/50';
-                  
-                  return (
-                    <Badge
-                      key={idx}
-                      variant="outline"
-                      className={cn("text-xs px-2.5 py-1 border", colourClass)}
-                    >
-                      {badge.label}
-                    </Badge>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground italic">Complete step 1 to populate your context.</p>
-            )}
+      {/* Selected Uses Summary */}
+      {selectedBadges.length > 0 && (
+        <Section icon={FileJson} title="Selected Uses" defaultOpen={true}>
+          <div className="flex flex-wrap gap-2">
+            {selectedBadges.map((badge, idx) => (
+              <Badge
+                key={idx}
+                variant="outline"
+                className={cn(
+                  "text-xs px-2.5 py-1 border",
+                  badge.colour === 'primary' ? 'bg-primary/15 text-primary border-primary/40' : 'bg-muted/40 text-muted-foreground border-border/50'
+                )}
+              >
+                {badge.label}
+              </Badge>
+            ))}
           </div>
-          
-          {/* Selected Intended Uses Badges */}
-          {selectedBadges.length > 0 && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Selected Uses</p>
-              <div className="flex flex-wrap gap-2">
-                {selectedBadges.map((badge, idx) => (
-                  <Badge
-                    key={idx}
-                    variant="outline"
-                    className={cn(
-                      "text-xs px-2.5 py-1 border",
-                      badge.colour === 'primary' ? 'bg-primary/15 text-primary border-primary/40' : 'bg-muted/40 text-muted-foreground border-border/50'
-                    )}
-                  >
-                    {badge.label}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </Section>
+        </Section>
+      )}
 
       {/* Loading / Error States */}
       {isLoadingBadgeMapping ? (
