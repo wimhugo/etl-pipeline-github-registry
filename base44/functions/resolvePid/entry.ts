@@ -34,49 +34,15 @@ Deno.serve(async (req) => {
         }
 
         const resolveData = await resolveResponse.json();
+        
+        // PIDMR returns both the target URL and metadata regardless of PID type
         const targetUrl = resolveData.url || resolveData.redirectUrl;
-        
-        // Fetch the actual metadata from DataCite API
-        const metadataUrl = `https://api.datacite.org/dois/${pid}`;
-        const metadataResponse = await fetch(metadataUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-            },
-        });
-
-        // If DataCite doesn't have this PID (404), return basic info with warning
-        if (metadataResponse.status === 404) {
-            return Response.json({ 
-                redirectURL: targetUrl,
-                pid: pid,
-                metadata: {
-                    id: pid,
-                    url: targetUrl,
-                    note: "Metadata not available from DataCite for this PID type"
-                },
-                warning: "This PID is not registered in DataCite. Limited metadata available."
-            });
-        }
-
-        // For other errors, return error response
-        if (!metadataResponse.ok) {
-            const errorText = await metadataResponse.text();
-            return Response.json({ 
-                error: 'Failed to fetch metadata from DataCite', 
-                details: errorText || metadataResponse.statusText 
-            }, { status: metadataResponse.status });
-        }
-
-        const metadataData = await metadataResponse.json();
-        
-        // DataCite returns metadata in data.attributes
-        const fullMetadata = metadataData.data?.attributes || metadataData.attributes || metadataData;
+        const metadata = resolveData.metadata || resolveData;
         
         return Response.json({ 
             redirectURL: targetUrl,
             pid: pid,
-            metadata: fullMetadata
+            metadata: metadata
         });
     } catch (error) {
         return Response.json({ error: error.message }, { status: 500 });
