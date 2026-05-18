@@ -68,12 +68,20 @@ export default function KBUserConfig() {
   // Use parsed or existing stored API URL to list files (strip any stale ?ref= param)
   const apiUrl = (parsed?.apiUrl || form.kb_search_data_api_url || '').replace(/\?ref=[^&]*/, '');
 
-  const { data: fileList = [], isLoading: filesLoading } = useQuery({
+  const { data: fileList = [], isLoading: filesLoading, error: filesError } = useQuery({
     queryKey: ['kbSearchFiles', apiUrl],
     queryFn: async () => {
+      console.log('📥 Fetching file list from:', apiUrl);
       const res = await fetch(`${apiUrl}?_=${Date.now()}`);
-      if (!res.ok) throw new Error('Failed to fetch file list');
-      return res.json();
+      console.log('📄 File list response status:', res.status);
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('❌ File list error:', errorText);
+        throw new Error(`Failed to fetch file list: ${res.status}`);
+      }
+      const data = await res.json();
+      console.log('✅ File list:', data.length, 'files');
+      return data;
     },
     enabled: !!apiUrl,
     staleTime: 0,
@@ -291,6 +299,12 @@ export default function KBUserConfig() {
           )}
           {!filesLoading && !apiUrl && (
             <p className="text-xs text-muted-foreground">Enter a GitHub folder URL above to browse available files.</p>
+          )}
+          {filesError && (
+            <div className="flex items-center gap-2 text-xs text-destructive">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              Failed to load files: {filesError.message}
+            </div>
           )}
 
           {jsonFiles.length > 0 && (
