@@ -19,7 +19,8 @@ export default function ObjectAnalysis() {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [error, setError] = useState(null);
   const [openrelActions, setOpenrelActions] = useState([]);
-  const [actionsLoaded, setActionsLoaded] = useState(false);
+  const [openrelConstraints, setOpenrelConstraints] = useState([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [actionMappings, setActionMappings] = useState({});
 
   // Check for URL parameter on mount
