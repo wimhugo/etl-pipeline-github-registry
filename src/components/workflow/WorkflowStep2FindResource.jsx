@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, AlertCircle, CheckCircle2, ExternalLink, FileText, Lock, Unlock, Clock, Link } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Loader2, Search, AlertCircle, CheckCircle2, ExternalLink, FileText, Lock, Unlock, Clock, Link, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function WorkflowStep2FindResource() {
@@ -14,6 +15,7 @@ export default function WorkflowStep2FindResource() {
   const [matchingSpdx, setMatchingSpdx] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [licenseTextOpen, setLicenseTextOpen] = useState(false);
 
   const handleResolvePid = async (e) => {
     e.preventDefault();
@@ -352,12 +354,29 @@ export default function WorkflowStep2FindResource() {
                           )}
 
                           {result.spdxMatch.license.licenseText && (
-                            <div className="space-y-1">
-                              <p className="text-xs font-medium text-muted-foreground">License Text</p>
-                              <div className="p-3 bg-muted/30 rounded text-xs text-foreground max-h-48 overflow-auto whitespace-pre-wrap">
-                                {result.spdxMatch.license.licenseText}
+                            <Collapsible open={licenseTextOpen} onOpenChange={setLicenseTextOpen}>
+                              <div className="space-y-1">
+                                <CollapsibleTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-between text-xs font-medium text-muted-foreground hover:text-foreground"
+                                  >
+                                    License Text
+                                    {licenseTextOpen ? (
+                                      <ChevronUp className="w-3 h-3" />
+                                    ) : (
+                                      <ChevronDown className="w-3 h-3" />
+                                    )}
+                                  </Button>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="p-3 bg-muted/30 rounded text-xs text-foreground max-h-48 overflow-auto whitespace-pre-wrap">
+                                    {result.spdxMatch.license.licenseText}
+                                  </div>
+                                </CollapsibleContent>
                               </div>
-                            </div>
+                            </Collapsible>
                           )}
                         </div>
                       </>
