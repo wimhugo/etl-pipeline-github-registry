@@ -240,6 +240,9 @@ export default function ObjectAnalysis() {
                           <span className="font-mono">{pattern}</span>
                         </div>
                       ))}
+                    {analysisResult.detectedPatterns.filter(p => p.includes('ODRL term:') || p.includes('OpenREL term:') || p.includes('JSON-LD')).length === 0 && (
+                      <p className="text-xs text-muted-foreground italic">Generic rule patterns detected</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -265,6 +268,9 @@ export default function ObjectAnalysis() {
                           <span className="font-mono">{pattern}</span>
                         </div>
                       ))}
+                    {analysisResult.detectedPatterns.filter(p => p.includes('Configured Action:') || p.includes('Action/Permission')).length === 0 && (
+                      <p className="text-xs text-muted-foreground italic">Generic action patterns detected (no configured actions matched)</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -290,6 +296,9 @@ export default function ObjectAnalysis() {
                           <span className="font-mono">{pattern}</span>
                         </div>
                       ))}
+                    {analysisResult.detectedPatterns.filter(p => p.includes('Configured Constraint:') || p.includes('Constraint patterns')).length === 0 && (
+                      <p className="text-xs text-muted-foreground italic">Generic constraint patterns detected (no configured constraints matched)</p>
+                    )}
                   </div>
                 )}
               </div>
