@@ -71,9 +71,12 @@ const parseYamlToSections = (yamlContent) => {
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // Match context header: -context: "User" or - context: "User"
-    const contextMatch = line.match(/^-?\s*context:\s*"?([^"]+)"?/);
-    if (contextMatch) {
+    // Skip empty lines and comments
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    
+    // Match context header: -context: "User" or - context: "User" or context: "User"
+    const contextMatch = line.match(/^-?\s*context:\s*["']?([^"'\n]+)["']?/);
+    if (contextMatch && line.search(/\S/) === 0) {
       if (currentSection) {
         sections.push(currentSection);
       }
@@ -84,8 +87,8 @@ const parseYamlToSections = (yamlContent) => {
       continue;
     }
     
-    // Match row item: \- profileBadge: "..."
-    const rowMatch = line.match(/^\\-\s+profileBadge:\s*"?([^"]+)"?/);
+    // Match row item: - profileBadge: "..." (at indent level 2)
+    const rowMatch = line.match(/^\s+-\s+profileBadge:\s*["']?([^"'\n]+)["']?/);
     if (rowMatch && currentSection) {
       const row = {
         profileBadge: rowMatch[1].trim(),
@@ -94,11 +97,19 @@ const parseYamlToSections = (yamlContent) => {
         constraintMapping: ''
       };
       
-      // Look ahead for remaining fields
-      for (let j = i + 1; j < lines.length && !lines[j].match(/^-?\s*context:/) && !lines[j].match(/^\\-\s+profileBadge:/); j++) {
-        const ctxMatch = lines[j].match(/contextBadge:\s*"?([^"]+)"?/);
-        const colourMatch = lines[j].match(/colour:\s*(\S+)/);
-        const constraintMatch = lines[j].match(/constraintMapping:\s*"?([^"]+)"?/);
+      // Look ahead for remaining fields (indented lines that belong to this row)
+      for (let j = i + 1; j < lines.length; j++) {
+        const nextLine = lines[j];
+        // Stop if we hit another context or profileBadge
+        if (nextLine.match(/^-?\s*context:/) || nextLine.match(/^\s+-\s+profileBadge:/)) {
+          break;
+        }
+        // Skip empty lines
+        if (!nextLine.trim()) continue;
+        
+        const ctxMatch = nextLine.match(/contextBadge:\s*["']?([^"'\n]+)["']?/);
+        const colourMatch = nextLine.match(/colour:\s*(\S+)/);
+        const constraintMatch = nextLine.match(/constraintMapping:\s*["']?([^"'\n]+)["']?/);
         
         if (ctxMatch) row.contextBadge = ctxMatch[1].trim();
         if (colourMatch) row.colour = colourMatch[1].trim();
