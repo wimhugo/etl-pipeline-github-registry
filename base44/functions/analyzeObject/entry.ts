@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
     };
     
     // Auto-match detected items with OpenREL items using fuzzy matching
-    const MATCH_THRESHOLD = 0.75;
+    const MATCH_THRESHOLD = 0.65;
     
     const matchedActions = detectedActions.map(detected => {
       let bestMatch = null;
