@@ -194,25 +194,6 @@ export default function KBUserConfig() {
         </CardContent>
       </Card>
 
-      {/* Badge Mapping */}
-      <Card className="bg-card border-border/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <Tag className="w-4 h-4" /> Badge Mapping
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Map user profile verification statuses to context badge labels, standardise badge colours, and indicate which constraint keys apply to each badge.
-          </p>
-          <BadgeMappingTable
-            rows={form.badge_mappings || []}
-            onChange={rows => setForm(f => ({ ...f, badge_mappings: rows }))}
-            constraintOptions={constraintsData}
-          />
-        </CardContent>
-      </Card>
-
       {/* File assignments */}
       <Card className="bg-card border-border/50">
         <CardHeader className="pb-2">
@@ -279,6 +260,25 @@ export default function KBUserConfig() {
               </div>
             </>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Badge Mapping */}
+      <Card className="bg-card border-border/50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <Tag className="w-4 h-4" /> Badge Mapping
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Map user profile verification statuses to context badge labels, standardise badge colours, and indicate which constraint keys apply to each badge.
+          </p>
+          <BadgeMappingTable
+            rows={form.badge_mappings || []}
+            onChange={rows => setForm(f => ({ ...f, badge_mappings: rows }))}
+            constraintOptions={constraintsData}
+          />
         </CardContent>
       </Card>
     </div>
