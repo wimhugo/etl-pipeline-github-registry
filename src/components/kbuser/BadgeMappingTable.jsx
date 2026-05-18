@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Trash2, ChevronDown, ChevronRight, FileJson } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, FileJson, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { base44 } from '@/api/base44Client';
 
 const COLOUR_OPTIONS = [
   { label: 'Green',   value: 'accent',      swatch: 'bg-accent',              cls: 'bg-accent/15 text-accent border-accent/40' },
@@ -62,50 +63,217 @@ const CONTEXT_BADGE_OPTIONS = [
 
 const EMPTY_ROW = { profileBadge: '', contextBadge: '', colour: 'muted', constraintMapping: '' };
 
-export default function BadgeMappingTable({ rows = [], onChange, constraintOptions = [], mappingFile, onMappingFileChange }) {
+// Parse YAML content into sections with rows
+const parseYamlToSections = (yamlContent) => {
+  const sections = [];
+  const lines = yamlContent.split('\n');
+  let currentSection = null;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Match context header: -context: "User" or - context: "User"
+    const contextMatch = line.match(/^-?\s*context:\s*"?([^"]+)"?/);
+    if (contextMatch) {
+      if (currentSection) {
+        sections.push(currentSection);
+      }
+      currentSection = {
+        name: contextMatch[1].trim(),
+        rows: []
+      };
+      continue;
+    }
+    
+    // Match row item: \- profileBadge: "..."
+    const rowMatch = line.match(/^\\-\s+profileBadge:\s*"?([^"]+)"?/);
+    if (rowMatch && currentSection) {
+      const row = {
+        profileBadge: rowMatch[1].trim(),
+        contextBadge: '',
+        colour: 'muted',
+        constraintMapping: ''
+      };
+      
+      // Look ahead for remaining fields
+      for (let j = i + 1; j < lines.length && !lines[j].match(/^-?\s*context:/) && !lines[j].match(/^\\-\s+profileBadge:/); j++) {
+        const ctxMatch = lines[j].match(/contextBadge:\s*"?([^"]+)"?/);
+        const colourMatch = lines[j].match(/colour:\s*(\S+)/);
+        const constraintMatch = lines[j].match(/constraintMapping:\s*"?([^"]+)"?/);
+        
+        if (ctxMatch) row.contextBadge = ctxMatch[1].trim();
+        if (colourMatch) row.colour = colourMatch[1].trim();
+        if (constraintMatch) row.constraintMapping = constraintMatch[1].trim();
+      }
+      
+      currentSection.rows.push(row);
+    }
+  }
+  
+  if (currentSection) {
+    sections.push(currentSection);
+  }
+  
+  return sections;
+};
+
+// Convert sections back to YAML
+const sectionsToYaml = (sections) => {
+  return sections.map(section => {
+    let yaml = `- context: "${section.name}"\n`;
+    if (section.rows && section.rows.length > 0) {
+      yaml += section.rows.map(row => 
+        ` \\- profileBadge: "${row.profileBadge || ''}"\n  contextBadge: "${row.contextBadge || ''}"\n  colour: ${row.colour || 'muted'}\n  constraintMapping: "${row.constraintMapping || ''}"`
+      ).join('\n');
+    }
+    return yaml;
+  }).join('\n');
+};
+
+export default function BadgeMappingTable({ 
+  rows = [], 
+  onChange, 
+  constraintOptions = [], 
+  mappingFile, 
+  onMappingFileChange,
+  showLoadFromGithub = true 
+}) {
   const [editIdx, setEditIdx] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [sections, setSections] = useState([{ name: 'User', rows: rows }]);
+  const [loadingFromGithub, setLoadingFromGithub] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+  
+  // Initialize sections from rows prop
+  useEffect(() => {
+    if (rows && rows.length > 0 && sections.length === 1 && sections[0].name === 'User') {
+      setSections([{ name: 'User', rows }]);
+    }
+  }, [rows]);
 
-  const update = (idx, field, value) => {
-    const updated = rows.map((r, i) => i === idx ? { ...r, [field]: value } : r);
-    onChange(updated);
-  };
-
-  const addRow = () => {
-    onChange([...rows, { ...EMPTY_ROW }]);
-    setEditIdx(rows.length);
-  };
-
-  const removeRow = (idx) => {
-    onChange(rows.filter((_, i) => i !== idx));
-    setEditIdx(null);
+  const loadFromGithub = async () => {
+    setLoadingFromGithub(true);
+    setLoadError(null);
+    
+    try {
+      const url = 'https://raw.githubusercontent.com/wimhugo/openrel/main/.configs/badge_mapping.yaml';
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+      }
+      const content = await response.text();
+      const parsedSections = parseYamlToSections(content);
+      
+      if (parsedSections.length > 0) {
+        setSections(parsedSections);
+        // Notify parent of the first section's rows (backward compatibility)
+        if (onChange && parsedSections[0].rows) {
+          onChange(parsedSections[0].rows);
+        }
+      }
+    } catch (err) {
+      setLoadError(err.message);
+    } finally {
+      setLoadingFromGithub(false);
+    }
   };
 
   // Generate YAML preview from current table values
   const generateYamlPreview = () => {
-    if (!rows || rows.length === 0) {
+    if (!sections || sections.length === 0) {
       return '# No mappings defined';
     }
-    
-    return rows.map(row => 
-      `- profileBadge: "${row.profileBadge || ''}"\n  contextBadge: "${row.contextBadge || ''}"\n  colour: ${row.colour || 'muted'}\n  constraintMapping: "${row.constraintMapping || ''}"`
-    ).join('\n\n');
+    return sectionsToYaml(sections);
+  };
+
+  const updateSectionRows = (sectionIdx, newRows) => {
+    const updated = sections.map((s, i) => i === sectionIdx ? { ...s, rows: newRows } : s);
+    setSections(updated);
+    // Notify parent of changes (for backward compatibility, use first section)
+    if (onChange && updated[0]?.rows) {
+      onChange(updated[0].rows);
+    }
+  };
+
+  const addSection = () => {
+    const newSection = { name: 'New Section', rows: [] };
+    setSections([...sections, newSection]);
+  };
+
+  const updateSectionName = (sectionIdx, newName) => {
+    const updated = sections.map((s, i) => i === sectionIdx ? { ...s, name: newName } : s);
+    setSections(updated);
   };
 
   return (
-    <div className="space-y-2">
-      {/* Header */}
-      <div className="grid grid-cols-[1.5fr_1.5fr_140px_2fr_32px] gap-3 px-3 pb-2 border-b border-border/40">
-        {['Profile Badge', 'Context Badge', 'Badge Colour', 'Constraint Mapping', ''].map((h, i) => (
-          <span key={i} className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{h}</span>
-        ))}
-      </div>
-
-      {/* Rows */}
-      {rows.length === 0 && (
-        <p className="text-xs text-muted-foreground italic px-3 py-2">No mappings yet. Add a row below.</p>
+    <div className="space-y-4">
+      {/* Load from GitHub button */}
+      {showLoadFromGithub && (
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-foreground">Badge Mapping Sections</h3>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-2"
+            onClick={loadFromGithub}
+            disabled={loadingFromGithub}
+          >
+            {loadingFromGithub ? (
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            Load from GitHub
+          </Button>
+        </div>
       )}
-      {rows.map((row, idx) => (
+
+      {loadError && (
+        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+          <p className="text-xs text-destructive">{loadError}</p>
+        </div>
+      )}
+
+      {sections.length === 0 && (
+        <p className="text-xs text-muted-foreground italic px-3 py-2">No sections yet. Load from GitHub or add a section.</p>
+      )}
+      
+      {sections.map((section, sectionIdx) => (
+        <div key={sectionIdx} className="border border-border/40 rounded-lg overflow-hidden">
+          {/* Section Header */}
+          <div className="bg-muted/30 px-3 py-2 border-b border-border/40 flex items-center justify-between">
+            <Input
+              value={section.name}
+              onChange={(e) => updateSectionName(sectionIdx, e.target.value)}
+              className="w-48 h-7 text-xs font-semibold bg-transparent border-none p-0"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs gap-1.5"
+              onClick={() => {
+                const updated = sections.filter((_, i) => i !== sectionIdx);
+                setSections(updated);
+                if (onChange && updated[0]?.rows) {
+                  onChange(updated[0].rows);
+                }
+              }}
+            >
+              <Trash2 className="w-3 h-3" /> Remove Section
+            </Button>
+          </div>
+
+          {/* Header */}
+          <div className="grid grid-cols-[1.5fr_1.5fr_140px_2fr_32px] gap-3 px-3 pb-2 border-b border-border/40">
+            {['Profile Badge', 'Context Badge', 'Badge Colour', 'Constraint Mapping', ''].map((h, i) => (
+              <span key={i} className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{h}</span>
+            ))}
+          </div>
+
+          {/* Rows */}
+          {section.rows.length === 0 && (
+            <p className="text-xs text-muted-foreground italic px-3 py-2">No mappings in this section. Add a row below.</p>
+          )}
+          {section.rows.map((row, idx) => (
         <div
           key={idx}
           className={cn(
@@ -119,7 +287,10 @@ export default function BadgeMappingTable({ rows = [], onChange, constraintOptio
               <div className="h-8 flex items-center">
                 <select
                   value={row.profileBadge}
-                  onChange={e => update(idx, 'profileBadge', e.target.value)}
+                  onChange={e => {
+                    const updated = section.rows.map((r, i) => i === idx ? { ...r, profileBadge: e.target.value } : r);
+                    updateSectionRows(sectionIdx, updated);
+                  }}
                   className="w-full h-7 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
                   onClick={e => e.stopPropagation()}
                 >
@@ -132,7 +303,10 @@ export default function BadgeMappingTable({ rows = [], onChange, constraintOptio
               <div className="h-8 flex items-center">
                 <select
                   value={row.contextBadge}
-                  onChange={e => update(idx, 'contextBadge', e.target.value)}
+                  onChange={e => {
+                    const updated = section.rows.map((r, i) => i === idx ? { ...r, contextBadge: e.target.value } : r);
+                    updateSectionRows(sectionIdx, updated);
+                  }}
                   className="w-full h-7 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
                   onClick={e => e.stopPropagation()}
                 >
@@ -145,7 +319,10 @@ export default function BadgeMappingTable({ rows = [], onChange, constraintOptio
               <div className="h-8 flex items-center">
                 <select
                   value={row.colour}
-                  onChange={e => update(idx, 'colour', e.target.value)}
+                  onChange={e => {
+                    const updated = section.rows.map((r, i) => i === idx ? { ...r, colour: e.target.value } : r);
+                    updateSectionRows(sectionIdx, updated);
+                  }}
                   className="w-full h-7 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
                   onClick={e => e.stopPropagation()}
                 >
@@ -157,7 +334,10 @@ export default function BadgeMappingTable({ rows = [], onChange, constraintOptio
               <div className="h-8 flex items-center">
                 <select
                   value={row.constraintMapping}
-                  onChange={e => update(idx, 'constraintMapping', e.target.value)}
+                  onChange={e => {
+                    const updated = section.rows.map((r, i) => i === idx ? { ...r, constraintMapping: e.target.value } : r);
+                    updateSectionRows(sectionIdx, updated);
+                  }}
                   className="w-full h-7 text-xs rounded-md border border-input bg-muted/50 px-2 text-foreground"
                   onClick={e => e.stopPropagation()}
                 >
@@ -183,15 +363,34 @@ export default function BadgeMappingTable({ rows = [], onChange, constraintOptio
             variant="ghost"
             size="icon"
             className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-            onClick={e => { e.stopPropagation(); removeRow(idx); }}
+            onClick={e => { e.stopPropagation(); {
+              const updated = section.rows.filter((_, i) => i !== idx);
+              updateSectionRows(sectionIdx, updated);
+            }}}
           >
             <Trash2 className="w-3 h-3" />
           </Button>
         </div>
       ))}
 
-      <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 mt-1" onClick={addRow}>
-        <Plus className="w-3.5 h-3.5" /> Add Row
+          <div className="px-3 py-2 border-t border-border/40">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-7 text-xs gap-1.5" 
+              onClick={() => {
+                const updated = [...section.rows, { ...EMPTY_ROW }];
+                updateSectionRows(sectionIdx, updated);
+              }}
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Row
+            </Button>
+          </div>
+        </div>
+      ))}
+
+      <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 mt-2" onClick={addSection}>
+        <Plus className="w-3.5 h-3.5" /> Add Section
       </Button>
     </div>
   );

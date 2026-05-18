@@ -397,6 +397,7 @@ export default function KBUserConfig() {
               constraintOptions={constraintsData}
               mappingFile={form.badge_mapping_file}
               onMappingFileChange={(val) => setForm(f => ({ ...f, badge_mapping_file: val }))}
+              showLoadFromGithub={true}
             />
           </div>
           
@@ -414,10 +415,23 @@ export default function KBUserConfig() {
               </div>
               <CollapsibleContent>
                 <div className="mt-2 rounded-lg border border-border/40 bg-muted/30 overflow-hidden">
-                  <pre className="p-3 text-xs font-mono text-foreground overflow-x-auto max-h-96 overflow-y-auto">
-                    {form.badge_mappings.map(row => 
-                      `- profileBadge: "${row.profileBadge || ''}"\n  contextBadge: "${row.contextBadge || ''}"\n  colour: ${row.colour || 'muted'}\n  constraintMapping: "${row.constraintMapping || ''}"`
-                    ).join('\n\n')}
+                  <pre className="p-3 text-xs font-mono text-foreground overflow-x-auto max-h-96 overflow-y-auto whitespace-pre-wrap">
+                    {(() => {
+                      // Generate multi-section YAML preview
+                      const sections = [
+                        { name: 'User', rows: form.badge_mappings },
+                        // Add more sections as needed
+                      ];
+                      return sections.map(section => {
+                        let yaml = `- context: "${section.name}"\n`;
+                        if (section.rows && section.rows.length > 0) {
+                          yaml += section.rows.map(row => 
+                            ` \- profileBadge: "${row.profileBadge || ''}"\n  contextBadge: "${row.contextBadge || ''}"\n  colour: ${row.colour || 'muted'}\n  constraintMapping: "${row.constraintMapping || ''}"`
+                          ).join('\n');
+                        }
+                        return yaml;
+                      }).join('\n');
+                    })()}
                   </pre>
                 </div>
               </CollapsibleContent>
