@@ -27,9 +27,21 @@ Deno.serve(async (req) => {
 
         if (!resolveResponse.ok) {
             const errorText = await resolveResponse.text();
+            let errorMessage = errorText || resolveResponse.statusText;
+            
+            // Try to parse as JSON to extract human-readable message
+            try {
+                const errorJson = JSON.parse(errorText);
+                if (errorJson.message) {
+                    errorMessage = errorJson.message;
+                }
+            } catch {
+                // Not JSON, use the raw text
+            }
+            
             return Response.json({ 
                 error: 'Failed to resolve PID', 
-                details: errorText || resolveResponse.statusText 
+                message: errorMessage 
             }, { status: resolveResponse.status });
         }
 
