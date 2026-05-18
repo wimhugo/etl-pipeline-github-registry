@@ -93,18 +93,31 @@ export default function WorkflowStep1UserContext({ workflowId }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [overrides, setOverrides] = useState({});
+  const [rorVerification, setRorVerification] = useState(null); // live ROR lookup result
 
   const loadProfile = useCallback(async (showSpinner = false) => {
     if (showSpinner) setRefreshing(true);
     else setLoading(true);
-    // auth.me() returns flattened custom fields; force fresh fetch by calling it
-    // then also fetch from User entity to get the very latest saved data
+
     const users = await base44.entities.User.list();
     const rawUser = users.find(u => u.email === user?.email) || users[0];
-    // Custom fields are stored inside rawUser.data — flatten them onto the profile object
+    // Custom fields are stored inside rawUser.data — flatten them
     const freshProfile = rawUser ? { ...rawUser, ...(rawUser.data || {}) } : null;
     setProfile(freshProfile);
     setOverrides({});
+    setRorVerification(null);
+
+    // If primary_institution_status not yet saved, look it up live from ROR
+    const savedStatus = freshProfile?.primary_institution_status;
+    const institutionName = freshProfile?.default_institution;
+    if (!savedStatus && institutionName) {
+      const res = await base44.functions.invoke('verifyInstitution', { name: institutionName });
+      setRorVerification(res.data || null);
+    } else if (savedStatus) {
+      // Already saved — reconstruct the same shape from stored fields
+      setRorVerification({ status: savedStatus, match: freshProfile?.primary_institution_ror || null });
+    }
+
     setRefreshing(false);
     setLoading(false);
   }, [user?.email]);
@@ -127,12 +140,12 @@ export default function WorkflowStep1UserContext({ workflowId }) {
   const institutions = profile?.orcid_institutions || [];
   const locations = profile?.locations || [];
 
-  // Signals derived from persisted ROR verification + location
-  const verifiedStatus = profile?.primary_institution_status;
-  const rorMatch = profile?.primary_institution_ror;
+  // Signals derived from live ROR lookup (rorVerification) — covers both fresh lookup and saved data
+  const verifiedStatus = rorVerification?.status;
+  const rorMatch = rorVerification?.match;
   const isVerifiedResearcher = verifiedStatus === 'verified_education' || verifiedStatus === 'verified_research';
   const isHEI = verifiedStatus === 'verified_education';
-  // EU: check default location, all stored locations, ROR country, and ORCID institution countries
+  // EU: check all available country sources
   const rorCountry = rorMatch?.country_code || '';
   const primaryInst = institutions.find(i => i.name === institution);
   const instCountry = primaryInst?.country || '';
