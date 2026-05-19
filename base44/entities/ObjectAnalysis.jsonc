@@ -1,0 +1,55 @@
+{
+  "name": "ObjectAnalysis",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name/label for this analysis"
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description"
+    },
+    "input_type": {
+      "type": "string",
+      "enum": [
+        "url",
+        "text",
+        "file"
+      ],
+      "default": "url",
+      "description": "How the content is provided"
+    },
+    "object_url": {
+      "type": "string",
+      "description": "URL of the object to analyse (when input_type=url)"
+    },
+    "text_content": {
+      "type": "string",
+      "description": "Pasted text to analyse (when input_type=text)"
+    },
+    "file_url": {
+      "type": "string",
+      "description": "URL of uploaded file (when input_type=file)"
+    },
+    "analysis_result": {
+      "type": "object",
+      "description": "Full analysis result JSON returned by the analyzeObject function"
+    },
+    "action_mappings": {
+      "type": "object",
+      "description": "User-adjusted action mappings keyed by pattern index",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "last_analysed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the last successful analysis run"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

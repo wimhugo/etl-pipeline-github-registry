@@ -1,506 +1,220 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Microscope, Link2, Type, File, Loader2, CheckCircle2, AlertCircle, FileJson, Shield, Zap, Info } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
-import { base44 } from '@/api/base44Client';
+import { Plus, Search, Microscope } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import ObjectAnalysisCard from '@/components/objectanalysis/ObjectAnalysisCard';
+import ObjectAnalysisEditor from '@/components/objectanalysis/ObjectAnalysisEditor';
+import EmptyState from '@/components/shared/EmptyState';
 
 export default function ObjectAnalysis() {
-  const [inputType, setInputType] = useState('url');
-  const [objectUrl, setObjectUrl] = useState('');
-  const [textContent, setTextContent] = useState('');
-  const [fileUrl, setFileUrl] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);
-  const [error, setError] = useState(null);
+  const [showEditor, setShowEditor] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [deletingItem, setDeletingItem] = useState(null);
+  const [search, setSearch] = useState('');
   const [openrelActions, setOpenrelActions] = useState([]);
   const [openrelConstraints, setOpenrelConstraints] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
-  const [actionMappings, setActionMappings] = useState({});
 
-  // Check for URL parameter on mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlParam = params.get('url');
-    if (urlParam) {
-      setObjectUrl(urlParam);
-      setInputType('url');
-    }
-  }, []);
+  const queryClient = useQueryClient();
 
-  // Fetch OpenREL Actions and Constraints from GlobalConfig on mount
+  // Fetch OpenREL Actions and Constraints from GlobalConfig
   useEffect(() => {
     const fetchOpenrelData = async () => {
       try {
-        console.log('=== Fetching OpenREL Data ===');
         const configs = await base44.entities.GlobalConfig.list();
-        console.log('GlobalConfig count:', configs?.length);
         if (configs && configs.length > 0) {
           const config = configs[0];
           const subEntityFiles = config.kb_sub_entity_files || {};
           const dataBaseUrl = config.kb_search_data_url;
           const apiUrl = config.kb_search_data_api_url?.replace(/\?ref=[^&]*/, '');
-          console.log('subEntityFiles:', subEntityFiles);
-          console.log('dataBaseUrl:', dataBaseUrl);
-          console.log('apiUrl:', apiUrl);
-          
-          // Auto-detect files if not explicitly configured (same as Dashboard)
+
           let actionsFile = subEntityFiles.actions;
           let constraintsFile = subEntityFiles.constraints;
-          
+
           if (apiUrl && (!actionsFile || !constraintsFile)) {
             const fileRes = await fetch(apiUrl);
             if (fileRes.ok) {
               const fileList = await fileRes.json();
               const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
               const autoFile = (hint) => jsonFiles.find(f => f.name.toLowerCase().includes(hint))?.name || '';
-              
-              if (!actionsFile) {
-                actionsFile = autoFile('action');
-                console.log('Auto-detected actions file:', actionsFile);
-              }
-              if (!constraintsFile) {
-                constraintsFile = autoFile('constraint');
-                console.log('Auto-detected constraints file:', constraintsFile);
-              }
+              if (!actionsFile) actionsFile = autoFile('action');
+              if (!constraintsFile) constraintsFile = autoFile('constraint');
             }
           }
-          
-          // Fetch actions
+
           if (actionsFile && dataBaseUrl) {
-            const actionsUrl = `${dataBaseUrl}/${actionsFile}`;
-            console.log('Fetching actions from:', actionsUrl);
-            const actionsRes = await fetch(actionsUrl);
-            console.log('Actions response status:', actionsRes.status);
-            if (actionsRes.ok) {
-              const actionsData = await actionsRes.json();
-              console.log('Raw actionsData:', actionsData);
-              let actions = [];
-              if (Array.isArray(actionsData)) {
-                actions = actionsData;
-                console.log('Actions is array, count:', actions.length);
-              } else if (actionsData.actions && Array.isArray(actionsData.actions)) {
-                actions = actionsData.actions;
-                console.log('Actions has .actions key, count:', actions.length);
-              }
-              setOpenrelActions(actions);
-              console.log('Final actions array:', actions.length);
+            const res = await fetch(`${dataBaseUrl}/${actionsFile}`);
+            if (res.ok) {
+              const data = await res.json();
+              setOpenrelActions(Array.isArray(data) ? data : (data.actions || []));
             }
           }
-          
-          // Fetch constraints
+
           if (constraintsFile && dataBaseUrl) {
-            const constraintsUrl = `${dataBaseUrl}/${constraintsFile}`;
-            console.log('Fetching constraints from:', constraintsUrl);
-            const constraintsRes = await fetch(constraintsUrl);
-            console.log('Constraints response status:', constraintsRes.status);
-            if (constraintsRes.ok) {
-              const constraintsData = await constraintsRes.json();
-              console.log('Raw constraintsData:', constraintsData);
-              let constraints = [];
-              if (Array.isArray(constraintsData)) {
-                constraints = constraintsData;
-                console.log('Constraints is array, count:', constraints.length);
-              } else if (constraintsData.constraints && Array.isArray(constraintsData.constraints)) {
-                constraints = constraintsData.constraints;
-                console.log('Constraints has .constraints key, count:', constraints.length);
-              }
-              setOpenrelConstraints(constraints);
-              console.log('Final constraints array:', constraints.length);
+            const res = await fetch(`${dataBaseUrl}/${constraintsFile}`);
+            if (res.ok) {
+              const data = await res.json();
+              setOpenrelConstraints(Array.isArray(data) ? data : (data.constraints || []));
             }
           }
-          
-          setDataLoaded(true);
-        } else {
-          console.log('No GlobalConfig found');
-          setDataLoaded(true);
         }
       } catch (e) {
-        console.log('Error fetching OpenREL data:', e.message);
+        // silently ignore
+      } finally {
         setDataLoaded(true);
       }
     };
     fetchOpenrelData();
   }, []);
 
-  const handleAnalyse = async () => {
-    setError(null);
-    setAnalysisResult(null);
+  const { data: analyses = [], isLoading } = useQuery({
+    queryKey: ['object-analyses'],
+    queryFn: () => base44.entities.ObjectAnalysis.list('-created_date'),
+  });
 
-    // Validate input based on type
-    if (inputType === 'url') {
-      if (!objectUrl) {
-        setError('Please enter an Object URL');
-        return;
-      }
-      try {
-        new URL(objectUrl);
-      } catch (err) {
-        setError('Invalid URL format. Please enter a valid URL.');
-        return;
-      }
-    } else if (inputType === 'text') {
-      if (!textContent.trim()) {
-        setError('Please enter some text to analyze');
-        return;
-      }
-    } else if (inputType === 'file') {
-      setError('File upload is not yet implemented');
-      return;
-    }
+  const createMutation = useMutation({
+    mutationFn: (data) => base44.entities.ObjectAnalysis.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['object-analyses'] });
+      setShowEditor(false);
+    },
+  });
 
-    setIsAnalyzing(true);
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.ObjectAnalysis.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['object-analyses'] });
+      setEditingItem(null);
+    },
+  });
 
-    try {
-      const response = await base44.functions.invoke('analyzeObject', { 
-        inputType, 
-        objectUrl: inputType === 'url' ? objectUrl : undefined,
-        textContent: inputType === 'text' ? textContent : undefined,
-        fileUrl: inputType === 'file' ? fileUrl : undefined
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.ObjectAnalysis.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['object-analyses'] });
+      setDeletingItem(null);
+    },
+  });
+
+  const copyMutation = useMutation({
+    mutationFn: (item) => {
+      const { id, created_date, updated_date, created_by, ...rest } = item;
+      return base44.entities.ObjectAnalysis.create({
+        ...rest,
+        name: `${item.name} (copy)`,
+        last_analysed_at: null,
       });
-      setAnalysisResult(response.data.analysis);
-    } catch (err) {
-      setError(err.message || 'Failed to analyze object');
-    } finally {
-      setIsAnalyzing(false);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['object-analyses'] }),
+  });
+
+  const filtered = analyses.filter(a =>
+    a.name?.toLowerCase().includes(search.toLowerCase()) ||
+    a.description?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleSave = (data) => {
+    if (editingItem) {
+      updateMutation.mutate({ id: editingItem.id, data: { ...data, last_analysed_at: data.analysis_result ? new Date().toISOString() : editingItem.last_analysed_at } });
+    } else {
+      createMutation.mutate({ ...data, last_analysed_at: data.analysis_result ? new Date().toISOString() : undefined });
     }
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Object Analysis</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          This analysis will determine whether OpenREL/ODRL rules, actions, and/or constraints can be determined in the source material or object served from the URL.
-        </p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Object Analysis</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Detect OpenREL/ODRL rules, actions, and constraints in objects and documents.
+          </p>
+        </div>
+        <Button onClick={() => { setEditingItem(null); setShowEditor(true); }} className="gap-2">
+          <Plus className="w-4 h-4" />
+          New Analysis
+        </Button>
       </div>
 
-      {/* Input Method Tabs */}
-      <Card className="bg-card border-border/50">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Input Method</CardTitle>
-          <CardDescription>
-            Choose how to provide the content for analysis.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={inputType} onValueChange={setInputType}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="url" className="gap-2">
-                <Link2 className="w-4 h-4" />
-                URL
-              </TabsTrigger>
-              <TabsTrigger value="text" className="gap-2">
-                <Type className="w-4 h-4" />
-                Text
-              </TabsTrigger>
-              <TabsTrigger value="file" className="gap-2">
-                <File className="w-4 h-4" />
-                File
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="url" className="space-y-4 mt-4">
-              <div className="flex gap-3">
-                <Input
-                  value={objectUrl}
-                  onChange={(e) => setObjectUrl(e.target.value)}
-                  placeholder="https://example.com/object.json"
-                  className="flex-1"
-                />
-              </div>
-            </TabsContent>
-            <TabsContent value="text" className="space-y-4 mt-4">
-              <Textarea
-                value={textContent}
-                onChange={(e) => setTextContent(e.target.value)}
-                placeholder="Paste or type the content to analyze here..."
-                className="min-h-[200px]"
-              />
-            </TabsContent>
-            <TabsContent value="file" className="space-y-4 mt-4">
-              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-border/50 rounded-lg bg-muted/20">
-                <File className="w-8 h-8 text-muted-foreground mb-2" />
-                <p className="text-sm font-medium text-foreground">File Upload</p>
-                <p className="text-xs text-muted-foreground text-center mt-1">
-                  Upload a text file for analysis<br />
-                  <span className="text-accent">Coming soon</span>
-                </p>
-              </div>
-            </TabsContent>
-          </Tabs>
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search analyses..."
+          className="pl-9 bg-muted/50 text-sm"
+        />
+      </div>
 
-          <div className="flex justify-end mt-4">
-            <Button 
-              onClick={handleAnalyse} 
-              disabled={isAnalyzing || inputType === 'file'}
-              className="gap-2"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Microscope className="w-4 h-4" />
-                  Analyse Object
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Error State */}
-      {error && (
-        <Card className="bg-destructive/10 border-destructive/20">
-          <CardContent className="flex items-start gap-3 py-4">
-            <AlertCircle className="w-5 h-5 text-destructive shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-destructive">Analysis Failed</p>
-              <p className="text-xs text-destructive/80 mt-1">{error}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Analysis Results */}
-      {analysisResult && (
-        <div className="space-y-4">
-          {/* Summary Card */}
-          <Card className={cn(
-            "border-border/50",
-            analysisResult.hasRules ? "bg-accent/10" : "bg-muted/10"
-          )}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                {analysisResult.hasRules ? (
-                  <CheckCircle2 className="w-4 h-4 text-accent" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-muted-foreground" />
-                )}
-                Analysis Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-foreground">{analysisResult.summary}</p>
-            </CardContent>
-          </Card>
-
-          {/* Metadata */}
-          <Card className="bg-card border-border/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Object Metadata</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Source:</span>
-                <span className="text-foreground font-mono truncate max-w-[300px]">{analysisResult.source}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Input Type:</span>
-                <span className="text-foreground font-mono capitalize">{analysisResult.inputType}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Content Length:</span>
-                <span className="text-foreground font-mono">{analysisResult.contentLength} bytes</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Detection Results - Detailed */}
-          <Card className="bg-card border-border/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Detection Results</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Rules Section */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-primary" />
-                    <span className="text-sm font-medium">OpenREL/ODRL Rules</span>
-                  </div>
-                  <Badge variant={analysisResult.hasRules ? "default" : "secondary"}>
-                    {analysisResult.hasRules ? 'Detected' : 'Not Found'}
-                  </Badge>
-                </div>
-                {analysisResult.hasRules && (
-                  <div className="ml-6 space-y-1">
-                    {analysisResult.detectedPatterns
-                      .filter(p => p.includes('ODRL term:') || p.includes('OpenREL term:') || p.includes('JSON-LD'))
-                      .map((pattern, idx) => (
-                        <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
-                          <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
-                          <span className="font-mono">{pattern}</span>
-                        </div>
-                      ))}
-                    {analysisResult.detectedPatterns.filter(p => p.includes('ODRL term:') || p.includes('OpenREL term:') || p.includes('JSON-LD')).length === 0 && (
-                      <p className="text-xs text-muted-foreground italic">Generic rule patterns detected</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Actions Section */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-primary" />
-                    <span className="text-sm font-medium">Actions</span>
-                  </div>
-                  <Badge variant={analysisResult.hasActions ? "default" : "secondary"}>
-                    {analysisResult.hasActions ? 'Detected' : 'Not Found'}
-                  </Badge>
-                </div>
-                {analysisResult.hasActions && (
-                  <div className="ml-6 space-y-2">
-                    {analysisResult.detectedPatterns
-                      .filter(p => p.includes('Configured Action:') || p.includes('Potential Action:'))
-                      .map((pattern, idx) => {
-                        const parts = pattern.split('|');
-                        const detectedTerm = parts[0].replace(/^(Configured Action: |Potential Action: )/, '');
-                        const autoMatchedId = parts[1] || '';
-                        const autoMatchedLabel = parts[2] || '';
-                        const mappingKey = `action-${idx}-${detectedTerm}`;
-                        
-                        return (
-                          <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
-                            <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
-                            <div className="flex items-center gap-1 flex-1">
-                              <span className="font-mono">{detectedTerm}</span>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="text-xs">Detected phrase: "{detectedTerm}"</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
-                            {!dataLoaded ? (
-                              <Badge variant="secondary" className="text-xs">Loading...</Badge>
-                            ) : (
-                              <Select
-                                value={actionMappings[mappingKey] || autoMatchedLabel || ""}
-                                onValueChange={(value) => setActionMappings(prev => ({ ...prev, [mappingKey]: value }))}
-                              >
-                                <SelectTrigger className="w-[200px] h-8 text-xs">
-                                  <SelectValue placeholder={openrelActions.length > 0 ? "Map to Action" : "No actions configured"} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {openrelActions.length > 0 ? (
-                                    openrelActions.map((action, actionIdx) => (
-                                      <SelectItem key={actionIdx} value={action.label}>
-                                        {action.label}
-                                      </SelectItem>
-                                    ))
-                                  ) : (
-                                    <div className="p-2 text-xs text-muted-foreground">No actions configured</div>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            )}
-                            {autoMatchedLabel && (
-                              <Badge className="text-xs bg-accent/20 text-accent border-accent/30">Auto: {autoMatchedLabel}</Badge>
-                            )}
-                          </div>
-                        );
-                      })}
-                    {analysisResult.detectedPatterns.filter(p => p.includes('Configured Action:') || p.includes('Potential Action:')).length === 0 && (
-                      <p className="text-xs text-muted-foreground italic">Generic action language detected</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Constraints Section */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileJson className="w-4 h-4 text-primary" />
-                    <span className="text-sm font-medium">Constraints</span>
-                  </div>
-                  <Badge variant={analysisResult.hasConstraints ? "default" : "secondary"}>
-                    {analysisResult.hasConstraints ? 'Detected' : 'Not Found'}
-                  </Badge>
-                </div>
-                {analysisResult.hasConstraints && (
-                  <div className="ml-6 space-y-1">
-                    {analysisResult.detectedPatterns
-                      .filter(p => p.includes('Configured Constraint:') || p.includes('Potential Constraint:'))
-                      .map((pattern, idx) => {
-                        const parts = pattern.split('|');
-                        const detectedTerm = parts[0].replace(/^(Configured Constraint: |Potential Constraint: )/, '');
-                        const autoMatchedId = parts[1] || '';
-                        const autoMatchedLabel = parts[2] || '';
-                        const mappingKey = `constraint-${idx}-${detectedTerm}`;
-                        
-                        return (
-                          <div key={idx} className="text-xs text-foreground flex items-center gap-2 p-1.5 rounded bg-muted/20">
-                            <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
-                            <div className="flex items-center gap-1 flex-1">
-                              <span className="font-mono">{detectedTerm}</span>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Info className="w-3 h-3 text-muted-foreground cursor-help" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="text-xs">Detected phrase: "{detectedTerm}"</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
-                            {!dataLoaded ? (
-                              <Badge variant="secondary" className="text-xs">Loading...</Badge>
-                            ) : (
-                              <Select
-                                value={actionMappings[mappingKey] || autoMatchedLabel || ""}
-                                onValueChange={(value) => setActionMappings(prev => ({ ...prev, [mappingKey]: value }))}
-                              >
-                                <SelectTrigger className="w-[200px] h-8 text-xs">
-                                  <SelectValue placeholder={openrelConstraints.length > 0 ? "Map to Constraint" : "No constraints configured"} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {openrelConstraints.length > 0 ? (
-                                    openrelConstraints.map((constraint, constraintIdx) => (
-                                      <SelectItem key={constraintIdx} value={constraint.label}>
-                                        {constraint.label}
-                                      </SelectItem>
-                                    ))
-                                  ) : (
-                                    <div className="p-2 text-xs text-muted-foreground">No constraints configured</div>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            )}
-                            {autoMatchedLabel && (
-                              <Badge className="text-xs bg-accent/20 text-accent border-accent/30">Auto: {autoMatchedLabel}</Badge>
-                            )}
-                          </div>
-                        );
-                      })}
-                    {analysisResult.detectedPatterns.filter(p => p.includes('Configured Constraint:') || p.includes('Potential Constraint:')).length === 0 && (
-                      <p className="text-xs text-muted-foreground italic">Generic constraint language detected</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-
+      {/* Grid */}
+      {isLoading ? (
+        <div className="grid md:grid-cols-2 gap-4">
+          {Array(4).fill(0).map((_, i) => (
+            <div key={i} className="h-44 rounded-lg bg-card animate-pulse border border-border/50" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={Microscope}
+          title={search ? 'No matches' : 'No analyses yet'}
+          description={search ? 'Try a different search term.' : 'Create your first object analysis to detect OpenREL/ODRL patterns.'}
+          actionLabel={!search ? 'New Analysis' : undefined}
+          onAction={!search ? () => { setEditingItem(null); setShowEditor(true); } : undefined}
+        />
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          {filtered.map(a => (
+            <ObjectAnalysisCard
+              key={a.id}
+              analysis={a}
+              onEdit={(item) => { setEditingItem(item); setShowEditor(true); }}
+              onCopy={(item) => copyMutation.mutate(item)}
+              onDelete={(item) => setDeletingItem(item)}
+            />
+          ))}
         </div>
       )}
+
+      {/* Editor dialog */}
+      <ObjectAnalysisEditor
+        open={showEditor}
+        initialData={editingItem}
+        onClose={() => { setShowEditor(false); setEditingItem(null); }}
+        onSave={handleSave}
+        openrelActions={openrelActions}
+        openrelConstraints={openrelConstraints}
+        dataLoaded={dataLoaded}
+      />
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deletingItem} onOpenChange={() => setDeletingItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete analysis?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{deletingItem?.name}" will be permanently deleted. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteMutation.mutate(deletingItem.id)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
