@@ -341,7 +341,7 @@ export default function KBWorkflow() {
               workflowId={openInstance.workflow_type}
             />
           )}
-          {steps[currentStep].placeholder && steps[currentStep].id !== 'find' && (
+          {steps[currentStep].placeholder && !['find', 'licence'].includes(steps[currentStep].id) && (
             <div className="rounded-xl border border-border/50 bg-card flex flex-col items-center justify-center py-20 gap-3 text-center">
               <span className="text-3xl">🚧</span>
               <p className="text-sm font-medium text-foreground">{steps[currentStep].label}</p>
