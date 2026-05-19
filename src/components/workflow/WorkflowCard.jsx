@@ -15,7 +15,7 @@ export const WORKFLOW_TYPES = {
     steps: [
       { id: 'user-context', label: 'User Context' },
       { id: 'resource',     label: 'Resource' },
-      { id: 'licence',      label: 'Examine Content',       placeholder: true },
+      { id: 'licence',      label: 'Examine Content' },
       { id: 'review',       label: 'Review',        placeholder: true },
     ],
   },

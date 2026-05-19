@@ -23,6 +23,7 @@ import WorkflowStep2FindResource from '@/components/workflow/WorkflowStep2FindRe
 import WorkflowStep2Resource from '@/components/workflow/WorkflowStep2Resource';
 import WorkflowStep3IntendedUse from '@/components/workflow/WorkflowStep3IntendedUse';
 import WorkflowStep3ChecklistSelection from '@/components/workflow/WorkflowStep3ChecklistSelection';
+import WorkflowStep3ExamineContent from '@/components/workflow/WorkflowStep3ExamineContent';
 import OAStepContentSource from '@/components/objectanalysis/OAStepContentSource';
 import OAStepRunAnalysis from '@/components/objectanalysis/OAStepRunAnalysis';
 import EmptyState from '@/components/shared/EmptyState';
@@ -336,7 +337,7 @@ export default function KBWorkflow() {
             <WorkflowStep3IntendedUse instanceId={openInstance.id} workflowId={openInstance.workflow_type} />
           )}
           {steps[currentStep].id === 'licence' && (
-            <WorkflowStep3ChecklistSelection
+            <WorkflowStep3ExamineContent
               instanceId={openInstance.id}
               workflowId={openInstance.workflow_type}
             />
