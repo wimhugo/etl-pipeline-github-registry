@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useRole } from '@/lib/RoleContext';
 import { useProject } from '@/lib/ProjectContext';
-import { Menu, X, LayoutDashboard, FolderOpen, Database, GitBranch, CheckSquare, FileText, Layers, RefreshCw, BookOpen, PenTool, Link2, FileEdit, Box, Eye, Settings2, Search, Pencil, Shuffle, BookMarked, Sliders, SlidersHorizontal, Workflow, BookKey, KeyRound } from 'lucide-react';
+import { Menu, X, ChevronRight, LayoutDashboard, FolderOpen, Database, GitBranch, CheckSquare, FileText, Layers, RefreshCw, BookOpen, PenTool, Link2, FileEdit, Box, Eye, Settings2, Search, Pencil, Shuffle, BookMarked, Sliders, SlidersHorizontal, Workflow, BookKey, KeyRound } from 'lucide-react';
 
 const ICON_MAP = {
   'Dashboard':            LayoutDashboard,
@@ -34,6 +34,7 @@ const ICON_MAP = {
 export default function Sidebar() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
   const { activeProject } = useProject();
   const { visibleFeatures, activeContainer } = useRole();
 
@@ -89,6 +90,18 @@ export default function Sidebar() {
 
   return (
     <>
+      {/* Desktop toggle button - moves with sidebar */}
+      <button
+        onClick={() => setIsVisible(!isVisible)}
+        className={cn(
+          "fixed top-1/2 -translate-y-1/2 z-50 p-1.5 rounded-lg bg-card border border-border shadow-lg hover:bg-accent transition-all duration-300",
+          isVisible ? "left-60" : "left-3"
+        )}
+        title={isVisible ? 'Hide sidebar' : 'Show sidebar'}
+      >
+        {isVisible ? <ChevronRight className="w-4 h-4" /> : <ChevronRight className="w-4 h-4 rotate-180" />}
+      </button>
+
       {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
@@ -108,7 +121,7 @@ export default function Sidebar() {
       {/* Sidebar */}
       <aside className={cn(
         "fixed top-0 left-0 h-screen w-60 bg-sidebar border-r border-border z-40 transition-transform duration-300",
-        mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        isVisible ? "translate-x-0" : "-translate-x-full"
       )}>
         <NavContent />
       </aside>
