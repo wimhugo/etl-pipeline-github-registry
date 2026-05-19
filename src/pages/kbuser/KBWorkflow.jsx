@@ -341,6 +341,25 @@ export default function KBWorkflow() {
             <WorkflowStep3ExamineContent
               instanceId={openInstance.id}
               workflowId={openInstance.workflow_type}
+              onComplete={(data) => {
+                console.log('Step 3 analysis completed:', data);
+                // Automatically save to workflow instance step_data
+                const stepData = openInstance.step_data || {};
+                updateMutation.mutate({
+                  id: openInstance.id,
+                  source: openInstance._source,
+                  data: {
+                    step_data: {
+                      ...stepData,
+                      'step-3': {
+                        status: 'completed',
+                        analysis_results: data.results,
+                        summary: data.summary,
+                      },
+                    },
+                  },
+                });
+              }}
             />
           )}
           {steps[currentStep].id === 'review' && (

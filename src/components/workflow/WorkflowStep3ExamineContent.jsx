@@ -32,9 +32,11 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
             try {
                 const instance = await base44.entities.WorkflowInstance.get(instanceId);
                 const step3Data = instance.step_data?.['step-3'];
-                if (step3Data && step3Data.status === 'completed' && step3Data.analysis_results) {
+                if (step3Data && step3Data.analysis_results && step3Data.analysis_results.length > 0) {
                     console.log('Loaded existing analysis results from step-3');
                     setAnalysisStatus(step3Data);
+                    // Also save to localStorage for backward compatibility
+                    localStorage.setItem(`wf_${instanceId}_step-3`, JSON.stringify(step3Data));
                 }
             } catch (err) {
                 console.error('Failed to load existing analysis:', err);
