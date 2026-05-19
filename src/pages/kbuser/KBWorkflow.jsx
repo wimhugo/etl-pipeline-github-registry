@@ -22,6 +22,7 @@ import WorkflowStep1UserContext from '@/components/workflow/WorkflowStep1UserCon
 import WorkflowStep2FindResource from '@/components/workflow/WorkflowStep2FindResource';
 import WorkflowStep2Resource from '@/components/workflow/WorkflowStep2Resource';
 import WorkflowStep3IntendedUse from '@/components/workflow/WorkflowStep3IntendedUse';
+import WorkflowStep3ChecklistSelection from '@/components/workflow/WorkflowStep3ChecklistSelection';
 import OAStepContentSource from '@/components/objectanalysis/OAStepContentSource';
 import OAStepRunAnalysis from '@/components/objectanalysis/OAStepRunAnalysis';
 import EmptyState from '@/components/shared/EmptyState';
@@ -333,6 +334,12 @@ export default function KBWorkflow() {
           )}
           {steps[currentStep].id === 'reuse-context' && (
             <WorkflowStep3IntendedUse instanceId={openInstance.id} workflowId={openInstance.workflow_type} />
+          )}
+          {steps[currentStep].id === 'licence' && (
+            <WorkflowStep3ChecklistSelection
+              instanceId={openInstance.id}
+              workflowId={openInstance.workflow_type}
+            />
           )}
           {steps[currentStep].placeholder && steps[currentStep].id !== 'find' && (
             <div className="rounded-xl border border-border/50 bg-card flex flex-col items-center justify-center py-20 gap-3 text-center">
