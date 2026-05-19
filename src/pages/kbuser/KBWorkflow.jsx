@@ -447,16 +447,10 @@ export default function KBWorkflow() {
           <span className="text-xs text-muted-foreground">Step {currentStep + 1} of {steps.length}</span>
           <Button
             size="sm" className="gap-1.5"
-            onClick={() => {
-              // For step 4 (review), save progress before continuing to step 5
-              if (currentStep === 3 && openInstance) {
-                handleSaveProgress();
-              }
-              setCurrentStep(s => s + 1);
-            }}
+            onClick={() => setCurrentStep(s => s + 1)}
             disabled={currentStep === steps.length - 1}
           >
-            {currentStep === 3 ? 'Continue' : 'Next'} <ChevronRight className="w-3.5 h-3.5" />
+            Next <ChevronRight className="w-3.5 h-3.5" />
           </Button>
         </div>
       </div>

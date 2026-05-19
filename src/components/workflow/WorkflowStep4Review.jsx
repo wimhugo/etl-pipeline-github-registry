@@ -128,12 +128,6 @@ export default function WorkflowStep4Review({ instanceId, workflowId, onComplete
     // Filter to only show recommended policies
     const recommendedPolicies = policies.filter(p => recommendedPolicyIds.includes(p.id));
 
-    const handleContinue = () => {
-        if (onComplete) {
-            onComplete({ selectedPolicies });
-        }
-    };
-
     if (instanceLoading || checklistsLoading) {
         return (
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
@@ -285,17 +279,7 @@ export default function WorkflowStep4Review({ instanceId, workflowId, onComplete
                 ))}
             </div>
 
-            {/* Continue button */}
-            <div className="flex justify-end pt-2">
-                <Button 
-                    onClick={handleContinue} 
-                    className="gap-2"
-                    disabled={selectedPolicies.length === 0}
-                >
-                    Continue ({selectedPolicies.length})
-                    <CheckCircle2 className="w-4 h-4" />
-                </Button>
-            </div>
+
         </div>
     );
 }
