@@ -543,26 +543,35 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
     is_active: true,
   });
 
-  const { data: globalConfigs = [] } = useQuery({
+  const { data: globalConfigs = [], isLoading: configLoading } = useQuery({
     queryKey: ['globalConfig'],
-    queryFn: () => base44.entities.GlobalConfig.list(),
+    queryFn: async () => {
+      const configs = await base44.entities.GlobalConfig.list();
+      console.log('ChecklistManager - GlobalConfig:', configs);
+      return configs;
+    },
   });
   const config = globalConfigs[0] || {};
+  console.log('ChecklistManager - config.kb_search_data_api_url:', config.kb_search_data_api_url);
   
   const { data: policies = [], isLoading: policiesLoading, error: policiesError } = useQuery({
     queryKey: ['kb-policies', config.kb_search_data_api_url],
     queryFn: async () => {
+      console.log('Fetching policies from:', config.kb_search_data_api_url);
       if (!config.kb_search_data_api_url) {
         throw new Error('KB data API URL not configured');
       }
       const response = await fetch(config.kb_search_data_api_url);
+      console.log('Policies API response status:', response.status);
       if (!response.ok) throw new Error('Failed to fetch file list');
       const fileList = await response.json();
+      console.log('File list:', fileList);
       const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
       // Filter for policy files and extract names
       const policyFiles = jsonFiles.filter(item => 
         item.name.toLowerCase().includes('policy') || item.name.toLowerCase().includes('licence')
       );
+      console.log('Policy files found:', policyFiles);
       return policyFiles.map(file => ({
         name: file.name.replace('.json', ''),
         path: file.path
