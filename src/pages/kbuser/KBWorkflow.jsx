@@ -384,7 +384,22 @@ export default function KBWorkflow() {
               workflowId={openInstance.workflow_type}
               onComplete={(data) => {
                 console.log('Step 4 completed:', data);
-                // Save selected policies to step_data
+                // Save selected policies to step_data and localStorage
+                const step4Data = {
+                  selected_policies: data.selectedPolicies,
+                };
+                localStorage.setItem(`wf_${openInstance.id}_step-4`, JSON.stringify(step4Data));
+                const stepData = openInstance.step_data || {};
+                updateMutation.mutate({
+                  id: openInstance.id,
+                  source: openInstance._source,
+                  data: {
+                    step_data: {
+                      ...stepData,
+                      'step-4': step4Data,
+                    },
+                  },
+                });
               }}
             />
           )}

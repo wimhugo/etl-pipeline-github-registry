@@ -5,6 +5,7 @@ import { CheckCircle2, AlertCircle, FileCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import PolicyCard from '@/components/kbsearch/PolicyCard';
 import { toast } from '@/components/ui/use-toast';
 
@@ -245,25 +246,53 @@ export default function WorkflowStep4Review({ instanceId, workflowId, onComplete
 
             {/* Policy list */}
             <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    Policies ({recommendedPolicies.length})
-                </h4>
+                <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Policies ({recommendedPolicies.length})
+                    </h4>
+                    {selectedPolicies.length > 0 && (
+                        <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20">
+                            {selectedPolicies.length} selected
+                        </Badge>
+                    )}
+                </div>
                 {recommendedPolicies.map(policy => (
-                    <PolicyCard 
-                        key={policy.id} 
-                        policy={policy} 
-                        actionsMap={actionsMap} 
-                        constraintsMap={constraintsMap} 
-                        statesMap={statesMap} 
-                        policiesMap={policiesMap} 
-                    />
+                    <div key={policy.id} className="flex items-start gap-3">
+                        <Checkbox
+                            id={`policy-${policy.id}`}
+                            checked={selectedPolicies.includes(policy.id)}
+                            onCheckedChange={(checked) => {
+                                setSelectedPolicies(prev => {
+                                    if (checked) {
+                                        return [...prev, policy.id];
+                                    } else {
+                                        return prev.filter(id => id !== policy.id);
+                                    }
+                                });
+                            }}
+                            className="mt-2 shrink-0"
+                        />
+                        <div className="flex-1">
+                            <PolicyCard 
+                                policy={policy} 
+                                actionsMap={actionsMap} 
+                                constraintsMap={constraintsMap} 
+                                statesMap={statesMap} 
+                                policiesMap={policiesMap} 
+                            />
+                        </div>
+                    </div>
                 ))}
             </div>
 
             {/* Continue button */}
             <div className="flex justify-end pt-2">
-                <Button onClick={handleContinue} className="gap-2">
-                    Continue
+                <Button 
+                    onClick={handleContinue} 
+                    className="gap-2"
+                    disabled={selectedPolicies.length === 0}
+                >
+                    Continue ({selectedPolicies.length})
                     <CheckCircle2 className="w-4 h-4" />
                 </Button>
             </div>
