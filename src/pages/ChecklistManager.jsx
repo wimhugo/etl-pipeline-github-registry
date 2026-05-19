@@ -563,7 +563,8 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
         });
         
         console.log('githubFiles response:', response);
-        const fileList = response.data?.items || [];
+        // githubFiles returns {success: true, files: [...]}
+        const fileList = response.data?.files || [];
         console.log('File list from GitHub:', fileList);
         const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
         console.log('JSON files:', jsonFiles.map(f => f.name));
