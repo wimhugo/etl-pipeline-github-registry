@@ -17,7 +17,7 @@ export const WORKFLOW_TYPES = {
       { id: 'resource',     label: 'Resource' },
       { id: 'licence',      label: 'Examine Content' },
       { id: 'review',       label: 'Review' },
-      { id: 'generate',     label: 'Generate',      placeholder: true },
+      { id: 'generate',     label: 'Generate' },
     ],
   },
   reuse: {
