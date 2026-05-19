@@ -88,6 +88,11 @@ Deno.serve(async (req) => {
         const path = vocabSource.github_path;
         const branch = vocabSource.github_branch || 'main';
         
+        // Fetch GitHub token from GlobalConfig
+        const globalConfigs = await base44.entities.GlobalConfig.list();
+        const globalConfig = globalConfigs[0] || {};
+        const token = globalConfig.github_token;
+        
         // Use GitHub API to fetch file content
         const githubUrl = `https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`;
         const headers = {
@@ -96,7 +101,6 @@ Deno.serve(async (req) => {
         };
         
         // Add token if available
-        const token = Deno.env.get('GITHUB_TOKEN');
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
