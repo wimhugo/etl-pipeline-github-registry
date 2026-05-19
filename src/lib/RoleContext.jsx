@@ -14,6 +14,7 @@ export const KB_MANAGER_FEATURES_DEFAULT = [
   { label: 'Template Manager',     path: '/template-manager',   access: { Administrator: true, Curator: true,  Contributor: false, 'End User': false } },
   { label: 'Schema Extraction',    path: '/schema-extraction',  access: { Administrator: true, Curator: true,  Contributor: false, 'End User': false } },
   { label: 'Data Sync',            path: '/data-sync',          access: { Administrator: true, Curator: true,  Contributor: false, 'End User': false } },
+  { label: 'Vocabulary Manager',   path: '/vocabulary-manager', access: { Administrator: true, Curator: true,  Contributor: false, 'End User': false } },
   { label: 'Vocabulary Linker',    path: '/vocab-linker',       access: { Administrator: true, Curator: true,  Contributor: false, 'End User': false } },
   { label: 'Vocabulary Maker',     path: '/vocab-maker',        access: { Administrator: true, Curator: true,  Contributor: false, 'End User': false } },
   { label: 'Manual Vocab Links',   path: '/vocab-links',        access: { Administrator: true, Curator: true,  Contributor: false, 'End User': false } },
