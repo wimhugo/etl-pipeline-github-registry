@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import KBEntityCard from '@/components/kbuser/KBEntityCard';
 import { Link } from 'react-router-dom';
 import { FileJson, ShieldCheck, Zap, Lock, BookOpen, Users, Layers, Workflow, FileCheck2, Search, Microscope, ArrowRight } from 'lucide-react';
+import IWantToSection from '@/components/kbuser/IWantToSection';
 
 const SUB_ENTITY_HINTS = ['actions', 'constraints', 'agents', 'sources', 'scenarios'];
 
@@ -151,6 +152,8 @@ export default function KBUserDashboard() {
           Overview of the configured knowledge base data files.
         </p>
       </div>
+
+      <IWantToSection />
 
       {/* My Workflows summary card */}
       <Link to="/kb-user/workflow" className="block">

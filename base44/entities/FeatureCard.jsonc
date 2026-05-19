@@ -1,0 +1,39 @@
+{
+  "name": "FeatureCard",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "The title displayed on the card"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description shown on the card"
+    },
+    "icon_name": {
+      "type": "string",
+      "description": "Lucide icon name to display on the card"
+    },
+    "target_path": {
+      "type": "string",
+      "description": "Internal route/path to navigate to when the card is clicked"
+    },
+    "linked_type": {
+      "type": "string",
+      "description": "Linked workflow type (e.g. 'workflow_type:licence') or KB user feature path (e.g. '/kb-user/search') used for permission filtering"
+    },
+    "order": {
+      "type": "number",
+      "description": "Display order of the card",
+      "default": 0
+    },
+    "is_active": {
+      "type": "boolean",
+      "description": "Whether this card is visible on the dashboard",
+      "default": true
+    }
+  },
+  "required": [
+    "title"
+  ]
+}

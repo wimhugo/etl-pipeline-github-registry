@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, Loader2, FileJson, Database, AlertCircle, Tag, ChevronDown, ChevronRight } from 'lucide-react';
+import { Save, Loader2, FileJson, Database, AlertCircle, Tag, ChevronDown, ChevronRight, LayoutGrid } from 'lucide-react';
+import FeatureCardsEditor from '@/components/kbuser/FeatureCardsEditor';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -368,6 +369,18 @@ export default function KBUserConfig() {
               </div>
             </>
           )}
+        </CardContent>
+      </Card>
+
+      {/* I Want To Cards */}
+      <Card className="bg-card border-border/50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <LayoutGrid className="w-4 h-4" /> "I Want To…" Dashboard Cards
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <FeatureCardsEditor />
         </CardContent>
       </Card>
 
