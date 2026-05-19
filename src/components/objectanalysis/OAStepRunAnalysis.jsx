@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Microscope, Loader2, CheckCircle2, AlertCircle,
-  FileJson, Shield, Zap, Info,
+  FileJson, Shield, Zap, Info, ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
@@ -158,35 +159,52 @@ export default function OAStepRunAnalysis({
 }
 
 function PatternSection({ icon, label, hasItems, patterns }) {
+  const [open, setOpen] = useState(true);
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2">
-        {icon}
-        <span className="text-xs font-medium">{label}</span>
-        <Badge variant={hasItems ? 'default' : 'secondary'} className="text-xs ml-auto">
-          {hasItems ? 'Detected' : 'Not Found'}
-        </Badge>
-      </div>
-      {patterns.map((pattern, idx) => (
-        <div key={idx} className="text-xs flex items-center gap-2 p-1.5 rounded bg-muted/20 ml-5">
-          <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
-          <span className="font-mono">{pattern}</span>
-        </div>
-      ))}
-    </div>
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button className="w-full flex items-center gap-2 py-1 hover:opacity-80 transition-opacity">
+          {icon}
+          <span className="text-xs font-medium">{label}</span>
+          <Badge variant={hasItems ? 'default' : 'secondary'} className="text-xs ml-auto">
+            {hasItems ? 'Detected' : 'Not Found'}
+          </Badge>
+          <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0", open && "rotate-180")} />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-1 mt-1">
+        {patterns.map((pattern, idx) => (
+          <div key={idx} className="text-xs flex items-center gap-2 p-1.5 rounded bg-muted/20 ml-5">
+            <CheckCircle2 className="w-3 h-3 text-accent shrink-0" />
+            <span className="font-mono">{pattern}</span>
+          </div>
+        ))}
+        {patterns.length === 0 && (
+          <p className="text-xs text-muted-foreground ml-5 italic">No items detected.</p>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
 function MappingSection({ icon, label, hasItems, patterns, prefix, mappingKey, mappings, onMap, options, optionPlaceholder }) {
+  const [open, setOpen] = useState(true);
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2">
-        {icon}
-        <span className="text-xs font-medium">{label}</span>
-        <Badge variant={hasItems ? 'default' : 'secondary'} className="text-xs ml-auto">
-          {hasItems ? 'Detected' : 'Not Found'}
-        </Badge>
-      </div>
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button className="w-full flex items-center gap-2 py-1 hover:opacity-80 transition-opacity">
+          {icon}
+          <span className="text-xs font-medium">{label}</span>
+          <Badge variant={hasItems ? 'default' : 'secondary'} className="text-xs ml-auto">
+            {hasItems ? 'Detected' : 'Not Found'}
+          </Badge>
+          <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0", open && "rotate-180")} />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-1 mt-1">
+      {patterns.length === 0 && (
+        <p className="text-xs text-muted-foreground ml-5 italic">No items detected.</p>
+      )}
       {patterns.map((pattern, idx) => {
         const parts = pattern.split('|');
         const detectedTerm = parts[0].replace(new RegExp(`^(${prefix.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`), '');
@@ -225,6 +243,7 @@ function MappingSection({ icon, label, hasItems, patterns, prefix, mappingKey, m
           </div>
         );
       })}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
