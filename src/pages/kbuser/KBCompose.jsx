@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import ComposePolicyCard from '@/components/kbcompose/ComposePolicyCard';
 import PolicyFilterBar from '@/components/kbpolicy/PolicyFilterBar';
+import NewPolicyFromTemplateDialog from '@/components/kbcompose/NewPolicyFromTemplateDialog';
 
 function useComposeData() {
   const { data: globalConfigs = [] } = useQuery({
@@ -108,6 +109,7 @@ export default function KBCompose() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({});
+  const [showNewDialog, setShowNewDialog] = useState(false);
   // Local overlay: deleted ids + cloned additions
   const [deletedIds, setDeletedIds] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('kbcompose_deletedIds') || '[]')); }
@@ -120,10 +122,22 @@ export default function KBCompose() {
 
   const { remotePolicies, actionsMap, constraintsMap, statesMap, policiesLoading, policiesError, noConfig, config, policyFile } = useComposeData();
 
-  // Merge: remote (minus deleted) + clones
+  // Templates: policies with status openrel:status/template
+  const templates = useMemo(() =>
+    remotePolicies.filter(p => String(p.status || '').split(/[:/]/).pop()?.toLowerCase() === 'template'),
+    [remotePolicies]
+  );
+
+  // Merge: remote (minus deleted) + clones; drafts with _createdLocally float to top
   const allPolicies = useMemo(() => {
     const base = remotePolicies.filter(p => !deletedIds.has(p.id));
-    return [...base, ...cloned];
+    const merged = [...base, ...cloned];
+    return merged.sort((a, b) => {
+      if (a._createdLocally && !b._createdLocally) return -1;
+      if (!a._createdLocally && b._createdLocally) return 1;
+      if (a._createdLocally && b._createdLocally) return b._createdLocally - a._createdLocally;
+      return 0;
+    });
   }, [remotePolicies, deletedIds, cloned]);
 
   const policiesMap = useMemo(() => Object.fromEntries(allPolicies.map(p => [p.id, p])), [allPolicies]);
@@ -169,9 +183,14 @@ export default function KBCompose() {
 
   const handleCopy = (policy) => {
     const newId = `${policy.id}-copy-${Date.now()}`;
-    const copy = { ...policy, id: newId, label: `${policy.label} (copy)`, status: 'openrel:status/draft', derived_from: policy.id };
+    const copy = { ...policy, id: newId, label: `${policy.label} (copy)`, status: 'openrel:status/draft', derived_from: policy.id, _createdLocally: Date.now() };
     persistCloned([...cloned, copy]);
     toast({ title: 'Policy copied', description: `Created "${copy.label}"` });
+  };
+
+  const handleNewFromTemplate = (draft) => {
+    persistCloned([...cloned, draft]);
+    toast({ title: 'Draft created', description: `"${draft.label}" added to the top of the list.` });
   };
 
   const handleSubmitPR = async (policy) => {
@@ -232,7 +251,7 @@ export default function KBCompose() {
             Create, edit, copy, or delete policies from the knowledge base.
           </p>
         </div>
-        <Button size="sm" className="gap-1.5 shrink-0 mt-1" disabled title="Create new policy (coming soon)">
+        <Button size="sm" className="gap-1.5 shrink-0 mt-1" onClick={() => setShowNewDialog(true)}>
           <Plus className="w-4 h-4" /> New Policy
         </Button>
       </div>
@@ -255,6 +274,13 @@ export default function KBCompose() {
       {policiesError && (
         <div className="text-sm text-destructive py-4">Failed to load policies: {policiesError.message}</div>
       )}
+
+      <NewPolicyFromTemplateDialog
+        open={showNewDialog}
+        onClose={() => setShowNewDialog(false)}
+        templates={templates}
+        onCreate={handleNewFromTemplate}
+      />
 
       {!policiesLoading && !policiesError && (
         <>
