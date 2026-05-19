@@ -30,7 +30,7 @@ const LINKED_TYPE_OPTIONS = [
   })),
 ];
 
-const EMPTY_FORM = { title: '', description: '', icon_name: 'Star', linked_type: '', order: 0, is_active: true };
+const EMPTY_FORM = { title: '', description: '', icon_name: 'Star', linked_type: '', create_new_instance: false, order: 0, is_active: true };
 
 export default function FeatureCardsEditor() {
   const queryClient = useQueryClient();
@@ -68,7 +68,7 @@ export default function FeatureCardsEditor() {
 
   const openEdit = (card) => {
     setEditingCard(card);
-    setForm({ title: card.title || '', description: card.description || '', icon_name: card.icon_name || 'Star', linked_type: card.linked_type || '', order: card.order ?? 0, is_active: card.is_active !== false });
+    setForm({ title: card.title || '', description: card.description || '', icon_name: card.icon_name || 'Star', linked_type: card.linked_type || '', create_new_instance: card.create_new_instance ?? false, order: card.order ?? 0, is_active: card.is_active !== false });
     setDialogOpen(true);
   };
 
@@ -126,6 +126,7 @@ export default function FeatureCardsEditor() {
                 {card.linked_type && (
                   <p className="text-[10px] text-muted-foreground/60 mt-0.5">
                     {LINKED_TYPE_OPTIONS.find(o => o.value === card.linked_type)?.label || card.linked_type}
+                    {card.create_new_instance && <span className="ml-1 text-primary/70">· creates new</span>}
                   </p>
                 )}
               </div>
@@ -183,6 +184,10 @@ export default function FeatureCardsEditor() {
                 </SelectContent>
               </Select>
               <p className="text-[10px] text-muted-foreground">Card will only show if the user's role has access to this feature or workflow type.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.create_new_instance} onCheckedChange={v => setField('create_new_instance', v)} />
+              <Label className="text-sm">Create new instance on click</Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={form.is_active} onCheckedChange={v => setField('is_active', v)} />

@@ -47,7 +47,17 @@ export default function IWantToSection() {
           return (
             <button
               key={card.id}
-              onClick={() => card.target_path && navigate(card.target_path)}
+              onClick={() => {
+                if (!card.target_path) return;
+                if (card.create_new_instance && card.linked_type) {
+                  const wfType = card.linked_type.startsWith('workflow_type:')
+                    ? card.linked_type.replace('workflow_type:', '')
+                    : null;
+                  navigate(card.target_path + (wfType ? `?new=${wfType}` : '?new=1'));
+                } else {
+                  navigate(card.target_path);
+                }
+              }}
               className={cn(
                 "group flex items-start gap-3 rounded-xl border border-border/50 bg-card p-4 text-left transition-all",
                 "hover:border-primary/40 hover:bg-primary/5",

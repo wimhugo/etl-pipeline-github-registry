@@ -33,11 +33,24 @@ export default function KBWorkflow() {
   const queryClient = useQueryClient();
   const { allowedWorkflowTypes } = useRole();
 
+  // Auto-open new dialog from ?new= query param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const newType = params.get('new');
+    if (newType) {
+      setPreselectedType(newType === '1' ? null : newType);
+      setShowNew(true);
+      // Clean URL without reload
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   // List view state
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [preselectedType, setPreselectedType] = useState(null);
   const [editingInstance, setEditingInstance] = useState(null);
   const [deletingInstance, setDeletingInstance] = useState(null);
 
@@ -446,9 +459,10 @@ export default function KBWorkflow() {
       {/* New workflow dialog */}
       <WorkflowNewDialog
         open={showNew}
-        onClose={() => setShowNew(false)}
+        onClose={() => { setShowNew(false); setPreselectedType(null); }}
         onCreate={(data) => createMutation.mutate(data)}
         allowedTypes={allowedWorkflowTypes}
+        preselectedType={preselectedType}
       />
 
       {/* Edit dialog */}

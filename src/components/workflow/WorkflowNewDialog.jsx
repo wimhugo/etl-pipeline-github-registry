@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { WORKFLOW_TYPES } from './WorkflowCard';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -7,10 +7,15 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 
-export default function WorkflowNewDialog({ open, onClose, onCreate, allowedTypes }) {
-  const [selectedType, setSelectedType] = useState(null);
+export default function WorkflowNewDialog({ open, onClose, onCreate, allowedTypes, preselectedType }) {
+  const [selectedType, setSelectedType] = useState(preselectedType || null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+
+  // Sync preselectedType when dialog opens
+  useEffect(() => {
+    if (open) setSelectedType(preselectedType || null);
+  }, [open, preselectedType]);
 
   const handleClose = () => {
     setSelectedType(null);

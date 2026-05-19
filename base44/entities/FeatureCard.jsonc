@@ -22,6 +22,11 @@
       "type": "string",
       "description": "Linked workflow type (e.g. 'workflow_type:licence') or KB user feature path (e.g. '/kb-user/search') used for permission filtering"
     },
+    "create_new_instance": {
+      "type": "boolean",
+      "description": "When true, clicking this card immediately opens the 'new instance' dialog for the linked feature/workflow",
+      "default": false
+    },
     "order": {
       "type": "number",
       "description": "Display order of the card",
