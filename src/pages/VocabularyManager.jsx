@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Plus, Loader2, Edit, Trash2, RefreshCw, ExternalLink, Code, FileJson, Globe, Link2, Unlink, KeyRound, CheckCircle, AlertCircle } from 'lucide-react';
+import { Plus, Loader2, Edit, Trash2, RefreshCw, ExternalLink, Code, FileJson, Globe, Link2, Unlink, KeyRound, CheckCircle, AlertCircle, Trash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -119,6 +119,21 @@ export default function VocabularyManager() {
   const handleTest = (source) => {
     setTestingSource(source);
     testVocabulary.mutate(source.id);
+  };
+
+  const handleFlushCache = async (source) => {
+    if (!confirm(`Clear cache for "${source.name}"? This will force a fresh fetch on next test.`)) return;
+    
+    try {
+      await base44.entities.VocabularySource.update(source.id, {
+        inline_data: '',
+        last_fetch_status: 'pending'
+      });
+      toast({ title: 'Cache cleared', description: 'Vocabulary cache has been flushed.' });
+      queryClient.invalidateQueries({ queryKey: ['vocabularySources'] });
+    } catch (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
   };
 
   const testVocabulary = useMutation({
@@ -253,6 +268,15 @@ export default function VocabularyManager() {
                       title="Test vocabulary fetch"
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
+                      onClick={() => handleFlushCache(source)}
+                      title="Clear cache"
+                    >
+                      <Trash className="w-3.5 h-3.5" />
                     </Button>
                     <Button
                       size="icon"
