@@ -129,21 +129,32 @@ Deno.serve(async (req) => {
                 }
             });
 
-            // Prepare LLM prompt
-            const prompt = `You are analyzing content to determine if it matches a specific checklist item.
+            // Prepare LLM prompt with explicit instructions based on checklist description
+            const prompt = `You are an expert data analyst tasked with evaluating content against a specific checklist requirement.
 
-CHECKLIST ITEM: "${item.label || item.id}"
-DESCRIPTION: "${itemDescription}"
+CHECKLIST REQUIREMENT:
+- Item: "${item.label || item.id}"
+- Description: "${itemDescription}"
+
+YOUR TASK:
+Carefully analyze the content below to determine if it SATISFIES the checklist requirement described above. 
+
+IMPORTANT GUIDELINES:
+1. Look for EXPLICIT evidence - the information should be clearly stated, not implied
+2. If the checklist asks for specific data fields (like ID, name, date, etc.), verify these are actually present
+3. Consider the INTENT of the requirement, not just keyword matching
+4. Be strict: if the information is missing or ambiguous, mark as no match
+5. Extract exact text snippets that prove your conclusion
 
 CONTENT TO ANALYZE:
-${contentChunks.slice(0, 3).join('\n\n---\n\n')} ${contentChunks.length > 3 ? '(content truncated for analysis)' : ''}
+${contentChunks.slice(0, 3).join('\n\n---\n\n')} ${contentChunks.length > 3 ? '(content continues...)' : ''}
 
-Determine if the content contains information relevant to this checklist item. Return a JSON response with:
+Return your analysis as JSON:
 {
-    "match": boolean,
-    "confidence": number (0-100),
-    "explanation": string (brief explanation of why it matches or doesn't),
-    "matched_snippets": array of strings (exact text snippets that support the match)
+    "match": boolean (true only if content clearly satisfies the requirement),
+    "confidence": number 0-100 (be honest - low confidence if evidence is weak),
+    "explanation": string (explain WHAT you found or WHAT IS MISSING),
+    "matched_snippets": array of strings (copy exact quotes from the content that support your decision)
 }`;
 
             try {
