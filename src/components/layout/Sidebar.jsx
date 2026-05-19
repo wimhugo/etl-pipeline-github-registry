@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useRole } from '@/lib/RoleContext';
 import { useProject } from '@/lib/ProjectContext';
-import { Menu, X, LayoutDashboard, FolderOpen, Database, GitBranch, CheckSquare, FileText, Layers, RefreshCw, BookOpen, PenTool, Link2, FileEdit, Box, Eye, Settings2, Search, Pencil, Shuffle, BookMarked, Sliders, SlidersHorizontal, Workflow, BookKey } from 'lucide-react';
+import { Menu, X, LayoutDashboard, FolderOpen, Database, GitBranch, CheckSquare, FileText, Layers, RefreshCw, BookOpen, PenTool, Link2, FileEdit, Box, Eye, Settings2, Search, Pencil, Shuffle, BookMarked, Sliders, SlidersHorizontal, Workflow, BookKey, KeyRound } from 'lucide-react';
 
 const ICON_MAP = {
   'Dashboard':            LayoutDashboard,
@@ -14,7 +14,7 @@ const ICON_MAP = {
   'Template Manager':     FileText,
   'Schema Extraction':    Layers,
   'Data Sync':            RefreshCw,
-  'Vocabulary Manager':   BookKey,
+  'Vocabulary Manager':   KeyRound,
   'Vocabulary Linker':    Link2,
   'Vocabulary Maker':     BookOpen,
   'Manual Vocab Links':   PenTool,
