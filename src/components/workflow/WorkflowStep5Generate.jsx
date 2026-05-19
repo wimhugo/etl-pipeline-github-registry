@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import PolicyEditor from '@/components/kbcompose/PolicyEditor';
 
@@ -289,6 +290,22 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
 
     return (
         <div className="space-y-4">
+            {/* Header with Edit button */}
+            <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground">Draft Policy</h3>
+                {draftPolicy && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowEditor(true)}
+                        className="gap-2"
+                    >
+                        <FileText className="w-3.5 h-3.5" />
+                        {showEditor ? 'Editing...' : 'Edit Draft'}
+                    </Button>
+                )}
+            </div>
+
             {/* Summary */}
             <Card className="border-primary/20 bg-primary/5">
                 <CardHeader className="pb-3">
