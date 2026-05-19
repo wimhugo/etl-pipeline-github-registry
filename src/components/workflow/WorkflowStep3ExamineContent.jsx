@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useMutation } from '@tanstack/react-query';
-import { FileSearch, Loader2, CheckCircle2, AlertCircle, TrendingUp, Quote } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { FileSearch, Loader2, CheckCircle2, AlertCircle, TrendingUp, Quote, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,14 @@ import { cn } from '@/lib/utils';
 export default function WorkflowStep3ExamineContent({ instanceId, workflowId, onComplete }) {
     const [analysisStatus, setAnalysisStatus] = useState(null);
     const [isPolling, setIsPolling] = useState(false);
+
+    // Fetch active checklist sources
+    const { data: checklists = [] } = useQuery({
+        queryKey: ['checklist-sources-active'],
+        queryFn: () => base44.entities.ChecklistSource.list('-created_date'),
+    });
+
+    const activeChecklists = checklists.filter(c => c.is_active);
 
     // Mutation to trigger analysis
     const analyzeMutation = useMutation({
@@ -83,8 +91,21 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
         const saved = localStorage.getItem(
             instanceId ? `wf_${instanceId}_licence-checklists` : `workflow_${workflowId}_checklists`
         );
-        return saved ? JSON.parse(saved) : [];
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch {
+                return [];
+            }
+        }
+        // Auto-select single checklist if only one exists
+        if (activeChecklists.length === 1) {
+            return [activeChecklists[0].id];
+        }
+        return [];
     };
+
+    const selectedChecklists = getSelectedChecklists();
 
     if (analyzeMutation.isError) {
         return (
@@ -210,20 +231,37 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
                 <div>
                     <h3 className="text-sm font-semibold text-foreground">Ready to Analyze</h3>
                     <p className="text-xs text-muted-foreground mt-1">
-                        {getSelectedChecklists().length} checklists selected. Click below to start analysis.
+                        {selectedChecklists.length} checklist{selectedChecklists.length !== 1 ? 's' : ''} selected. Click below to start analysis.
                     </p>
                 </div>
+                {selectedChecklists.length > 0 && (
+                    <div className="flex flex-wrap gap-1 justify-center mb-2">
+                        {selectedChecklists.map(id => {
+                            const checklist = activeChecklists.find(c => c.id === id);
+                            return checklist ? (
+                                <Badge key={id} variant="outline" className="text-xs">
+                                    {checklist.name}
+                                </Badge>
+                            ) : null;
+                        })}
+                    </div>
+                )}
                 <Button 
                     onClick={handleStartAnalysis}
-                    disabled={getSelectedChecklists().length === 0}
+                    disabled={selectedChecklists.length === 0}
                     className="gap-2"
                 >
                     <FileSearch className="w-4 h-4" />
                     Start Analysis
                 </Button>
-                {getSelectedChecklists().length === 0 && (
+                {selectedChecklists.length === 0 && activeChecklists.length === 0 && (
                     <p className="text-xs text-destructive">
-                        Please select at least one checklist in the previous step.
+                        No active checklists available. Please configure checklists in the Checklist Manager.
+                    </p>
+                )}
+                {selectedChecklists.length === 0 && activeChecklists.length > 1 && (
+                    <p className="text-xs text-muted-foreground">
+                        Please go back to select which checklists to use.
                     </p>
                 )}
             </CardContent>
