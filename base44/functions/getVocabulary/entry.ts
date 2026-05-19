@@ -100,9 +100,9 @@ Deno.serve(async (req) => {
           'User-Agent': 'OpenREL-App'
         };
         
-        // Add token if available
+        // Add token if available (classic PAT uses 'token' prefix, not 'Bearer')
         if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
+          headers['Authorization'] = `token ${token}`;
         }
         
         const response = await fetch(githubUrl, { headers });
