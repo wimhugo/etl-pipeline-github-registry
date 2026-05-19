@@ -1,0 +1,36 @@
+{
+  "name": "WorkflowInstance",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "User-given title for this workflow instance"
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description"
+    },
+    "workflow_type": {
+      "type": "string",
+      "enum": [
+        "licence",
+        "reuse"
+      ],
+      "description": "The type of workflow"
+    },
+    "step_data": {
+      "type": "object",
+      "description": "Persisted step data keyed by step id",
+      "additionalProperties": true
+    },
+    "last_opened_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last time this workflow was opened"
+    }
+  },
+  "required": [
+    "name",
+    "workflow_type"
+  ]
+}
