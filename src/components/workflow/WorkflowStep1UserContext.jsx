@@ -87,7 +87,7 @@ function ProfileField({ icon: Icon, label, value, aside }) {
   );
 }
 
-export default function WorkflowStep1UserContext({ workflowId }) {
+export default function WorkflowStep1UserContext({ instanceId, workflowId }) {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -170,7 +170,8 @@ export default function WorkflowStep1UserContext({ workflowId }) {
         commercialApplication: contexts.includes('Commercial Application of Results'),
       }
     };
-    localStorage.setItem('workflow_user_context', JSON.stringify(contextData));
+    const storageKey = instanceId ? `wf_${instanceId}_user-context` : 'workflow_user_context';
+    localStorage.setItem(storageKey, JSON.stringify(contextData));
   }, [profile, loading, overrides, rorCache]);
 
   if (loading) {

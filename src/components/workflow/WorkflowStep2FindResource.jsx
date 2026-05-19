@@ -9,14 +9,28 @@ import { Loader2, Search, AlertCircle, CheckCircle2, ExternalLink, FileText, Loc
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
 
-export default function WorkflowStep2FindResource() {
-  const [pid, setPid] = useState('');
+export default function WorkflowStep2FindResource({ instanceId }) {
+  const storageKey = instanceId ? `wf_${instanceId}_find` : null;
+
+  const loadSaved = () => {
+    if (!storageKey) return {};
+    try { return JSON.parse(localStorage.getItem(storageKey)) || {}; } catch { return {}; }
+  };
+
+  const saved = loadSaved();
+  const [pid, setPid] = useState(saved.pid || '');
   const [loading, setLoading] = useState(false);
   const [extractingLicense, setExtractingLicense] = useState(false);
   const [matchingSpdx, setMatchingSpdx] = useState(false);
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState(saved.result || null);
   const [error, setError] = useState(null);
   const [licenseTextOpen, setLicenseTextOpen] = useState(false);
+
+  const persistState = (updates) => {
+    if (!storageKey) return;
+    const current = loadSaved();
+    localStorage.setItem(storageKey, JSON.stringify({ ...current, ...updates }));
+  };
 
   const handleResolvePid = async (e) => {
     e.preventDefault();
@@ -36,6 +50,7 @@ export default function WorkflowStep2FindResource() {
       };
 
       setResult(resolvedData);
+      persistState({ pid: pid.trim(), result: resolvedData });
     } catch (err) {
       // Extract error details from the response
       const responseData = err.response?.data;
@@ -75,10 +90,11 @@ export default function WorkflowStep2FindResource() {
       }
 
       const licenseInfo = response.data;
-      setResult(prev => ({
-        ...prev,
-        licenseInfo
-      }));
+      setResult(prev => {
+        const updated = { ...prev, licenseInfo };
+        persistState({ result: updated });
+        return updated;
+      });
 
       // Auto-match SPDX if we have a license name or URI
       if (licenseInfo.license.name || licenseInfo.license.url) {
@@ -113,10 +129,11 @@ export default function WorkflowStep2FindResource() {
         return;
       }
 
-      setResult(prev => ({
-        ...prev,
-        spdxMatch: response.data
-      }));
+      setResult(prev => {
+        const updated = { ...prev, spdxMatch: response.data };
+        persistState({ result: updated });
+        return updated;
+      });
     } catch (err) {
       setError(err.message || 'Failed to match SPDX license');
     } finally {
@@ -142,7 +159,7 @@ export default function WorkflowStep2FindResource() {
             <Input
               placeholder="Enter PID (e.g., 10.1000/182, urn:nbn:se:uu:diva-123456)"
               value={pid}
-              onChange={(e) => setPid(e.target.value)}
+              onChange={(e) => { setPid(e.target.value); persistState({ pid: e.target.value }); }}
               disabled={loading}
               className="bg-muted/50"
             />

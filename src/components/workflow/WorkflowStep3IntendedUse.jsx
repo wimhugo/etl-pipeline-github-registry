@@ -76,7 +76,7 @@ function parseBadgeMappingYaml(yamlText) {
   return result;
 }
 
-export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
+export default function WorkflowStep3IntendedUse({ instanceId, workflowId, onComplete }) {
   const [selectedUses, setSelectedUses] = useState([]);
   const [userContext, setUserContext] = useState(null);
 
@@ -89,7 +89,9 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
 
   // Load user context from localStorage (set in step 1)
   useEffect(() => {
-    const savedContext = localStorage.getItem('workflow_user_context');
+    const savedContext = localStorage.getItem(
+      instanceId ? `wf_${instanceId}_user-context` : 'workflow_user_context'
+    );
     if (savedContext) {
       try {
         setUserContext(JSON.parse(savedContext));
@@ -161,7 +163,9 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
 
   // Load saved selections from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem(`workflow_${workflowId}_intendedUses`);
+    const saved = localStorage.getItem(
+      instanceId ? `wf_${instanceId}_reuse-context` : `workflow_${workflowId}_intendedUses`
+    );
     if (saved) {
       try {
         setSelectedUses(JSON.parse(saved));
@@ -177,7 +181,8 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
         ? prev.filter(k => k !== useKey)
         : [...prev, useKey];
       
-      localStorage.setItem(`workflow_${workflowId}_intendedUses`, JSON.stringify(updated));
+      const key = instanceId ? `wf_${instanceId}_reuse-context` : `workflow_${workflowId}_intendedUses`;
+      localStorage.setItem(key, JSON.stringify(updated));
       
       if (onComplete) {
         onComplete({ intendedUses: updated });
@@ -338,7 +343,8 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
                         const sectionKeys = section.items.map(item => item.name);
                         const updated = selectedUses.filter(k => !sectionKeys.includes(k));
                         setSelectedUses(updated);
-                        localStorage.setItem(`workflow_${workflowId}_intendedUses`, JSON.stringify(updated));
+                        const key = instanceId ? `wf_${instanceId}_reuse-context` : `workflow_${workflowId}_intendedUses`;
+                        localStorage.setItem(key, JSON.stringify(updated));
                         if (onComplete) {
                           onComplete({ intendedUses: updated });
                         }
@@ -361,7 +367,8 @@ export default function WorkflowStep3IntendedUse({ workflowId, onComplete }) {
                 size="sm"
                 onClick={() => {
                   setSelectedUses([]);
-                  localStorage.removeItem(`workflow_${workflowId}_intendedUses`);
+                  const key = instanceId ? `wf_${instanceId}_reuse-context` : `workflow_${workflowId}_intendedUses`;
+                  localStorage.removeItem(key);
                   if (onComplete) {
                     onComplete({ intendedUses: [] });
                   }

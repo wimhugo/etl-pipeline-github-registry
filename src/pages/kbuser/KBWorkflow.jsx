@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Search, ChevronLeft, ChevronRight, Plus, SlidersHorizontal, X, GitBranch } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Plus, SlidersHorizontal, X, GitBranch, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -88,6 +88,12 @@ export default function KBWorkflow() {
 
   // ── Handlers ──────────────────────────────────────────────────
   const handleOpen = (instance) => {
+    // Seed localStorage from persisted step_data before opening
+    if (instance.step_data && typeof instance.step_data === 'object') {
+      Object.entries(instance.step_data).forEach(([stepId, value]) => {
+        localStorage.setItem(`wf_${instance.id}_${stepId}`, JSON.stringify(value));
+      });
+    }
     setOpenInstance(instance);
     setCurrentStep(0);
     updateMutation.mutate({ id: instance.id, data: { last_opened_at: new Date().toISOString() } });
@@ -96,6 +102,20 @@ export default function KBWorkflow() {
   const handleClose = () => {
     setOpenInstance(null);
     setCurrentStep(0);
+  };
+
+  // ── Save step data ────────────────────────────────────────────
+  const handleSaveProgress = () => {
+    if (!openInstance) return;
+    const typeMeta = WORKFLOW_TYPES[openInstance.workflow_type] || WORKFLOW_TYPES.licence;
+    const stepData = {};
+    typeMeta.steps.forEach(step => {
+      const raw = localStorage.getItem(`wf_${openInstance.id}_${step.id}`);
+      if (raw) {
+        try { stepData[step.id] = JSON.parse(raw); } catch { stepData[step.id] = raw; }
+      }
+    });
+    updateMutation.mutate({ id: openInstance.id, data: { step_data: stepData } });
   };
 
   // ── Detail view ───────────────────────────────────────────────
@@ -111,12 +131,15 @@ export default function KBWorkflow() {
           <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleClose}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-semibold tracking-tight">{openInstance.name}</h1>
             <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
               <Icon className="w-3 h-3" /> {typeMeta.label}
             </p>
           </div>
+          <Button size="sm" variant="outline" className="gap-1.5 shrink-0" onClick={handleSaveProgress}>
+            <Save className="w-3.5 h-3.5" /> Save
+          </Button>
         </div>
 
         {/* Step progress bar */}
@@ -168,13 +191,13 @@ export default function KBWorkflow() {
         {/* Step content */}
         <div>
           {steps[currentStep].id === 'user-context' && (
-            <WorkflowStep1UserContext workflowId={openInstance.workflow_type} />
+            <WorkflowStep1UserContext instanceId={openInstance.id} workflowId={openInstance.workflow_type} />
           )}
           {steps[currentStep].id === 'find' && (
-            <WorkflowStep2FindResource />
+            <WorkflowStep2FindResource instanceId={openInstance.id} />
           )}
           {steps[currentStep].id === 'reuse-context' && (
-            <WorkflowStep3IntendedUse workflowId={openInstance.workflow_type} />
+            <WorkflowStep3IntendedUse instanceId={openInstance.id} workflowId={openInstance.workflow_type} />
           )}
           {steps[currentStep].placeholder && steps[currentStep].id !== 'find' && (
             <div className="rounded-xl border border-border/50 bg-card flex flex-col items-center justify-center py-20 gap-3 text-center">
