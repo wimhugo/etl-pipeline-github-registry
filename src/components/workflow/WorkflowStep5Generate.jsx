@@ -1,21 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, AlertCircle, FileText, Save } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { AlertCircle, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
+import PolicyEditor from '@/components/kbcompose/PolicyEditor';
 
 export default function WorkflowStep5Generate({ instanceId, workflowId, onComplete }) {
-    const [draftPolicy, setDraftPolicy] = useState({
-        label: '',
-        description: '',
-        selected_policy_ids: [],
-    });
-    const [isSaving, setIsSaving] = useState(false);
+    const [showEditor, setShowEditor] = useState(false);
+    const [draftPolicy, setDraftPolicy] = useState(null);
 
     // Fetch the workflow instance to get step 4 selected policies
     const { data: workflowInstance, isLoading: instanceLoading } = useQuery({
@@ -54,61 +48,110 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
         gcTime: 0,
     });
 
+    const { data: actionsData } = useQuery({
+        queryKey: ['kbActionsContent', rawBaseUrl, config.kb_sub_entity_files?.actions],
+        queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${config.kb_sub_entity_files?.actions}?_=${Date.now()}`); if (!r.ok) throw new Error(); return r.json(); },
+        enabled: !!config.kb_sub_entity_files?.actions && !!rawBaseUrl,
+        staleTime: 0,
+        gcTime: 0,
+    });
+
+    const { data: constraintsData } = useQuery({
+        queryKey: ['kbConstraintsContent', rawBaseUrl, config.kb_sub_entity_files?.constraints],
+        queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${config.kb_sub_entity_files?.constraints}?_=${Date.now()}`); if (!r.ok) throw new Error(); return r.json(); },
+        enabled: !!config.kb_sub_entity_files?.constraints && !!rawBaseUrl,
+        staleTime: 0,
+        gcTime: 0,
+    });
+
+    const { data: statesData } = useQuery({
+        queryKey: ['kbStatesContent', rawBaseUrl, config.kb_sub_entity_files?.states],
+        queryFn: async () => { const r = await fetch(`${rawBaseUrl}/${config.kb_sub_entity_files?.states}?_=${Date.now()}`); if (!r.ok) throw new Error(); return r.json(); },
+        enabled: !!config.kb_sub_entity_files?.states && !!rawBaseUrl,
+        staleTime: 0,
+        gcTime: 0,
+    });
+
     const policies = fileData?.policies || (Array.isArray(fileData) ? fileData : []);
     const policiesMap = Object.fromEntries(policies.map(p => [p.id, p]));
 
-    // Get selected policies from step 4
-    const selectedPolicyIds = workflowInstance?.step_data?.['step-4']?.selected_policies || [];
+    const actionsArray = Array.isArray(actionsData) ? actionsData : (actionsData?.actions || []);
+    const actionsMap = Object.fromEntries(actionsArray.map(a => [a.id, a]));
+
+    const constraintsArray = Array.isArray(constraintsData) ? constraintsData : (constraintsData?.constraints || []);
+    const constraintsMap = Object.fromEntries(constraintsArray.map(c => [c.id, c]));
+
+    const statesArray = Array.isArray(statesData) ? statesData : (statesData?.states || []);
+    const statesMap = statesArray.reduce((acc, s) => {
+        if (s.id) {
+            acc[s.id] = s;
+            const shortKey = s.id.split(/[:/]/).pop()?.toLowerCase();
+            if (shortKey && shortKey !== s.id) acc[shortKey] = s;
+        }
+        return acc;
+    }, {});
+
+    // Get selected policies from step 4 (localStorage or step_data)
+    const selectedPolicyIds = useMemo(() => {
+        const fromStorage = JSON.parse(localStorage.getItem(`wf_${instanceId}_step-4`) || '{}')?.selected_policies || [];
+        const fromStepData = workflowInstance?.step_data?.['step-4']?.selected_policies || [];
+        return fromStorage.length > 0 ? fromStorage : fromStepData;
+    }, [instanceId, workflowInstance]);
+
     const selectedPolicies = selectedPolicyIds.map(id => policiesMap[id]).filter(Boolean);
 
-    // Initialize draft policy from first selected policy (for now)
+    // Create draft policy and open editor when component mounts
     useEffect(() => {
-        if (selectedPolicies.length > 0 && !draftPolicy.label) {
+        if (selectedPolicies.length > 0 && !draftPolicy) {
             const firstPolicy = selectedPolicies[0];
-            setDraftPolicy({
+            const newId = `${firstPolicy.id}-draft-${Date.now()}`;
+            const draft = {
+                ...firstPolicy,
+                id: newId,
                 label: `${firstPolicy.label} (Draft)`,
-                description: firstPolicy.description || '',
-                selected_policy_ids: selectedPolicyIds,
-            });
-        }
-    }, [selectedPolicies]);
-
-    const handleSave = async () => {
-        if (!draftPolicy.label.trim()) {
-            toast({
-                title: "Label required",
-                description: "Please provide a label for the draft policy.",
-                variant: "destructive",
-            });
-            return;
-        }
-
-        setIsSaving(true);
-        try {
-            // Save to step_data
-            const step5Data = {
-                draft_policy: draftPolicy,
-                status: 'draft',
+                status: 'openrel:status/draft',
+                derived_from: firstPolicy.id,
+                _createdLocally: Date.now(),
             };
-            localStorage.setItem(`wf_${instanceId}_step-5`, JSON.stringify(step5Data));
             
+            // Save to localStorage as a draft (same as Compose)
+            const existingDrafts = JSON.parse(localStorage.getItem('kbcompose_drafts') || '[]');
+            localStorage.setItem('kbcompose_drafts', JSON.stringify([...existingDrafts, draft]));
+            
+            setDraftPolicy(draft);
+            setShowEditor(true);
+            
+            // Notify parent that step 5 is complete with the draft
             if (onComplete) {
-                onComplete(step5Data);
+                onComplete({
+                    draft_policy: draft,
+                    status: 'draft',
+                });
             }
-
+            
             toast({
-                title: "Draft policy saved",
-                description: "You can continue editing or submit for review.",
+                title: "Draft policy created",
+                description: `"${draft.label}" is ready for editing.`,
             });
-        } catch (error) {
-            toast({
-                title: "Failed to save",
-                description: error.message,
-                variant: "destructive",
-            });
-        } finally {
-            setIsSaving(false);
         }
+    }, [selectedPolicies, instanceId, onComplete]);
+
+    const handleSaveDraft = (updatedPolicy) => {
+        // Update the draft in localStorage (same as Compose)
+        const existingDrafts = JSON.parse(localStorage.getItem('kbcompose_drafts') || '[]');
+        const updatedDrafts = existingDrafts.map(d => d.id === updatedPolicy.id ? updatedPolicy : d);
+        localStorage.setItem('kbcompose_drafts', JSON.stringify(updatedDrafts));
+        
+        setDraftPolicy(updatedPolicy);
+        
+        toast({
+            title: "Draft policy saved",
+            description: `"${updatedPolicy.label}" saved as draft.`,
+        });
+    };
+
+    const handleCloseEditor = () => {
+        setShowEditor(false);
     };
 
     if (instanceLoading || policiesLoading) {
@@ -157,7 +200,7 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
                         </div>
                         <div className="text-center">
                             <p className="text-2xl font-bold text-accent">1</p>
-                            <p className="text-xs text-muted-foreground">Draft Policy</p>
+                            <p className="text-xs text-muted-foreground">Draft Policy Created</p>
                         </div>
                     </div>
                 </CardContent>
@@ -177,57 +220,17 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
                 </div>
             </div>
 
-            {/* Draft policy editor */}
-            <Card className="border-border/50">
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Draft Policy Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <label className="text-xs font-medium text-foreground">
-                            Policy Label *
-                        </label>
-                        <Input
-                            value={draftPolicy.label}
-                            onChange={(e) => setDraftPolicy({ ...draftPolicy, label: e.target.value })}
-                            placeholder="Enter policy label"
-                            className="text-sm"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <label className="text-xs font-medium text-foreground">
-                            Description
-                        </label>
-                        <Textarea
-                            value={draftPolicy.description}
-                            onChange={(e) => setDraftPolicy({ ...draftPolicy, description: e.target.value })}
-                            placeholder="Enter policy description"
-                            className="text-sm min-h-[100px]"
-                        />
-                    </div>
-
-                    <div className="pt-2 flex justify-end">
-                        <Button 
-                            onClick={handleSave} 
-                            className="gap-2"
-                            disabled={isSaving}
-                        >
-                            {isSaving ? (
-                                <>
-                                    <AlertCircle className="w-4 h-4 animate-spin" />
-                                    Saving...
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="w-4 h-4" />
-                                    Save Draft
-                                </>
-                            )}
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
+            {/* Policy Editor Dialog */}
+            {showEditor && draftPolicy && (
+                <PolicyEditor
+                    policy={draftPolicy}
+                    actionsMap={actionsMap}
+                    constraintsMap={constraintsMap}
+                    statesMap={statesMap}
+                    onSave={handleSaveDraft}
+                    onClose={handleCloseEditor}
+                />
+            )}
         </div>
     );
 }
