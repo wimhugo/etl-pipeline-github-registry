@@ -106,7 +106,7 @@ export default function OAStepRunAnalysis({
             {analysisResult.hasRules
               ? <CheckCircle2 className="w-4 h-4 shrink-0" />
               : <AlertCircle className="w-4 h-4 shrink-0" />}
-            {analysisResult.summary}
+            {analysisResult.summary?.replace(/OpenREL\/ODRL pattern\(s\)/g, 'applicable pattern(s)').replace(/OpenREL\/ODRL patterns/g, 'applicable patterns')}
           </div>
 
           {/* Rules */}
@@ -159,16 +159,19 @@ export default function OAStepRunAnalysis({
 }
 
 function PatternSection({ icon, label, hasItems, patterns }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
         <button className="w-full flex items-center gap-2 py-1 hover:opacity-80 transition-opacity">
           {icon}
           <span className="text-xs font-medium">{label}</span>
-          <Badge variant={hasItems ? 'default' : 'secondary'} className="text-xs ml-auto">
-            {hasItems ? 'Detected' : 'Not Found'}
-          </Badge>
+          <span className={cn(
+            "ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-full",
+            hasItems ? "bg-muted/60 text-muted-foreground" : "bg-muted/30 text-muted-foreground/60"
+          )}>
+            {patterns.length}
+          </span>
           <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0", open && "rotate-180")} />
         </button>
       </CollapsibleTrigger>
@@ -188,16 +191,19 @@ function PatternSection({ icon, label, hasItems, patterns }) {
 }
 
 function MappingSection({ icon, label, hasItems, patterns, prefix, mappingKey, mappings, onMap, options, optionPlaceholder }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
         <button className="w-full flex items-center gap-2 py-1 hover:opacity-80 transition-opacity">
           {icon}
           <span className="text-xs font-medium">{label}</span>
-          <Badge variant={hasItems ? 'default' : 'secondary'} className="text-xs ml-auto">
-            {hasItems ? 'Detected' : 'Not Found'}
-          </Badge>
+          <span className={cn(
+            "ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded-full",
+            hasItems ? "bg-muted/60 text-muted-foreground" : "bg-muted/30 text-muted-foreground/60"
+          )}>
+            {patterns.length}
+          </span>
           <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0", open && "rotate-180")} />
         </button>
       </CollapsibleTrigger>
