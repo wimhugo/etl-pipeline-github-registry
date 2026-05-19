@@ -93,10 +93,13 @@ export default function KBPolicyList({ searchQuery = '', advancedFilters = {}, o
   // Derive distinct filter values from data and notify parent
   useEffect(() => {
     if (!onDataReady) return;
-    const odrlTypes = [...new Set(policies.map(p => p.odrl_type).filter(Boolean))];
+    // Skip obvious placeholders like "<...>" or "{{...}}"
+    const isPlaceholder = (value) => /^{{.*}}$|^<.*>$/.test(value);
+    
+    const odrlTypes = [...new Set(policies.map(p => p.odrl_type).filter(Boolean).filter(v => !isPlaceholder(v)))];
     // Include all statuses from states file, not just those present in current policies
-    const statusesFromStates = statesArray.map(s => s.id).filter(Boolean);
-    const statusesFromPolicies = policies.map(p => p.status).filter(Boolean);
+    const statusesFromStates = statesArray.map(s => s.id).filter(Boolean).filter(v => !isPlaceholder(v));
+    const statusesFromPolicies = policies.map(p => p.status).filter(Boolean).filter(v => !isPlaceholder(v));
     const statuses = [...new Set([...statusesFromStates, ...statusesFromPolicies])];
     onDataReady({ odrlTypes, statuses });
   }, [policies.length, statesArray.length]); // eslint-disable-line react-hooks/exhaustive-deps
