@@ -24,6 +24,7 @@ import WorkflowStep2Resource from '@/components/workflow/WorkflowStep2Resource';
 import WorkflowStep3IntendedUse from '@/components/workflow/WorkflowStep3IntendedUse';
 import WorkflowStep3ChecklistSelection from '@/components/workflow/WorkflowStep3ChecklistSelection';
 import WorkflowStep3ExamineContent from '@/components/workflow/WorkflowStep3ExamineContent';
+import WorkflowStep4Review from '@/components/workflow/WorkflowStep4Review';
 import OAStepContentSource from '@/components/objectanalysis/OAStepContentSource';
 import OAStepRunAnalysis from '@/components/objectanalysis/OAStepRunAnalysis';
 import EmptyState from '@/components/shared/EmptyState';
@@ -342,7 +343,17 @@ export default function KBWorkflow() {
               workflowId={openInstance.workflow_type}
             />
           )}
-          {steps[currentStep].placeholder && !['find', 'licence'].includes(steps[currentStep].id) && (
+          {steps[currentStep].id === 'review' && (
+            <WorkflowStep4Review
+              instanceId={openInstance.id}
+              workflowId={openInstance.workflow_type}
+              onComplete={(data) => {
+                console.log('Step 4 completed:', data);
+                // Save selected policies to step_data
+              }}
+            />
+          )}
+          {steps[currentStep].placeholder && !['find', 'review'].includes(steps[currentStep].id) && (
             <div className="rounded-xl border border-border/50 bg-card flex flex-col items-center justify-center py-20 gap-3 text-center">
               <span className="text-3xl">🚧</span>
               <p className="text-sm font-medium text-foreground">{steps[currentStep].label}</p>
