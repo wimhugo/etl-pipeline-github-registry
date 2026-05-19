@@ -1,0 +1,99 @@
+{
+  "name": "VocabularySource",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Descriptive name for this vocabulary (e.g., 'Policy Statuses', 'ODRL Action Types')"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of what this vocabulary controls"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "github",
+        "url",
+        "inline"
+      ],
+      "default": "github",
+      "description": "Where the vocabulary data is stored"
+    },
+    "source_url": {
+      "type": "string",
+      "description": "Full URL for external vocabularies (when source_type=url)"
+    },
+    "github_repo": {
+      "type": "string",
+      "description": "GitHub repository in format owner/repo (when source_type=github)"
+    },
+    "github_path": {
+      "type": "string",
+      "description": "Path to the vocabulary file in the GitHub repository"
+    },
+    "github_branch": {
+      "type": "string",
+      "default": "main",
+      "description": "GitHub branch name"
+    },
+    "data_format": {
+      "type": "string",
+      "enum": [
+        "json",
+        "json-ld",
+        "yaml",
+        "ttl"
+      ],
+      "default": "json",
+      "description": "Format of the vocabulary data"
+    },
+    "json_path_expression": {
+      "type": "string",
+      "description": "JSONPath or simple dot notation to extract vocabulary items (e.g., '$.statuses[*]' or 'items')"
+    },
+    "value_field": {
+      "type": "string",
+      "default": "id",
+      "description": "Field name to use as the value in form elements"
+    },
+    "label_field": {
+      "type": "string",
+      "default": "label",
+      "description": "Field name to use as the display label in form elements"
+    },
+    "inline_data": {
+      "type": "string",
+      "description": "JSON string with vocabulary data (when source_type=inline)"
+    },
+    "cache_duration_minutes": {
+      "type": "number",
+      "default": 60,
+      "description": "How long to cache the vocabulary data before re-fetching"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this vocabulary source is currently active"
+    },
+    "last_fetched_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last successful fetch"
+    },
+    "last_fetch_status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failed",
+        "pending"
+      ],
+      "default": "pending",
+      "description": "Status of the last fetch operation"
+    }
+  },
+  "required": [
+    "name",
+    "source_type"
+  ]
+}

@@ -28,6 +28,7 @@ import VocabLinks from './pages/VocabLinks';
 import AnnotationNotes from './pages/AnnotationNotes';
 import PopulateSubObjects from './pages/PopulateSubObjects';
 import ProvenanceViewer from './pages/ProvenanceViewer';
+import VocabularyManager from './pages/VocabularyManager';
 
 // KB User pages
 import KBUserDashboard from './pages/kbuser/KBUserDashboard';
@@ -83,6 +84,7 @@ const AuthenticatedApp = () => {
         <Route path="/annotation-notes" element={<AnnotationNotes />} />
         <Route path="/populate-subobjects" element={<PopulateSubObjects />} />
         <Route path="/provenance" element={<ProvenanceViewer />} />
+        <Route path="/vocabulary-manager" element={<VocabularyManager />} />
 
         {/* KB User */}
         <Route path="/kb-user/dashboard" element={<KBUserDashboard />} />
