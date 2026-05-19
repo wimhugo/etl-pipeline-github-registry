@@ -815,40 +815,28 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
             ) : policies.length === 0 ? (
               <div className="text-sm text-muted-foreground">No policies found in repository</div>
             ) : (
-              <>
-                <Select
-                  value={formData.recommended_policies.length > 0 ? formData.recommended_policies[0] : ''}
-                  onValueChange={(value) => {
-                    if (!formData.recommended_policies.includes(value)) {
-                      setFormData({ ...formData, recommended_policies: [...formData.recommended_policies, value] });
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a policy" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {policies.map(policy => (
-                      <SelectItem key={policy.name} value={policy.name}>{policy.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {formData.recommended_policies.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {formData.recommended_policies.map(policyId => (
-                      <Badge key={policyId} variant="secondary" className="text-xs">
-                        {policyId}
-                        <button
-                          onClick={() => setFormData({ ...formData, recommended_policies: formData.recommended_policies.filter(p => p !== policyId) })}
-                          className="ml-1 hover:text-destructive"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    ))}
+              <div className="border rounded-md p-3 space-y-2 max-h-48 overflow-auto">
+                {policies.map(policy => (
+                  <div key={policy.id || policy.uid} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id={`policy-${policy.id || policy.uid}`}
+                      checked={formData.recommended_policies.includes(policy.id || policy.uid)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormData({ ...formData, recommended_policies: [...formData.recommended_policies, policy.id || policy.uid] });
+                        } else {
+                          setFormData({ ...formData, recommended_policies: formData.recommended_policies.filter(p => p !== (policy.id || policy.uid)) });
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <label htmlFor={`policy-${policy.id || policy.uid}`} className="text-sm cursor-pointer flex-1">
+                      {policy.name || policy.label || policy.id || policy.uid}
+                    </label>
                   </div>
-                )}
-              </>
+                ))}
+              </div>
             )}
           </div>
           <div className="space-y-2">
