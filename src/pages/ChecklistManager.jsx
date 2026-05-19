@@ -543,41 +543,37 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
     is_active: true,
   });
 
-  const { data: globalConfigs = [], isLoading: configLoading } = useQuery({
+  const { data: globalConfigs = [] } = useQuery({
     queryKey: ['globalConfig'],
-    queryFn: async () => {
-      const configs = await base44.entities.GlobalConfig.list();
-      console.log('ChecklistManager - GlobalConfig:', configs);
-      return configs;
-    },
+    queryFn: () => base44.entities.GlobalConfig.list(),
   });
   const config = globalConfigs[0] || {};
-  console.log('ChecklistManager - config.kb_search_data_api_url:', config.kb_search_data_api_url);
   
+  // Use the same approach as KBUserDashboard - fetch file list from GitHub API
   const { data: policies = [], isLoading: policiesLoading, error: policiesError } = useQuery({
-    queryKey: ['kb-policies', config.kb_search_data_api_url],
+    queryKey: ['kb-policies', config.kb_search_data_api_url, config.github_token],
     queryFn: async () => {
-      console.log('Fetching policies from:', config.kb_search_data_api_url);
-      if (!config.kb_search_data_api_url) {
-        throw new Error('KB data API URL not configured');
-      }
-      const response = await fetch(config.kb_search_data_api_url);
-      console.log('Policies API response status:', response.status);
-      if (!response.ok) throw new Error('Failed to fetch file list');
-      const fileList = await response.json();
-      console.log('File list:', fileList);
+      // Use githubFiles function like KBUserDashboard does internally
+      const apiUrl = config.kb_search_data_api_url || 'https://api.github.com/repos/wimhugo/openrel/contents/data/input/v0.3';
+      const response = await base44.functions.invoke('githubFiles', {
+        action: 'listFolder',
+        repo: 'wimhugo/openrel',
+        branch: 'main',
+        path: 'data/input/v0.3',
+        github_token: config.github_token
+      });
+      
+      const fileList = response.data.items || [];
       const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
-      // Filter for policy files and extract names
+      // Filter for policy files
       const policyFiles = jsonFiles.filter(item => 
         item.name.toLowerCase().includes('policy') || item.name.toLowerCase().includes('licence')
       );
-      console.log('Policy files found:', policyFiles);
       return policyFiles.map(file => ({
         name: file.name.replace('.json', ''),
         path: file.path
       }));
     },
-    enabled: !!config.kb_search_data_api_url,
   });
 
   React.useEffect(() => {
