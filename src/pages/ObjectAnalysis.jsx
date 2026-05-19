@@ -183,9 +183,9 @@ export default function ObjectAnalysis() {
 
       {/* Grid */}
       {isLoading ? (
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="flex flex-col gap-4">
           {Array(4).fill(0).map((_, i) => (
-            <div key={i} className="h-44 rounded-lg bg-card animate-pulse border border-border/50" />
+            <div key={i} className="h-24 rounded-lg bg-card animate-pulse border border-border/50" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
@@ -197,7 +197,7 @@ export default function ObjectAnalysis() {
           onAction={!search ? () => setOpenItem({}) : undefined}
         />
       ) : (
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="flex flex-col gap-4">
           {filtered.map(a => (
             <ObjectAnalysisCard
               key={a.id}
