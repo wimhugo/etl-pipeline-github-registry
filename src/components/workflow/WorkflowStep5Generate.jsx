@@ -10,6 +10,7 @@ import PolicyEditor from '@/components/kbcompose/PolicyEditor';
 export default function WorkflowStep5Generate({ instanceId, workflowId, onComplete }) {
     const [showEditor, setShowEditor] = useState(false);
     const [draftPolicy, setDraftPolicy] = useState(null);
+    const [prefillData, setPrefillData] = useState({ assignee: '', target: '' });
 
     // Fetch the workflow instance to get step 4 selected policies
     const { data: workflowInstance, isLoading: instanceLoading } = useQuery({
@@ -100,6 +101,28 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
 
     const selectedPolicies = selectedPolicyIds.map(id => policiesMap[id]).filter(Boolean);
 
+    // Prefill assignee (ORCID) and target (URL/file/text) from previous steps
+    useEffect(() => {
+        if (!instanceId) return;
+        
+        // Get ORCID from user context (step 1)
+        const userContext = JSON.parse(localStorage.getItem(`wf_${instanceId}_user-context`) || '{}');
+        const fullProfile = userContext.orcid || '';
+        
+        // Get resource from step 2
+        const resource = JSON.parse(localStorage.getItem(`wf_${instanceId}_resource`) || '{}');
+        let target = 'Custom text';
+        if (resource.inputType === 'url' && resource.url) {
+            target = resource.url;
+        } else if (resource.inputType === 'file' && resource.fileName) {
+            target = resource.fileName;
+        } else if (resource.inputType === 'text' && resource.text) {
+            target = 'Custom text';
+        }
+        
+        setPrefillData({ assignee: fullProfile, target });
+    }, [instanceId]);
+
     // Create draft policy and open editor when component mounts
     useEffect(() => {
         if (selectedPolicies.length === 0 || draftPolicy || showEditor) return;
@@ -113,6 +136,8 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
             status: 'openrel:status/draft',
             derived_from: firstPolicy.id,
             _createdLocally: Date.now(),
+            assignee: prefillData.assignee,
+            target: prefillData.target,
         };
         
         // Save to localStorage as a draft (same as Compose)
@@ -134,7 +159,7 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
             title: "Draft policy created",
             description: `"${draft.label}" is ready for editing.`,
         });
-    }, [selectedPolicies.length, instanceId]);
+    }, [selectedPolicies.length, instanceId, prefillData]);
 
     const handleSaveDraft = (updatedPolicy) => {
         // Update the draft in localStorage (same as Compose)
@@ -229,6 +254,7 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
                     statesMap={statesMap}
                     onSave={handleSaveDraft}
                     onClose={handleCloseEditor}
+                    isWorkflowEditor={true}
                 />
             )}
         </div>

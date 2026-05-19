@@ -254,13 +254,13 @@ function RuleSectionEditor({ sectionKey, label, icon: Icon, color, items, action
   );
 }
 
-export default function PolicyEditor({ policy, actionsMap, constraintsMap, onSave, onClose }) {
-  const [draft, setDraft] = useState(() => ({
-    ...policy,
-    permissions:  [...(policy.permissions  || [])],
-    prohibitions: [...(policy.prohibitions || [])],
-    duties:       [...(policy.duties       || [])],
-  }));
+export default function PolicyEditor({ policy, actionsMap, constraintsMap, statesMap, onSave, onClose, isWorkflowEditor = false }) {
+    const [draft, setDraft] = useState(() => ({
+        ...policy,
+        permissions:  [...(policy.permissions  || [])],
+        prohibitions: [...(policy.prohibitions || [])],
+        duties:       [...(policy.duties       || [])],
+    }));
 
   const handleSectionChange = (sectionKey, newItems) => {
     setDraft(prev => ({ ...prev, [sectionKey]: newItems }));
@@ -354,6 +354,32 @@ export default function PolicyEditor({ policy, actionsMap, constraintsMap, onSav
                   className="h-8 text-xs"
                 />
               </div>
+              {isWorkflowEditor && (
+                <>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Assigned To (assignee)
+                    </label>
+                    <Input
+                      value={draft.assignee || ''}
+                      onChange={(e) => handlePolicyFieldChange('assignee', e.target.value)}
+                      placeholder="ORCID iD"
+                      className="h-8 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Resource (target)
+                    </label>
+                    <Input
+                      value={draft.target || ''}
+                      onChange={(e) => handlePolicyFieldChange('target', e.target.value)}
+                      placeholder="Resource URL or filename"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </CollapsibleSection>
 
