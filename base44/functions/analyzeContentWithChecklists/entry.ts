@@ -96,17 +96,11 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'No checklist items found to analyze' }, { status: 400 });
         }
 
-        // Step 4: Analyze content against each checklist item using LLM
+        // Step 4: Analyze content against each checklist item
+        // First check regex patterns, then use LLM only if needed
         const analysisResults = [];
         const totalItems = checklistItems.length;
         
-        // Chunk content for LLM (max ~8000 chars per chunk to stay within limits)
-        const chunkSize = 8000;
-        const contentChunks = [];
-        for (let i = 0; i < contentToAnalyze.length; i += chunkSize) {
-            contentChunks.push(contentToAnalyze.slice(i, i + chunkSize));
-        }
-
         for (let i = 0; i < checklistItems.length; i++) {
             const item = checklistItems[i];
             const itemDescription = item.description || item.label || item.id;
@@ -129,7 +123,60 @@ Deno.serve(async (req) => {
                 }
             });
 
-            // Prepare LLM prompt with explicit instructions based on checklist description
+            // Check if regex patterns are available
+            const hasRegex = item.regex && Array.isArray(item.regex) && item.regex.length > 0;
+            let regexMatch = null;
+            
+            if (hasRegex) {
+                console.log(`🔍 Checking regex patterns for "${item.label}" (${item.regex.length} patterns)`);
+                // Try regex matching first
+                for (const pattern of item.regex) {
+                    try {
+                        const regex = new RegExp(pattern, 'i'); // case-insensitive
+                        const matches = contentToAnalyze.match(regex);
+                        if (matches) {
+                            regexMatch = {
+                                pattern: pattern,
+                                matched_text: matches[0],
+                                all_matches: matches
+                            };
+                            console.log(`✅ Regex match found for "${item.label}":`, regexMatch.matched_text.substring(0, 100));
+                            break;
+                        }
+                    } catch (regexError) {
+                        console.warn(`Invalid regex pattern "${pattern}" for ${item.id}:`, regexError.message);
+                    }
+                }
+            }
+
+            // If regex found a match, skip LLM
+            if (regexMatch) {
+                analysisResults.push({
+                    checklist_item_id: item.id,
+                    checklist_item_label: item.label,
+                    checklist_source_id: item.checklist_source_id,
+                    checklist_name: item.checklist_name,
+                    match: true,
+                    confidence: 95, // High confidence for regex matches
+                    explanation: `Matched by regex pattern: ${regexMatch.pattern.substring(0, 50)}...`,
+                    matched_snippets: [regexMatch.matched_text],
+                    match_source: 'regex',
+                    analyzed_at: new Date().toISOString()
+                });
+                continue;
+            }
+
+            // No regex match - use LLM
+            console.log(`🤖 Using LLM for "${item.label}" (no regex match)`);
+            
+            // Chunk content for LLM (max ~8000 chars per chunk to stay within limits)
+            const chunkSize = 8000;
+            const contentChunks = [];
+            for (let j = 0; j < contentToAnalyze.length; j += chunkSize) {
+                contentChunks.push(contentToAnalyze.slice(j, j + chunkSize));
+            }
+
+            // Prepare LLM prompt
             const prompt = `You are an expert data analyst tasked with evaluating content against a specific checklist requirement.
 
 CHECKLIST REQUIREMENT:
@@ -184,6 +231,7 @@ Return your analysis as JSON:
                     confidence: llmResponse.data.confidence,
                     explanation: llmResponse.data.explanation,
                     matched_snippets: llmResponse.data.matched_snippets || [],
+                    match_source: 'llm',
                     analyzed_at: new Date().toISOString()
                 });
             } catch (llmError) {
@@ -197,6 +245,7 @@ Return your analysis as JSON:
                     confidence: 0,
                     explanation: `Analysis failed: ${llmError.message}`,
                     matched_snippets: [],
+                    match_source: 'error',
                     analyzed_at: new Date().toISOString(),
                     error: true
                 });

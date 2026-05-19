@@ -401,6 +401,18 @@ function MatchResultCard({ result }) {
         : result.confidence >= 40 ? 'text-primary' 
         : 'text-muted-foreground';
 
+    const matchSourceBadge = result.match ? (
+        result.match_source === 'regex' ? (
+            <Badge variant="outline" className="text-[10px] bg-accent/10 text-accent border-accent/20">
+                Regex Match
+            </Badge>
+        ) : result.match_source === 'llm' ? (
+            <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20">
+                AI Analysis
+            </Badge>
+        ) : null
+    ) : null;
+
     return (
         <Card className={cn(
             "border-border/40",
@@ -409,7 +421,7 @@ function MatchResultCard({ result }) {
             <CardContent className="p-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-medium text-foreground">
                                 {result.checklist_item_label || result.checklist_item_id}
                             </span>
@@ -423,6 +435,7 @@ function MatchResultCard({ result }) {
                                     No Match
                                 </Badge>
                             )}
+                            {matchSourceBadge}
                         </div>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
                             {result.checklist_name}
