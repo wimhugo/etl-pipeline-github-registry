@@ -549,40 +549,31 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
   });
   const config = globalConfigs[0] || {};
   
-  // Use the same approach as KBUserDashboard - fetch file list from GitHub API
-  const { data: policies = [], isLoading: policiesLoading, error: policiesError } = useQuery({
-    queryKey: ['kb-policies'],
+  // Use the EXACT same approach as KBUserDashboard
+  const { data: fileList = [] } = useQuery({
+    queryKey: ['kb-policies-filelist', config.kb_search_data_api_url],
     queryFn: async () => {
-      try {
-        // Use githubFiles function - it will use token from GlobalConfig or env
-        const response = await base44.functions.invoke('githubFiles', {
-          action: 'listFolder',
-          repo: 'wimhugo/openrel',
-          branch: 'main',
-          path: 'data/input/v0.3'
-        });
-        
-        console.log('githubFiles response:', response);
-        // githubFiles returns {success: true, files: [...]}
-        const fileList = response.data?.files || [];
-        console.log('File list from GitHub:', fileList);
-        const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
-        console.log('JSON files:', jsonFiles.map(f => f.name));
-        // Filter for policy files
-        const policyFiles = jsonFiles.filter(item => 
-          item.name.toLowerCase().includes('policy') || item.name.toLowerCase().includes('licence')
-        );
-        console.log('Policy files:', policyFiles);
-        console.log('Policy file names:', policyFiles.map(f => f.name));
-        return policyFiles.map(file => ({
-          name: file.name.replace('.json', ''),
-          path: file.path
-        }));
-      } catch (err) {
-        console.error('Error fetching policies:', err);
-        throw err;
-      }
+      const r = await fetch(config.kb_search_data_api_url);
+      if (!r.ok) throw new Error('Failed to fetch file list');
+      return r.json();
     },
+    enabled: !!config.kb_search_data_api_url,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: policies = [], isLoading: policiesLoading, error: policiesError } = useQuery({
+    queryKey: ['kb-policies', config.kb_search_data_url, fileList],
+    queryFn: async () => {
+      const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
+      const policyFiles = jsonFiles.filter(item => 
+        item.name.toLowerCase().includes('policy') || item.name.toLowerCase().includes('licence')
+      );
+      return policyFiles.map(file => ({
+        name: file.name.replace('.json', ''),
+        path: file.path
+      }));
+    },
+    enabled: !!config.kb_search_data_url && fileList.length > 0,
   });
 
   React.useEffect(() => {
