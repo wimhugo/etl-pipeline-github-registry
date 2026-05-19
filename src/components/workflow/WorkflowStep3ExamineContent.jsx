@@ -220,6 +220,21 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
 
         return (
             <div className="space-y-4">
+                {/* Header with Re-run button */}
+                <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-foreground">Analysis Results</h3>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleStartAnalysis}
+                        disabled={selectedChecklists.length === 0}
+                        className="gap-2"
+                    >
+                        <FileSearch className="w-3.5 h-3.5" />
+                        Re-run Analysis
+                    </Button>
+                </div>
+
                 {/* Summary Card */}
                 <Card className="border-border/50">
                     <CardHeader className="pb-3">
