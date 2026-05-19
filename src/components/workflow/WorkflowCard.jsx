@@ -1,11 +1,7 @@
 import React from 'react';
-import { FileCheck2, Search, MoreHorizontal, Pencil, Copy, Trash2, Play } from 'lucide-react';
+import { FileCheck2, Search, Pencil, Copy, Trash2, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 
 export const WORKFLOW_TYPES = {
@@ -44,11 +40,6 @@ export default function WorkflowCard({ instance, onOpen, onEdit, onClone, onDele
   const typeMeta = WORKFLOW_TYPES[instance.workflow_type] || WORKFLOW_TYPES.licence;
   const Icon = typeMeta.icon;
 
-  const handleAction = (e, fn) => {
-    e.stopPropagation();
-    fn();
-  };
-
   return (
     <div className="rounded-xl border border-border/50 bg-card p-5 hover:border-primary/30 transition-all group">
       <div className="flex items-start justify-between gap-3">
@@ -73,38 +64,20 @@ export default function WorkflowCard({ instance, onOpen, onEdit, onClone, onDele
         <div className="flex items-center gap-1 shrink-0">
           <Button
             size="sm"
-            className="h-7 px-3 text-xs gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="h-7 px-3 text-xs gap-1.5"
             onClick={() => onOpen(instance)}
           >
             <Play className="w-3 h-3" /> Open
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={e => e.stopPropagation()}
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem onClick={e => handleAction(e, () => onEdit(instance))}>
-                <Pencil className="w-3.5 h-3.5 mr-2" /> Edit details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={e => handleAction(e, () => onClone(instance))}>
-                <Copy className="w-3.5 h-3.5 mr-2" /> Clone
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={e => handleAction(e, () => onDelete(instance))}
-              >
-                <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(instance)}>
+            <Pencil className="w-3.5 h-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onClone(instance)}>
+            <Copy className="w-3.5 h-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(instance)}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
         </div>
       </div>
 
