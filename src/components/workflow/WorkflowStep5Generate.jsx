@@ -7,6 +7,93 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import PolicyEditor from '@/components/kbcompose/PolicyEditor';
 
+/**
+ * Merge multiple policies into a single draft policy.
+ * - Combines permissions, prohibitions, and duties from all policies
+ * - Skips duplicate action+constraint combinations
+ * - Uses the first policy's metadata as the base
+ */
+function mergePolicies(policies) {
+    if (policies.length === 0) return null;
+    if (policies.length === 1) {
+        const firstPolicy = policies[0];
+        const newId = `${firstPolicy.id}-draft-${Date.now()}`;
+        return {
+            ...firstPolicy,
+            id: newId,
+            label: `${firstPolicy.label} (Draft)`,
+            status: 'openrel:status/draft',
+            derived_from: firstPolicy.id,
+            _createdLocally: Date.now(),
+        };
+    }
+    
+    // Use first policy as base
+    const basePolicy = policies[0];
+    const newId = `merged-draft-${Date.now()}`;
+    
+    // Track unique action+constraint combinations to avoid duplicates
+    const seenActionConstraints = new Set();
+    const mergedPermissions = [];
+    const mergedProhibitions = [];
+    const mergedDuties = [];
+    
+    // Helper to process a rule array and skip duplicates
+    const processRules = (rules, targetArray, ruleType) => {
+        if (!Array.isArray(rules)) return;
+        
+        rules.forEach(rule => {
+            if (!rule.action) return;
+            
+            // Create a unique key for action+constraint combination
+            const actionId = rule.action.id || rule.action;
+            const constraintIds = (rule.constraint || [])
+                .map(c => c.id || c)
+                .sort()
+                .join(',');
+            
+            const uniqueKey = `${ruleType}:${actionId}:${constraintIds}`;
+            
+            if (seenActionConstraints.has(uniqueKey)) {
+                console.log('Skipping duplicate:', uniqueKey);
+                return; // Skip duplicate
+            }
+            
+            seenActionConstraints.add(uniqueKey);
+            targetArray.push({ ...rule });
+        });
+    };
+    
+    // Merge rules from all selected policies
+    policies.forEach(policy => {
+        processRules(policy.permission, mergedPermissions, 'permission');
+        processRules(policy.prohibition, mergedProhibitions, 'prohibition');
+        processRules(policy.duty, mergedDuties, 'duty');
+    });
+    
+    // Build merged policy
+    const merged = {
+        ...basePolicy,
+        id: newId,
+        label: `Merged Policy (${policies.length} sources)`,
+        status: 'openrel:status/draft',
+        derived_from: policies.map(p => p.id),
+        _createdLocally: Date.now(),
+        permission: mergedPermissions,
+        prohibition: mergedProhibitions,
+        duty: mergedDuties,
+    };
+    
+    console.log('Merged policy:', {
+        sourceCount: policies.length,
+        permissions: mergedPermissions.length,
+        prohibitions: mergedProhibitions.length,
+        duties: mergedDuties.length,
+    });
+    
+    return merged;
+}
+
 export default function WorkflowStep5Generate({ instanceId, workflowId, onComplete }) {
     const [showEditor, setShowEditor] = useState(false);
     const [draftPolicy, setDraftPolicy] = useState(null);
@@ -130,37 +217,27 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
     useEffect(() => {
         if (selectedPolicies.length === 0 || draftPolicy || showEditor) return;
         
-        const firstPolicy = selectedPolicies[0];
-        const newId = `${firstPolicy.id}-draft-${Date.now()}`;
-        const draft = {
-            ...firstPolicy,
-            id: newId,
-            label: `${firstPolicy.label} (Draft)`,
-            status: 'openrel:status/draft',
-            derived_from: firstPolicy.id,
-            _createdLocally: Date.now(),
-            assignee: prefillData.assignee,
-            target: prefillData.target,
-        };
+        // Merge multiple selected policies
+        const mergedPolicy = mergePolicies(selectedPolicies);
         
         // Save to localStorage as a draft (same as Compose)
         const existingDrafts = JSON.parse(localStorage.getItem('kbcompose_drafts') || '[]');
-        localStorage.setItem('kbcompose_drafts', JSON.stringify([...existingDrafts, draft]));
+        localStorage.setItem('kbcompose_drafts', JSON.stringify([...existingDrafts, mergedPolicy]));
         
-        setDraftPolicy(draft);
+        setDraftPolicy(mergedPolicy);
         setShowEditor(true);
         
         // Notify parent that step 5 is complete with the draft
         if (onComplete) {
             onComplete({
-                draft_policy: draft,
+                draft_policy: mergedPolicy,
                 status: 'draft',
             });
         }
         
         toast({
             title: "Draft policy created",
-            description: `"${draft.label}" is ready for editing.`,
+            description: `"${mergedPolicy.label}" merged from ${selectedPolicies.length} policies.`,
         });
     }, [selectedPolicies.length, instanceId, prefillData.assignee, prefillData.target]);
 
