@@ -543,26 +543,32 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
     is_active: true,
   });
 
+  const { data: globalConfigs = [] } = useQuery({
+    queryKey: ['globalConfig'],
+    queryFn: () => base44.entities.GlobalConfig.list(),
+  });
+  const config = globalConfigs[0] || {};
+  
   const { data: policies = [], isLoading: policiesLoading, error: policiesError } = useQuery({
-    queryKey: ['kb-policies'],
+    queryKey: ['kb-policies', config.kb_search_data_api_url],
     queryFn: async () => {
-      const response = await base44.functions.invoke('githubFiles', {
-        action: 'listFolder',
-        repo: 'wimhugo/openrel',
-        branch: 'main',
-        path: 'data/input/v0.3'
-      });
-      console.log('Policies response:', response);
+      if (!config.kb_search_data_api_url) {
+        throw new Error('KB data API URL not configured');
+      }
+      const response = await fetch(config.kb_search_data_api_url);
+      if (!response.ok) throw new Error('Failed to fetch file list');
+      const fileList = await response.json();
+      const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
       // Filter for policy files and extract names
-      const policyFiles = (response.data.items || []).filter(item => 
-        item.name.includes('policy') || item.name.includes('licence')
+      const policyFiles = jsonFiles.filter(item => 
+        item.name.toLowerCase().includes('policy') || item.name.toLowerCase().includes('licence')
       );
-      console.log('Policy files:', policyFiles);
       return policyFiles.map(file => ({
         name: file.name.replace('.json', ''),
         path: file.path
       }));
     },
+    enabled: !!config.kb_search_data_api_url,
   });
 
   React.useEffect(() => {
