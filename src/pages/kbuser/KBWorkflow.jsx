@@ -14,6 +14,7 @@ import {
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+import { useRole } from '@/lib/RoleContext';
 import WorkflowCard, { WORKFLOW_TYPES } from '@/components/workflow/WorkflowCard';
 import WorkflowNewDialog from '@/components/workflow/WorkflowNewDialog';
 import WorkflowEditDialog from '@/components/workflow/WorkflowEditDialog';
@@ -30,6 +31,7 @@ const TYPE_LABELS = Object.fromEntries(
 
 export default function KBWorkflow() {
   const queryClient = useQueryClient();
+  const { allowedWorkflowTypes } = useRole();
 
   // List view state
   const [search, setSearch] = useState('');
@@ -102,6 +104,7 @@ export default function KBWorkflow() {
   }));
 
   const instances = [...workflowInstances, ...oaAsWorkflows]
+    .filter(inst => allowedWorkflowTypes.includes(inst.workflow_type))
     .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
 
   const isLoading = loadingWorkflows || loadingOA;
@@ -395,7 +398,7 @@ export default function KBWorkflow() {
                 </button>
               )}
             </div>
-            {Object.entries(TYPE_LABELS).map(([type, label]) => (
+            {Object.entries(TYPE_LABELS).filter(([type]) => allowedWorkflowTypes.includes(type)).map(([type, label]) => (
               <label key={type} className="flex items-center gap-2 cursor-pointer group">
                 <input
                   type="checkbox"
@@ -445,6 +448,7 @@ export default function KBWorkflow() {
         open={showNew}
         onClose={() => setShowNew(false)}
         onCreate={(data) => createMutation.mutate(data)}
+        allowedTypes={allowedWorkflowTypes}
       />
 
       {/* Edit dialog */}

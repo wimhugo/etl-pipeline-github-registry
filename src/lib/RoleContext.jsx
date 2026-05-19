@@ -23,6 +23,12 @@ export const KB_MANAGER_FEATURES_DEFAULT = [
   { label: 'Settings',             path: '/config',             access: { Administrator: true, Curator: false, Contributor: false, 'End User': false } },
 ];
 
+export const WORKFLOW_TYPES_DEFAULT = [
+  { label: 'Licence a Resource',        path: 'workflow_type:licence',         access: { Administrator: true, Curator: true, Contributor: true,  'End User': true  } },
+  { label: 'Reuse a Resource',          path: 'workflow_type:reuse',           access: { Administrator: true, Curator: true, Contributor: true,  'End User': true  } },
+  { label: 'Policy/Licence Analysis',   path: 'workflow_type:policy_analysis', access: { Administrator: true, Curator: true, Contributor: true,  'End User': false } },
+];
+
 export const KB_USER_FEATURES_DEFAULT = [
   { label: 'Dashboard',      path: '/kb-user/dashboard',      access: { Administrator: true, Curator: true, Contributor: true,  'End User': true  } },
   { label: 'My Workflows',   path: '/kb-user/workflow',       access: { Administrator: true, Curator: true, Contributor: true,  'End User': true  } },
@@ -92,9 +98,14 @@ export function RoleProvider({ children }) {
 
   const kbManagerFeatures = applyPermissions(KB_MANAGER_FEATURES_DEFAULT, permissionOverrides);
   const kbUserFeatures = applyPermissions(KB_USER_FEATURES_DEFAULT, permissionOverrides);
+  const workflowTypes = applyPermissions(WORKFLOW_TYPES_DEFAULT, permissionOverrides);
 
   const features = activeContainer === 'KB Manager' ? kbManagerFeatures : kbUserFeatures;
   const visibleFeatures = features.filter(f => f.access[activeRole]);
+
+  const allowedWorkflowTypes = workflowTypes
+    .filter(wt => wt.access[activeRole])
+    .map(wt => wt.path.replace('workflow_type:', ''));
 
   return (
     <RoleContext.Provider value={{
@@ -102,6 +113,7 @@ export function RoleProvider({ children }) {
       activeContainer, selectContainer,
       visibleFeatures, features,
       kbManagerFeatures, kbUserFeatures,
+      workflowTypes, allowedWorkflowTypes,
       permissionOverrides, savePermissions,
     }}>
       {children}

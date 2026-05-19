@@ -1,5 +1,5 @@
 import React from 'react';
-import { useRole, NON_ADMIN_ROLES, KB_MANAGER_FEATURES_DEFAULT, KB_USER_FEATURES_DEFAULT } from '@/lib/RoleContext';
+import { useRole, NON_ADMIN_ROLES, KB_MANAGER_FEATURES_DEFAULT, KB_USER_FEATURES_DEFAULT, WORKFLOW_TYPES_DEFAULT } from '@/lib/RoleContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { ShieldCheck, Lock } from 'lucide-react';
@@ -91,6 +91,12 @@ export default function RolePermissionsEditor() {
         <FeatureTable
           title="KB User"
           features={KB_USER_FEATURES_DEFAULT}
+          permissionOverrides={permissionOverrides}
+          onToggle={handleToggle}
+        />
+        <FeatureTable
+          title="Workflow Types"
+          features={WORKFLOW_TYPES_DEFAULT}
           permissionOverrides={permissionOverrides}
           onToggle={handleToggle}
         />

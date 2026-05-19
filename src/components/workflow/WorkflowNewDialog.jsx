@@ -7,7 +7,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 
-export default function WorkflowNewDialog({ open, onClose, onCreate }) {
+export default function WorkflowNewDialog({ open, onClose, onCreate, allowedTypes }) {
   const [selectedType, setSelectedType] = useState(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -37,7 +37,7 @@ export default function WorkflowNewDialog({ open, onClose, onCreate }) {
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Select Workflow Type</p>
             <div className="grid gap-3">
-              {Object.values(WORKFLOW_TYPES).map(wt => {
+              {Object.values(WORKFLOW_TYPES).filter(wt => !allowedTypes || allowedTypes.includes(wt.id)).map(wt => {
                 const Icon = wt.icon;
                 const selected = selectedType === wt.id;
                 return (
