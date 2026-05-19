@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileCheck2, Search, Pencil, Copy, Trash2, Play } from 'lucide-react';
+import { FileCheck2, Search, Microscope, Pencil, Copy, Trash2, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +32,18 @@ export const WORKFLOW_TYPES = {
       { id: 'reuse-context', label: 'Reuse Context' },
       { id: 'match',         label: 'Match Policy',  placeholder: true },
       { id: 'apply',         label: 'Apply',         placeholder: true },
+    ],
+  },
+  policy_analysis: {
+    id: 'policy_analysis',
+    label: 'Policy/Licence Analysis',
+    description: 'Detect OpenREL/ODRL rules, actions, and constraints in objects and documents.',
+    icon: Microscope,
+    color: 'text-chart-3',
+    bg: 'bg-chart-3/10',
+    steps: [
+      { id: 'content-source', label: 'Content Source' },
+      { id: 'run-analysis',   label: 'Run Analysis' },
     ],
   },
 };

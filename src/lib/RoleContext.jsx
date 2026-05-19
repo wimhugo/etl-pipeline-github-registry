@@ -30,7 +30,6 @@ export const KB_USER_FEATURES_DEFAULT = [
   { label: 'Annotate',       path: '/kb-user/annotate',       access: { Administrator: true, Curator: true, Contributor: true,  'End User': false } },
   { label: 'Match',          path: '/kb-user/match',          access: { Administrator: true, Curator: true, Contributor: true,  'End User': true  } },
   { label: 'Compose',        path: '/kb-user/compose',        access: { Administrator: true, Curator: true, Contributor: true,  'End User': false } },
-  { label: 'Object Analysis', path: '/kb-user/object-analysis', access: { Administrator: true, Curator: false, Contributor: false, 'End User': false } },
   { label: 'Preferences',    path: '/kb-user/preferences',    access: { Administrator: true, Curator: true, Contributor: true,  'End User': false } },
   { label: 'Configuration',  path: '/kb-user/configuration',  access: { Administrator: true, Curator: true, Contributor: false, 'End User': false } },
 ];

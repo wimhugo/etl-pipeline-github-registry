@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Search, ChevronLeft, ChevronRight, Plus, SlidersHorizontal, X, GitBranch, Save } from 'lucide-react';
@@ -20,6 +20,8 @@ import WorkflowEditDialog from '@/components/workflow/WorkflowEditDialog';
 import WorkflowStep1UserContext from '@/components/workflow/WorkflowStep1UserContext';
 import WorkflowStep2FindResource from '@/components/workflow/WorkflowStep2FindResource';
 import WorkflowStep3IntendedUse from '@/components/workflow/WorkflowStep3IntendedUse';
+import OAStepContentSource from '@/components/objectanalysis/OAStepContentSource';
+import OAStepRunAnalysis from '@/components/objectanalysis/OAStepRunAnalysis';
 import EmptyState from '@/components/shared/EmptyState';
 
 const TYPE_LABELS = Object.fromEntries(
@@ -40,6 +42,46 @@ export default function KBWorkflow() {
   // Detail view state
   const [openInstance, setOpenInstance] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
+  const [oaStepData, setOaStepData] = useState({
+    name: '', description: '', inputType: 'url', objectUrl: '', textContent: '', analysisResult: null, actionMappings: {},
+  });
+  const [openrelActions, setOpenrelActions] = useState([]);
+  const [openrelConstraints, setOpenrelConstraints] = useState([]);
+
+  // Fetch OpenREL actions/constraints for policy_analysis type
+  useEffect(() => {
+    const fetchOpenrelData = async () => {
+      try {
+        const configs = await base44.entities.GlobalConfig.list();
+        if (!configs?.length) return;
+        const config = configs[0];
+        const subEntityFiles = config.kb_sub_entity_files || {};
+        const dataBaseUrl = config.kb_search_data_url;
+        const apiUrl = config.kb_search_data_api_url?.replace(/\?ref=[^&]*/, '');
+        let actionsFile = subEntityFiles.actions;
+        let constraintsFile = subEntityFiles.constraints;
+        if (apiUrl && (!actionsFile || !constraintsFile)) {
+          const fileRes = await fetch(apiUrl);
+          if (fileRes.ok) {
+            const fileList = await fileRes.json();
+            const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
+            const autoFile = (hint) => jsonFiles.find(f => f.name.toLowerCase().includes(hint))?.name || '';
+            if (!actionsFile) actionsFile = autoFile('action');
+            if (!constraintsFile) constraintsFile = autoFile('constraint');
+          }
+        }
+        if (actionsFile && dataBaseUrl) {
+          const res = await fetch(`${dataBaseUrl}/${actionsFile}`);
+          if (res.ok) { const d = await res.json(); setOpenrelActions(Array.isArray(d) ? d : (d.actions || [])); }
+        }
+        if (constraintsFile && dataBaseUrl) {
+          const res = await fetch(`${dataBaseUrl}/${constraintsFile}`);
+          if (res.ok) { const d = await res.json(); setOpenrelConstraints(Array.isArray(d) ? d : (d.constraints || [])); }
+        }
+      } catch { /* silent */ }
+    };
+    fetchOpenrelData();
+  }, []);
 
   // ── Data ──────────────────────────────────────────────────────
   const { data: instances = [], isLoading } = useQuery({
@@ -96,6 +138,19 @@ export default function KBWorkflow() {
     }
     setOpenInstance(instance);
     setCurrentStep(0);
+    // Seed OA step data from persisted step_data for policy_analysis type
+    if (instance.workflow_type === 'policy_analysis') {
+      const sd = instance.step_data || {};
+      setOaStepData({
+        name: instance.name || '',
+        description: instance.description || '',
+        inputType: sd.inputType || instance.input_type || 'url',
+        objectUrl: sd.objectUrl || instance.object_url || '',
+        textContent: sd.textContent || instance.text_content || '',
+        analysisResult: sd.analysisResult || instance.analysis_result || null,
+        actionMappings: sd.actionMappings || instance.action_mappings || {},
+      });
+    }
     updateMutation.mutate({ id: instance.id, data: { last_opened_at: new Date().toISOString() } });
   };
 
@@ -107,6 +162,21 @@ export default function KBWorkflow() {
   // ── Save step data ────────────────────────────────────────────
   const handleSaveProgress = () => {
     if (!openInstance) return;
+    if (openInstance.workflow_type === 'policy_analysis') {
+      updateMutation.mutate({
+        id: openInstance.id,
+        data: {
+          step_data: oaStepData,
+          input_type: oaStepData.inputType,
+          object_url: oaStepData.inputType === 'url' ? oaStepData.objectUrl : '',
+          text_content: oaStepData.inputType === 'text' ? oaStepData.textContent : '',
+          analysis_result: oaStepData.analysisResult,
+          action_mappings: oaStepData.actionMappings,
+          last_analysed_at: oaStepData.analysisResult ? new Date().toISOString() : undefined,
+        },
+      });
+      return;
+    }
     const typeMeta = WORKFLOW_TYPES[openInstance.workflow_type] || WORKFLOW_TYPES.licence;
     const stepData = {};
     typeMeta.steps.forEach(step => {
@@ -190,6 +260,17 @@ export default function KBWorkflow() {
 
         {/* Step content */}
         <div>
+          {steps[currentStep].id === 'content-source' && (
+            <OAStepContentSource data={oaStepData} onChange={setOaStepData} />
+          )}
+          {steps[currentStep].id === 'run-analysis' && (
+            <OAStepRunAnalysis
+              data={oaStepData}
+              onChange={setOaStepData}
+              openrelActions={openrelActions}
+              openrelConstraints={openrelConstraints}
+            />
+          )}
           {steps[currentStep].id === 'user-context' && (
             <WorkflowStep1UserContext instanceId={openInstance.id} workflowId={openInstance.workflow_type} />
           )}

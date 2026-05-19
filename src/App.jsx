@@ -41,7 +41,6 @@ import KBDetailPolicies from './pages/kbuser/KBDetailPolicies';
 import KBDetailActions from './pages/kbuser/KBDetailActions';
 import KBDetailConstraints from './pages/kbuser/KBDetailConstraints';
 import KBWorkflow from './pages/kbuser/KBWorkflow';
-import ObjectAnalysis from './pages/ObjectAnalysis';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -97,7 +96,6 @@ const AuthenticatedApp = () => {
         <Route path="/kb-user/detail/actions" element={<KBDetailActions />} />
         <Route path="/kb-user/detail/constraints" element={<KBDetailConstraints />} />
         <Route path="/kb-user/workflow" element={<KBWorkflow />} />
-        <Route path="/kb-user/object-analysis" element={<ObjectAnalysis />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
