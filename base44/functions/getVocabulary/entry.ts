@@ -34,11 +34,14 @@ Deno.serve(async (req) => {
         if (vocabSource.inline_data) {
           try {
             const cached = JSON.parse(vocabSource.inline_data);
-            return Response.json({ 
-              vocabulary: vocabSource.name,
-              items: cached,
-              cached: true
-            });
+            // Only use cache if it has actual data
+            if (cached && Array.isArray(cached) && cached.length > 0) {
+              return Response.json({ 
+                vocabulary: vocabSource.name,
+                items: cached,
+                cached: true
+              });
+            }
           } catch (e) {
             // Cache invalid, continue to fetch
           }
