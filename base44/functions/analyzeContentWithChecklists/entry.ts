@@ -222,15 +222,21 @@ Return your analysis as JSON:
                     }
                 });
 
+                // InvokeLLM with response_json_schema returns parsed JSON directly
+                const result = llmResponse;
+                if (!result || typeof result.match !== 'boolean') {
+                    throw new Error('Invalid LLM response format');
+                }
+
                 analysisResults.push({
                     checklist_item_id: item.id,
                     checklist_item_label: item.label,
                     checklist_source_id: item.checklist_source_id,
                     checklist_name: item.checklist_name,
-                    match: llmResponse.data.match,
-                    confidence: llmResponse.data.confidence,
-                    explanation: llmResponse.data.explanation,
-                    matched_snippets: llmResponse.data.matched_snippets || [],
+                    match: result.match,
+                    confidence: result.confidence,
+                    explanation: result.explanation,
+                    matched_snippets: result.matched_snippets || [],
                     match_source: 'llm',
                     analyzed_at: new Date().toISOString()
                 });
