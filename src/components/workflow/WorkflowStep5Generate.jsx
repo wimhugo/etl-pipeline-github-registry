@@ -105,8 +105,12 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
         if (!instanceId) return { assignee: '', target: 'Custom text' };
         
         // Get ORCID from user context (step 1)
-        const userContext = JSON.parse(localStorage.getItem(`wf_${instanceId}_user-context`) || '{}');
+        const userContextRaw = localStorage.getItem(`wf_${instanceId}_user-context`);
+        console.log('[WorkflowStep5Generate] Raw user-context from localStorage:', userContextRaw);
+        const userContext = JSON.parse(userContextRaw || '{}');
+        console.log('[WorkflowStep5Generate] Parsed userContext:', userContext);
         const assignee = userContext.orcid || '';
+        console.log('[WorkflowStep5Generate] Extracted assignee:', assignee);
         
         // Get resource from step 2
         const resource = JSON.parse(localStorage.getItem(`wf_${instanceId}_resource`) || '{}');
