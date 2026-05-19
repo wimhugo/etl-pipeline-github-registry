@@ -239,6 +239,18 @@ export default function KBWorkflow() {
         try { stepData[step.id] = JSON.parse(raw); } catch { stepData[step.id] = raw; }
       }
     });
+    // Always save step-3 from localStorage if it exists
+    const step3Raw = localStorage.getItem(`wf_${openInstance.id}_step-3`);
+    if (step3Raw) {
+      try {
+        const step3Data = JSON.parse(step3Raw);
+        stepData['step-3'] = step3Data;
+        console.log('Saving step-3 from localStorage:', step3Data);
+      } catch (e) {
+        console.error('Failed to parse step-3 data:', e);
+      }
+    }
+    console.log('Saving step_data:', stepData);
     updateMutation.mutate({ id: openInstance.id, data: { step_data: stepData }, source: openInstance._source });
   };
 
@@ -344,7 +356,14 @@ export default function KBWorkflow() {
               workflowId={openInstance.workflow_type}
               onComplete={(data) => {
                 console.log('Step 3 analysis completed:', data);
-                // Automatically save to workflow instance step_data
+                // Save to localStorage first (for handleSaveProgress)
+                const step3Data = {
+                  status: 'completed',
+                  analysis_results: data.results,
+                  summary: data.summary,
+                };
+                localStorage.setItem(`wf_${openInstance.id}_step-3`, JSON.stringify(step3Data));
+                // Also save directly to database
                 const stepData = openInstance.step_data || {};
                 updateMutation.mutate({
                   id: openInstance.id,
@@ -352,11 +371,7 @@ export default function KBWorkflow() {
                   data: {
                     step_data: {
                       ...stepData,
-                      'step-3': {
-                        status: 'completed',
-                        analysis_results: data.results,
-                        summary: data.summary,
-                      },
+                      'step-3': step3Data,
                     },
                   },
                 });
