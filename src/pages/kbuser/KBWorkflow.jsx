@@ -297,7 +297,7 @@ export default function KBWorkflow() {
 
       {/* Cards */}
       {isLoading ? (
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid gap-4">
           {Array(4).fill(0).map((_, i) => (
             <div key={i} className="h-40 rounded-lg bg-card animate-pulse border border-border/50" />
           ))}
@@ -311,7 +311,7 @@ export default function KBWorkflow() {
           onAction={!search && !typeFilter.length ? () => setShowNew(true) : undefined}
         />
       ) : (
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid gap-4">
           {filtered.map(inst => (
             <WorkflowCard
               key={inst.id}

@@ -60,7 +60,7 @@ export default function WorkflowCard({ instance, onOpen, onEdit, onClone, onDele
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm truncate">{instance.name}</p>
             {instance.description && (
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{instance.description}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{instance.description}</p>
             )}
             <Badge variant="outline" className={cn('mt-2 text-[10px] gap-1', typeMeta.color)}>
               <Icon className="w-3 h-3" />
