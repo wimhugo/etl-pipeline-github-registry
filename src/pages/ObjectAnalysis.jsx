@@ -11,10 +11,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import ObjectAnalysisCard from '@/components/objectanalysis/ObjectAnalysisCard';
 import ObjectAnalysisEditor from '@/components/objectanalysis/ObjectAnalysisEditor';
+import ObjectAnalysisEditDialog from '@/components/objectanalysis/ObjectAnalysisEditDialog';
 import EmptyState from '@/components/shared/EmptyState';
 
 export default function ObjectAnalysis() {
   const [openItem, setOpenItem] = useState(null); // null = list view
+  const [editingItem, setEditingItem] = useState(null); // for name/description dialog
   const [deletingItem, setDeletingItem] = useState(null);
   const [search, setSearch] = useState('');
   const [openrelActions, setOpenrelActions] = useState([]);
@@ -200,13 +202,21 @@ export default function ObjectAnalysis() {
             <ObjectAnalysisCard
               key={a.id}
               analysis={a}
-              onEdit={(item) => setOpenItem(item)}
+              onOpen={(item) => setOpenItem(item)}
+              onEdit={(item) => setEditingItem(item)}
               onCopy={(item) => copyMutation.mutate(item)}
               onDelete={(item) => setDeletingItem(item)}
             />
           ))}
         </div>
       )}
+
+      {/* Edit name/description dialog */}
+      <ObjectAnalysisEditDialog
+        analysis={editingItem}
+        onClose={() => setEditingItem(null)}
+        onSave={(item, fields) => updateMutation.mutate({ id: item.id, data: fields })}
+      />
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deletingItem} onOpenChange={() => setDeletingItem(null)}>

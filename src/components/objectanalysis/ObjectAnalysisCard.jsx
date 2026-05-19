@@ -2,13 +2,13 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Microscope, Link2, Type, File, CheckCircle2, AlertCircle, Copy, Pencil, Trash2, Clock } from 'lucide-react';
+import { Microscope, Link2, Type, File, CheckCircle2, AlertCircle, Copy, Pencil, Trash2, Clock, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
 const INPUT_ICONS = { url: Link2, text: Type, file: File };
 
-export default function ObjectAnalysisCard({ analysis, onEdit, onCopy, onDelete }) {
+export default function ObjectAnalysisCard({ analysis, onOpen, onEdit, onCopy, onDelete }) {
   const result = analysis.analysis_result;
   const Icon = INPUT_ICONS[analysis.input_type] || Link2;
 
@@ -34,6 +34,9 @@ export default function ObjectAnalysisCard({ analysis, onEdit, onCopy, onDelete 
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <Button size="sm" className="h-7 px-3 text-xs gap-1.5" onClick={() => onOpen(analysis)}>
+              <Play className="w-3 h-3" /> Open
+            </Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(analysis)}>
               <Pencil className="w-3.5 h-3.5" />
             </Button>
