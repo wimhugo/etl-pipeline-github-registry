@@ -543,17 +543,21 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
     is_active: true,
   });
 
-  const { data: policies = [] } = useQuery({
+  const { data: policies = [], isLoading: policiesLoading, error: policiesError } = useQuery({
     queryKey: ['kb-policies'],
     queryFn: async () => {
       const response = await base44.functions.invoke('githubFiles', {
         action: 'listFolder',
-        path: 'input/v0.3'
+        repo: 'wimhugo/openrel',
+        branch: 'main',
+        path: 'data/input/v0.3'
       });
+      console.log('Policies response:', response);
       // Filter for policy files and extract names
       const policyFiles = (response.data.items || []).filter(item => 
         item.name.includes('policy') || item.name.includes('licence')
       );
+      console.log('Policy files:', policyFiles);
       return policyFiles.map(file => ({
         name: file.name.replace('.json', ''),
         path: file.path
@@ -764,37 +768,49 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="recommended_policies">Recommended Policies</Label>
-            <Select
-              value={formData.recommended_policies.length > 0 ? formData.recommended_policies[0] : ''}
-              onValueChange={(value) => {
-                if (!formData.recommended_policies.includes(value)) {
-                  setFormData({ ...formData, recommended_policies: [...formData.recommended_policies, value] });
-                }
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a policy" />
-              </SelectTrigger>
-              <SelectContent>
-                {policies.map(policy => (
-                  <SelectItem key={policy.name} value={policy.name}>{policy.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {formData.recommended_policies.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {formData.recommended_policies.map(policyId => (
-                  <Badge key={policyId} variant="secondary" className="text-xs">
-                    {policyId}
-                    <button
-                      onClick={() => setFormData({ ...formData, recommended_policies: formData.recommended_policies.filter(p => p !== policyId) })}
-                      className="ml-1 hover:text-destructive"
-                    >
-                      ×
-                    </button>
-                  </Badge>
-                ))}
+            {policiesLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" /> Loading policies...
               </div>
+            ) : policiesError ? (
+              <div className="text-sm text-destructive">Failed to load policies</div>
+            ) : policies.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No policies found in repository</div>
+            ) : (
+              <>
+                <Select
+                  value={formData.recommended_policies.length > 0 ? formData.recommended_policies[0] : ''}
+                  onValueChange={(value) => {
+                    if (!formData.recommended_policies.includes(value)) {
+                      setFormData({ ...formData, recommended_policies: [...formData.recommended_policies, value] });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a policy" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {policies.map(policy => (
+                      <SelectItem key={policy.name} value={policy.name}>{policy.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formData.recommended_policies.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {formData.recommended_policies.map(policyId => (
+                      <Badge key={policyId} variant="secondary" className="text-xs">
+                        {policyId}
+                        <button
+                          onClick={() => setFormData({ ...formData, recommended_policies: formData.recommended_policies.filter(p => p !== policyId) })}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          ×
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
           <div className="space-y-2">
