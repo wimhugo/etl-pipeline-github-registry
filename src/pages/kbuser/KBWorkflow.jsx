@@ -84,10 +84,27 @@ export default function KBWorkflow() {
   }, []);
 
   // ── Data ──────────────────────────────────────────────────────
-  const { data: instances = [], isLoading } = useQuery({
+  const { data: workflowInstances = [], isLoading: loadingWorkflows } = useQuery({
     queryKey: ['workflow-instances'],
     queryFn: () => base44.entities.WorkflowInstance.list('-created_date'),
   });
+
+  const { data: objectAnalyses = [], isLoading: loadingOA } = useQuery({
+    queryKey: ['object-analyses'],
+    queryFn: () => base44.entities.ObjectAnalysis.list('-created_date'),
+  });
+
+  // Merge OA records as virtual policy_analysis workflow instances
+  const oaAsWorkflows = objectAnalyses.map(oa => ({
+    ...oa,
+    _source: 'object_analysis',
+    workflow_type: 'policy_analysis',
+  }));
+
+  const instances = [...workflowInstances, ...oaAsWorkflows]
+    .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+
+  const isLoading = loadingWorkflows || loadingOA;
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.WorkflowInstance.create(data),
@@ -95,24 +112,40 @@ export default function KBWorkflow() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.WorkflowInstance.update(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workflow-instances'] }),
+    mutationFn: ({ id, data, source }) => {
+      if (source === 'object_analysis') return base44.entities.ObjectAnalysis.update(id, data);
+      return base44.entities.WorkflowInstance.update(id, data);
+    },
+    onSuccess: (_, vars) => {
+      if (vars.source === 'object_analysis') queryClient.invalidateQueries({ queryKey: ['object-analyses'] });
+      else queryClient.invalidateQueries({ queryKey: ['workflow-instances'] });
+    },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.WorkflowInstance.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workflow-instances'] });
+    mutationFn: ({ id, source }) => {
+      if (source === 'object_analysis') return base44.entities.ObjectAnalysis.delete(id);
+      return base44.entities.WorkflowInstance.delete(id);
+    },
+    onSuccess: (_, vars) => {
+      if (vars.source === 'object_analysis') queryClient.invalidateQueries({ queryKey: ['object-analyses'] });
+      else queryClient.invalidateQueries({ queryKey: ['workflow-instances'] });
       setDeletingInstance(null);
     },
   });
 
   const cloneMutation = useMutation({
     mutationFn: (inst) => {
-      const { id, created_date, updated_date, created_by, ...rest } = inst;
+      const { id, created_date, updated_date, created_by, _source, ...rest } = inst;
+      if (inst._source === 'object_analysis') {
+        return base44.entities.ObjectAnalysis.create({ ...rest, name: `${inst.name} (copy)` });
+      }
       return base44.entities.WorkflowInstance.create({ ...rest, name: `${inst.name} (copy)` });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workflow-instances'] }),
+    onSuccess: (_, inst) => {
+      if (inst._source === 'object_analysis') queryClient.invalidateQueries({ queryKey: ['object-analyses'] });
+      else queryClient.invalidateQueries({ queryKey: ['workflow-instances'] });
+    },
   });
 
   // ── Filtering ─────────────────────────────────────────────────
@@ -151,7 +184,7 @@ export default function KBWorkflow() {
         actionMappings: sd.actionMappings || instance.action_mappings || {},
       });
     }
-    updateMutation.mutate({ id: instance.id, data: { last_opened_at: new Date().toISOString() } });
+    updateMutation.mutate({ id: instance.id, data: { last_opened_at: new Date().toISOString() }, source: instance._source });
   };
 
   const handleClose = () => {
@@ -165,6 +198,7 @@ export default function KBWorkflow() {
     if (openInstance.workflow_type === 'policy_analysis') {
       updateMutation.mutate({
         id: openInstance.id,
+        source: openInstance._source,
         data: {
           step_data: oaStepData,
           input_type: oaStepData.inputType,
@@ -185,7 +219,7 @@ export default function KBWorkflow() {
         try { stepData[step.id] = JSON.parse(raw); } catch { stepData[step.id] = raw; }
       }
     });
-    updateMutation.mutate({ id: openInstance.id, data: { step_data: stepData } });
+    updateMutation.mutate({ id: openInstance.id, data: { step_data: stepData }, source: openInstance._source });
   };
 
   // ── Detail view ───────────────────────────────────────────────
@@ -418,7 +452,7 @@ export default function KBWorkflow() {
         open={!!editingInstance}
         instance={editingInstance}
         onClose={() => setEditingInstance(null)}
-        onSave={(data) => updateMutation.mutate({ id: editingInstance.id, data })}
+        onSave={(data) => updateMutation.mutate({ id: editingInstance.id, data, source: editingInstance._source })}
       />
 
       {/* Delete confirmation */}
@@ -434,7 +468,7 @@ export default function KBWorkflow() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteMutation.mutate(deletingInstance.id)}
+              onClick={() => deleteMutation.mutate({ id: deletingInstance.id, source: deletingInstance._source })}
             >
               Delete
             </AlertDialogAction>
