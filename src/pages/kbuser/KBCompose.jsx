@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Plus, Loader2 } from 'lucide-react';
@@ -110,6 +110,15 @@ export default function KBCompose() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({});
   const [showNewDialog, setShowNewDialog] = useState(false);
+
+  // Auto-open from ?new=1 query param (triggered by dashboard card)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new')) {
+      setShowNewDialog(true);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
   // Local overlay: deleted ids + cloned additions
   const [deletedIds, setDeletedIds] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('kbcompose_deletedIds') || '[]')); }
