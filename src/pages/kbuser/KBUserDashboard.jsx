@@ -2,7 +2,8 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import KBEntityCard from '@/components/kbuser/KBEntityCard';
-import { FileJson, ShieldCheck, Zap, Lock, BookOpen, Users, Layers } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { FileJson, ShieldCheck, Zap, Lock, BookOpen, Users, Layers, Workflow, FileCheck2, Search, Microscope, ArrowRight } from 'lucide-react';
 
 const SUB_ENTITY_HINTS = ['actions', 'constraints', 'agents', 'sources', 'scenarios'];
 
@@ -125,6 +126,23 @@ export default function KBUserDashboard() {
 
   const notConfigured = !rawBaseUrl && globalConfigs.length > 0;
 
+  // My Workflows summary
+  const { data: workflowInstances = [] } = useQuery({
+    queryKey: ['workflowInstances'],
+    queryFn: () => base44.entities.WorkflowInstance.list(),
+  });
+  const { data: objectAnalyses = [] } = useQuery({
+    queryKey: ['objectAnalyses'],
+    queryFn: () => base44.entities.ObjectAnalysis.list(),
+  });
+
+  const wfCounts = {
+    licence: workflowInstances.filter(w => w.workflow_type === 'licence').length,
+    reuse: workflowInstances.filter(w => w.workflow_type === 'reuse').length,
+    policy_analysis: objectAnalyses.length,
+  };
+  const totalWorkflows = workflowInstances.length + objectAnalyses.length;
+
   return (
     <div className="space-y-6">
       <div>
@@ -133,6 +151,38 @@ export default function KBUserDashboard() {
           Overview of the configured knowledge base data files.
         </p>
       </div>
+
+      {/* My Workflows summary card */}
+      <Link to="/kb-user/workflow" className="block">
+        <div className="rounded-xl border border-border/50 bg-card p-5 hover:border-primary/30 transition-all">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Workflow className="w-4 h-4 text-primary" />
+              </div>
+              <span className="font-semibold text-sm">My Workflows</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-2xl font-bold">{totalWorkflows}</span>
+              <ArrowRight className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <FileCheck2 className="w-3.5 h-3.5 text-primary" />
+              <span>{wfCounts.licence} Licence</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Search className="w-3.5 h-3.5 text-accent" />
+              <span>{wfCounts.reuse} Reuse</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Microscope className="w-3.5 h-3.5 text-chart-3" />
+              <span>{wfCounts.policy_analysis} Analysis</span>
+            </div>
+          </div>
+        </div>
+      </Link>
 
       {notConfigured && (
         <div className="rounded-lg border border-border/50 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
