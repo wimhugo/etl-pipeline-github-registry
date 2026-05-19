@@ -25,7 +25,7 @@ export const KB_MANAGER_FEATURES_DEFAULT = [
 
 export const KB_USER_FEATURES_DEFAULT = [
   { label: 'Dashboard',      path: '/kb-user/dashboard',      access: { Administrator: true, Curator: true, Contributor: true,  'End User': true  } },
-  { label: 'Workflow',       path: '/kb-user/workflow',       access: { Administrator: true, Curator: true, Contributor: true,  'End User': true  } },
+  { label: 'My Workflows',   path: '/kb-user/workflow',       access: { Administrator: true, Curator: true, Contributor: true,  'End User': true  } },
   { label: 'Search',         path: '/kb-user/search',         access: { Administrator: true, Curator: true, Contributor: true,  'End User': true  } },
   { label: 'Annotate',       path: '/kb-user/annotate',       access: { Administrator: true, Curator: true, Contributor: true,  'End User': false } },
   { label: 'Match',          path: '/kb-user/match',          access: { Administrator: true, Curator: true, Contributor: true,  'End User': true  } },

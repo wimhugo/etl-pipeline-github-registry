@@ -27,7 +27,7 @@ const ICON_MAP = {
   'Compose':              BookMarked,
   'Preferences':          Sliders,
   'Configuration':        SlidersHorizontal,
-  'Workflow':             Workflow,
+  'My Workflows':         Workflow,
 };
 
 export default function Sidebar() {
