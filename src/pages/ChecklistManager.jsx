@@ -545,10 +545,20 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
 
   const { data: policies = [] } = useQuery({
     queryKey: ['kb-policies'],
-    queryFn: () => base44.functions.invoke('githubFiles', {
-      path: 'input/v0.3',
-      file_pattern: 'policies'
-    }),
+    queryFn: async () => {
+      const response = await base44.functions.invoke('githubFiles', {
+        action: 'listFolder',
+        path: 'input/v0.3'
+      });
+      // Filter for policy files and extract names
+      const policyFiles = (response.data.items || []).filter(item => 
+        item.name.includes('policy') || item.name.includes('licence')
+      );
+      return policyFiles.map(file => ({
+        name: file.name.replace('.json', ''),
+        path: file.path
+      }));
+    },
   });
 
   React.useEffect(() => {
