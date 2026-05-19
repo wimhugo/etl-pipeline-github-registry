@@ -159,6 +159,7 @@ export default function WorkflowStep1UserContext({ instanceId, workflowId }) {
     const isEUMember = isEU(location) || isEU(rorCountry) || isEU(instCountry) || (locations || []).some(l => isEU(l.value));
     
     const contextData = {
+      orcid: orcid,
       verifiedEducation: isHEI,
       verifiedResearch: verifiedStatus === 'verified_research',
       institutionType: isHEI ? 'Higher Education Institution' : (verifiedStatus === 'verified_research' ? 'Research Organization' : null),

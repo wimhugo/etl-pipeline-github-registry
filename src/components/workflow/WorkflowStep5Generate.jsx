@@ -119,7 +119,6 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
             target = 'Custom text';
         }
         
-        console.log('[WorkflowStep5Generate] prefillData:', { assignee, target, userContext, resource });
         return { assignee, target };
     }, [instanceId]);
 
@@ -139,7 +138,6 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
             assignee: prefillData.assignee,
             target: prefillData.target,
         };
-        console.log('[WorkflowStep5Generate] Created draft:', draft);
         
         // Save to localStorage as a draft (same as Compose)
         const existingDrafts = JSON.parse(localStorage.getItem('kbcompose_drafts') || '[]');
