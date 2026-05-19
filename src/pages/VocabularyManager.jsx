@@ -96,7 +96,7 @@ export default function VocabularyManager() {
         toast({ title: 'Vocabulary created', description: `"${sourceData.name}" added successfully.` });
       }
       queryClient.invalidateQueries({ queryKey: ['vocabularySources'] });
-      setShowEditor(false);
+      setShowSourceEditor(false);
     } catch (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
