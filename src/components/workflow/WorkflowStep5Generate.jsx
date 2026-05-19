@@ -102,39 +102,39 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
 
     // Create draft policy and open editor when component mounts
     useEffect(() => {
-        if (selectedPolicies.length > 0 && !draftPolicy) {
-            const firstPolicy = selectedPolicies[0];
-            const newId = `${firstPolicy.id}-draft-${Date.now()}`;
-            const draft = {
-                ...firstPolicy,
-                id: newId,
-                label: `${firstPolicy.label} (Draft)`,
-                status: 'openrel:status/draft',
-                derived_from: firstPolicy.id,
-                _createdLocally: Date.now(),
-            };
-            
-            // Save to localStorage as a draft (same as Compose)
-            const existingDrafts = JSON.parse(localStorage.getItem('kbcompose_drafts') || '[]');
-            localStorage.setItem('kbcompose_drafts', JSON.stringify([...existingDrafts, draft]));
-            
-            setDraftPolicy(draft);
-            setShowEditor(true);
-            
-            // Notify parent that step 5 is complete with the draft
-            if (onComplete) {
-                onComplete({
-                    draft_policy: draft,
-                    status: 'draft',
-                });
-            }
-            
-            toast({
-                title: "Draft policy created",
-                description: `"${draft.label}" is ready for editing.`,
+        if (selectedPolicies.length === 0 || draftPolicy || showEditor) return;
+        
+        const firstPolicy = selectedPolicies[0];
+        const newId = `${firstPolicy.id}-draft-${Date.now()}`;
+        const draft = {
+            ...firstPolicy,
+            id: newId,
+            label: `${firstPolicy.label} (Draft)`,
+            status: 'openrel:status/draft',
+            derived_from: firstPolicy.id,
+            _createdLocally: Date.now(),
+        };
+        
+        // Save to localStorage as a draft (same as Compose)
+        const existingDrafts = JSON.parse(localStorage.getItem('kbcompose_drafts') || '[]');
+        localStorage.setItem('kbcompose_drafts', JSON.stringify([...existingDrafts, draft]));
+        
+        setDraftPolicy(draft);
+        setShowEditor(true);
+        
+        // Notify parent that step 5 is complete with the draft
+        if (onComplete) {
+            onComplete({
+                draft_policy: draft,
+                status: 'draft',
             });
         }
-    }, [selectedPolicies, instanceId, onComplete]);
+        
+        toast({
+            title: "Draft policy created",
+            description: `"${draft.label}" is ready for editing.`,
+        });
+    }, [selectedPolicies.length, instanceId]);
 
     const handleSaveDraft = (updatedPolicy) => {
         // Update the draft in localStorage (same as Compose)
