@@ -138,13 +138,18 @@ export default function VocabularyManager() {
 
   const testVocabulary = useMutation({
     mutationFn: (id) => base44.functions.invoke('getVocabulary', { vocabularyId: id }),
-    onSuccess: (data, variableId) => {
+    onSuccess: (response, variableId) => {
+      console.log('Test response:', response);
       const source = vocabSources.find(s => s.id === variableId);
-      setTestResult({ source, data, success: true });
+      const responseData = response.data || response;
+      console.log('Response data:', responseData);
+      console.log('Items count:', responseData.items?.length);
+      setTestResult({ source, data: responseData, success: !!responseData.items && responseData.items.length > 0 });
       setShowTestDialog(true);
       setTestingSource(null);
     },
     onError: (error) => {
+      console.log('Test error:', error);
       const source = vocabSources.find(s => s.id === testVocabulary.variables);
       setTestResult({ source, error: error.message, success: false });
       setShowTestDialog(true);
