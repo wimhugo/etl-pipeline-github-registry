@@ -16,7 +16,8 @@ export const WORKFLOW_TYPES = {
       { id: 'user-context', label: 'User Context' },
       { id: 'resource',     label: 'Resource' },
       { id: 'licence',      label: 'Examine Content' },
-      { id: 'review',       label: 'Review',        placeholder: true },
+      { id: 'review',       label: 'Review' },
+      { id: 'generate',     label: 'Generate',      placeholder: true },
     ],
   },
   reuse: {

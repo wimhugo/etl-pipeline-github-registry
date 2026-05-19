@@ -25,6 +25,7 @@ import WorkflowStep3IntendedUse from '@/components/workflow/WorkflowStep3Intende
 import WorkflowStep3ChecklistSelection from '@/components/workflow/WorkflowStep3ChecklistSelection';
 import WorkflowStep3ExamineContent from '@/components/workflow/WorkflowStep3ExamineContent';
 import WorkflowStep4Review from '@/components/workflow/WorkflowStep4Review';
+import WorkflowStep5Generate from '@/components/workflow/WorkflowStep5Generate';
 import OAStepContentSource from '@/components/objectanalysis/OAStepContentSource';
 import OAStepRunAnalysis from '@/components/objectanalysis/OAStepRunAnalysis';
 import EmptyState from '@/components/shared/EmptyState';
@@ -403,6 +404,28 @@ export default function KBWorkflow() {
               }}
             />
           )}
+          {steps[currentStep].id === 'generate' && (
+            <WorkflowStep5Generate
+              instanceId={openInstance.id}
+              workflowId={openInstance.workflow_type}
+              onComplete={(data) => {
+                console.log('Step 5 completed:', data);
+                // Save draft policy to step_data and localStorage
+                const step5Data = data;
+                const stepData = openInstance.step_data || {};
+                updateMutation.mutate({
+                  id: openInstance.id,
+                  source: openInstance._source,
+                  data: {
+                    step_data: {
+                      ...stepData,
+                      'step-5': step5Data,
+                    },
+                  },
+                });
+              }}
+            />
+          )}
           {steps[currentStep].placeholder && !['find', 'review'].includes(steps[currentStep].id) && (
             <div className="rounded-xl border border-border/50 bg-card flex flex-col items-center justify-center py-20 gap-3 text-center">
               <span className="text-3xl">🚧</span>
@@ -424,10 +447,16 @@ export default function KBWorkflow() {
           <span className="text-xs text-muted-foreground">Step {currentStep + 1} of {steps.length}</span>
           <Button
             size="sm" className="gap-1.5"
-            onClick={() => setCurrentStep(s => s + 1)}
+            onClick={() => {
+              // For step 4 (review), save progress before continuing to step 5
+              if (currentStep === 3 && openInstance) {
+                handleSaveProgress();
+              }
+              setCurrentStep(s => s + 1);
+            }}
             disabled={currentStep === steps.length - 1}
           >
-            Next <ChevronRight className="w-3.5 h-3.5" />
+            {currentStep === 3 ? 'Continue' : 'Next'} <ChevronRight className="w-3.5 h-3.5" />
           </Button>
         </div>
       </div>
