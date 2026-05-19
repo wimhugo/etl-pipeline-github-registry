@@ -355,7 +355,7 @@ export default function KBUserConfig() {
                           <SelectValue placeholder={auto ? `Auto: ${auto}` : 'Not detected — select manually'} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={null}>— None —</SelectItem>
+                          <SelectItem value="__none__">— None —</SelectItem>
                           {jsonFiles.map(f => (
                             <SelectItem key={f.name} value={f.name}>
                               {f.name}{f.name === auto ? ' (auto-detected)' : ''}

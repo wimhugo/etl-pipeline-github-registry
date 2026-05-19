@@ -17,7 +17,7 @@ const ICON_OPTIONS = [
 ];
 
 const LINKED_TYPE_OPTIONS = [
-  { label: '— None —', value: '' },
+  { label: '— None —', value: '__none__' },
   ...WORKFLOW_TYPES_DEFAULT.map(wt => ({
     label: `Workflow: ${wt.label}`,
     value: wt.path,
@@ -176,7 +176,7 @@ export default function FeatureCardsEditor() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Permission filter (linked feature/workflow)</Label>
-              <Select value={form.linked_type || ''} onValueChange={v => setField('linked_type', v)}>
+              <Select value={form.linked_type || '__none__'} onValueChange={v => setField('linked_type', v === '__none__' ? '' : v)}>
                 <SelectTrigger className="bg-muted/50 text-sm"><SelectValue placeholder="— None (always visible) —" /></SelectTrigger>
                 <SelectContent>
                   {LINKED_TYPE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
