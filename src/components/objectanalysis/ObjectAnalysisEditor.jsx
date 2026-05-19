@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   Microscope, Link2, Type, File, Loader2, CheckCircle2, AlertCircle,
-  FileJson, Shield, Zap, Info,
+  FileJson, Shield, Zap, Info, ArrowLeft,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
@@ -95,7 +95,12 @@ export default function ObjectAnalysisEditor({ open, initialData, onClose, onSav
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] w-full max-h-[95vh] h-full overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isNew ? 'New Object Analysis' : 'Edit Object Analysis'}</DialogTitle>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <DialogTitle>{isNew ? 'New Object Analysis' : 'Edit Object Analysis'}</DialogTitle>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
