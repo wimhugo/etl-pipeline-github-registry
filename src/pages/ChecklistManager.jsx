@@ -562,21 +562,32 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
   });
 
   const { data: policies = [], isLoading: policiesLoading, error: policiesError } = useQuery({
-    queryKey: ['kb-policies', config.kb_search_data_url, fileList],
+    queryKey: ['kb-policies', config.kb_search_data_url, fileList, config.kb_policy_file],
     queryFn: async () => {
       console.log('=== CHECKLIST MANAGER POLICY DEBUG ===');
       console.log('config.kb_search_data_url:', config.kb_search_data_url);
+      console.log('config.kb_policy_file:', config.kb_policy_file);
       console.log('fileList:', fileList);
       const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
       console.log('jsonFiles:', jsonFiles.map(f => f.name));
-      const policyFiles = jsonFiles.filter(item => 
-        item.name.toLowerCase().includes('policy') || item.name.toLowerCase().includes('licence')
-      );
-      console.log('policyFiles:', policyFiles);
-      const result = policyFiles.map(file => ({
-        name: file.name.replace('.json', ''),
-        path: file.path
-      }));
+      
+      // Use the configured policy file name (like KBUserDashboard does)
+      const policyFileName = config.kb_policy_file || jsonFiles.find(f => f.name.toLowerCase().includes('polic'))?.name;
+      console.log('policyFileName:', policyFileName);
+      
+      if (!policyFileName) {
+        console.log('No policy file found!');
+        return [];
+      }
+      
+      const policyFile = fileList.find(f => f.name === policyFileName);
+      console.log('policyFile:', policyFile);
+      
+      const result = policyFile ? [{
+        name: policyFile.name.replace('.json', ''),
+        path: policyFile.path
+      }] : [];
+      
       console.log('FINAL POLICIES LIST:', result);
       console.log('========================================');
       return result;
