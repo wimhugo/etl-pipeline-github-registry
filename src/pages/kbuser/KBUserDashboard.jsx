@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import KBEntityCard from '@/components/kbuser/KBEntityCard';
 import { Link } from 'react-router-dom';
-import { FileJson, ShieldCheck, Zap, Lock, BookOpen, Users, Layers, Workflow, FileCheck2, Search, Microscope, ArrowRight } from 'lucide-react';
+import { FileJson, ShieldCheck, Zap, Lock, BookOpen, Users, Layers, Workflow, FileCheck2, Search, Microscope, ArrowRight, BookMarked, Shuffle } from 'lucide-react';
 import IWantToSection from '@/components/kbuser/IWantToSection';
 
 const SUB_ENTITY_HINTS = ['actions', 'constraints', 'agents', 'sources', 'scenarios'];
@@ -172,11 +172,11 @@ export default function KBUserDashboard() {
           </div>
           <div className="flex gap-3">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <FileCheck2 className="w-3.5 h-3.5 text-primary" />
+              <BookMarked className="w-3.5 h-3.5 text-primary" />
               <span>{wfCounts.licence} Licence</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Search className="w-3.5 h-3.5 text-accent" />
+              <Shuffle className="w-3.5 h-3.5 text-accent" />
               <span>{wfCounts.reuse} Reuse</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
