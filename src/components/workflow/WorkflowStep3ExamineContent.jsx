@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { FileSearch, Loader2, CheckCircle2, AlertCircle, TrendingUp, Quote, ListChecks } from 'lucide-react';
+import { FileSearch, Loader2, CheckCircle2, AlertCircle, TrendingUp, Quote, ListChecks, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/use-toast';
 
 export default function WorkflowStep3ExamineContent({ instanceId, workflowId, onComplete }) {
     const [analysisStatus, setAnalysisStatus] = useState(null);
     const [isPolling, setIsPolling] = useState(false);
+    const [selectedChecklists, setSelectedChecklists] = useState([]);
 
     // Fetch active checklist sources
-    const { data: checklists = [] } = useQuery({
+    const { data: checklists = [], isLoading, error } = useQuery({
         queryKey: ['checklist-sources-active'],
         queryFn: () => base44.entities.ChecklistSource.list('-created_date'),
     });
@@ -39,6 +43,38 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
             console.error('Analysis failed:', error);
         }
     });
+
+    // Load saved selections from localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem(
+            instanceId ? `wf_${instanceId}_licence-checklists` : `workflow_${workflowId}_checklists`
+        );
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                setSelectedChecklists(parsed.length > 0 ? parsed : (activeChecklists.length === 1 ? [activeChecklists[0].id] : []));
+            } catch {
+                setSelectedChecklists(activeChecklists.length === 1 ? [activeChecklists[0].id] : []);
+            }
+        } else if (activeChecklists.length === 1) {
+            // Auto-select single checklist by default
+            setSelectedChecklists([activeChecklists[0].id]);
+        }
+    }, [activeChecklists]);
+
+    const handleToggle = (checklistId) => {
+        setSelectedChecklists(prev => {
+            const updated = prev.includes(checklistId)
+                ? prev.filter(id => id !== checklistId)
+                : [...prev, checklistId];
+            
+            // Save to localStorage
+            const key = instanceId ? `wf_${instanceId}_licence-checklists` : `workflow_${workflowId}_checklists`;
+            localStorage.setItem(key, JSON.stringify(updated));
+            
+            return updated;
+        });
+    };
 
     // Poll for progress updates
     useEffect(() => {
@@ -81,31 +117,10 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
     const handleStartAnalysis = () => {
         analyzeMutation.mutate({
             workflowInstanceId: instanceId,
-            activeChecklistSourceIds: [] // Will be populated from parent or localStorage
+            activeChecklistSourceIds: selectedChecklists
         });
         setIsPolling(true);
     };
-
-    // Load saved checklist selections
-    const getSelectedChecklists = () => {
-        const saved = localStorage.getItem(
-            instanceId ? `wf_${instanceId}_licence-checklists` : `workflow_${workflowId}_checklists`
-        );
-        if (saved) {
-            try {
-                return JSON.parse(saved);
-            } catch {
-                return [];
-            }
-        }
-        // Auto-select single checklist if only one exists
-        if (activeChecklists.length === 1) {
-            return [activeChecklists[0].id];
-        }
-        return [];
-    };
-
-    const selectedChecklists = getSelectedChecklists();
 
     if (analyzeMutation.isError) {
         return (
@@ -219,53 +234,157 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
         );
     }
 
-    // Default: Show start button
+    // Default: Show checklist selection + start button
+    if (isLoading) {
+        return (
+            <div className="rounded-lg border border-border/50 p-4 flex items-center gap-3 bg-muted/30">
+                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                <div className="text-sm text-muted-foreground">
+                    <p className="font-medium">Loading available checklists...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="rounded-lg border border-destructive/20 p-4 flex items-start gap-3 bg-destructive/10">
+                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                <div className="text-sm text-destructive">
+                    <p className="font-medium">Failed to load checklists</p>
+                    <p className="text-xs mt-1">{error.message}</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (activeChecklists.length === 0) {
+        return (
+            <div className="rounded-lg border border-border/40 p-4 flex items-start gap-3 bg-muted/30">
+                <ListChecks className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+                <div className="text-sm text-muted-foreground">
+                    <p className="font-medium">No checklists available</p>
+                    <p className="text-xs mt-1">
+                        No active checklists found in the Checklist Manager. Please configure at least one checklist source.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <Card className="border-border/50">
-            <CardContent className="p-6 text-center space-y-4">
-                <div className="flex justify-center">
-                    <div className="p-3 rounded-full bg-primary/10">
-                        <FileSearch className="w-8 h-8 text-primary" />
-                    </div>
-                </div>
-                <div>
-                    <h3 className="text-sm font-semibold text-foreground">Ready to Analyze</h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        {selectedChecklists.length} checklist{selectedChecklists.length !== 1 ? 's' : ''} selected. Click below to start analysis.
-                    </p>
-                </div>
-                {selectedChecklists.length > 0 && (
-                    <div className="flex flex-wrap gap-1 justify-center mb-2">
-                        {selectedChecklists.map(id => {
-                            const checklist = activeChecklists.find(c => c.id === id);
-                            return checklist ? (
-                                <Badge key={id} variant="outline" className="text-xs">
+        <div className="space-y-4">
+            {/* Intro */}
+            <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2.5 flex items-start gap-2">
+                <Info className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Select which checklists to use for evaluating this resource, then click Start Analysis.
+                </p>
+            </div>
+
+            {/* Summary */}
+            {selectedChecklists.length > 0 && (
+                <Card className="bg-card border-border/50">
+                    <CardContent className="p-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <Label className="text-xs font-medium text-muted-foreground">
+                                Active checklists:
+                            </Label>
+                            {selectedChecklists.map(id => {
+                                const checklist = activeChecklists.find(c => c.id === id);
+                                return checklist ? (
+                                    <Badge key={id} variant="outline" className="text-xs">
+                                        {checklist.name}
+                                    </Badge>
+                                ) : null;
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Checklist list */}
+            <div className="space-y-2">
+                {activeChecklists.map((checklist) => (
+                    <label
+                        key={checklist.id}
+                        className="flex items-center justify-between p-3 rounded-lg border border-border/40 hover:bg-muted/20 transition-colors cursor-pointer group"
+                    >
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">
                                     {checklist.name}
-                                </Badge>
-                            ) : null;
-                        })}
+                                </span>
+                                {checklist.description && (
+                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                        {checklist.source_type}
+                                    </Badge>
+                                )}
+                            </div>
+                            {checklist.description && (
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                    {checklist.description}
+                                </p>
+                            )}
+                        </div>
+                        <Switch
+                            checked={selectedChecklists.includes(checklist.id)}
+                            onCheckedChange={() => handleToggle(checklist.id)}
+                            className="shrink-0 ml-3"
+                        />
+                    </label>
+                ))}
+            </div>
+
+            {/* Clear all */}
+            {selectedChecklists.length > 0 && (
+                <div className="flex items-center justify-end pt-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            setSelectedChecklists([]);
+                            const key = instanceId ? `wf_${instanceId}_licence-checklists` : `workflow_${workflowId}_checklists`;
+                            localStorage.removeItem(key);
+                            toast({
+                                title: 'Checklists cleared',
+                                description: 'All checklist selections have been cleared.',
+                            });
+                        }}
+                        className="h-8 text-xs"
+                    >
+                        Clear All
+                    </Button>
+                </div>
+            )}
+
+            {/* Start Analysis button */}
+            <Card className="border-primary/20 bg-primary/5">
+                <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                            <div className="p-2 rounded-full bg-primary/10">
+                                <FileSearch className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-foreground">Ready to Analyze</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {selectedChecklists.length} checklist{selectedChecklists.length !== 1 ? 's' : ''} selected
+                                </p>
+                            </div>
+                        </div>
+                        <Button 
+                            onClick={handleStartAnalysis}
+                            disabled={selectedChecklists.length === 0}
+                            className="gap-2"
+                        >
+                            <FileSearch className="w-4 h-4" />
+                            Start Analysis
+                        </Button>
                     </div>
-                )}
-                <Button 
-                    onClick={handleStartAnalysis}
-                    disabled={selectedChecklists.length === 0}
-                    className="gap-2"
-                >
-                    <FileSearch className="w-4 h-4" />
-                    Start Analysis
-                </Button>
-                {selectedChecklists.length === 0 && activeChecklists.length === 0 && (
-                    <p className="text-xs text-destructive">
-                        No active checklists available. Please configure checklists in the Checklist Manager.
-                    </p>
-                )}
-                {selectedChecklists.length === 0 && activeChecklists.length > 1 && (
-                    <p className="text-xs text-muted-foreground">
-                        Please go back to select which checklists to use.
-                    </p>
-                )}
-            </CardContent>
-        </Card>
+                </CardContent>
+            </Card>
+        </div>
     );
 }
 
