@@ -145,22 +145,24 @@ Deno.serve(async (req) => {
       items = Array.isArray(rawData) ? rawData : [rawData];
     }
 
-    // Normalize to { id, label, description } format
+    // Normalize to { id, label, description, regex } format
     const normalizedItems = items.map(item => {
       if (typeof item === 'string' || typeof item === 'number') {
-        return { id: String(item), label: String(item), description: '' };
+        return { id: String(item), label: String(item), description: '', regex: [] };
       }
       if (typeof item === 'object') {
         const idField = checklistSource.value_field || 'id';
         const labelField = checklistSource.label_field || 'label';
         const descField = checklistSource.description_field || 'description';
+        const regexField = checklistSource.regex_field || 'regex';
         return {
           id: item[idField] || item.id || '',
           label: item[labelField] || item.label || item.name || item.title || String(item[idField] || ''),
-          description: item[descField] || item.description || ''
+          description: item[descField] || item.description || '',
+          regex: Array.isArray(item[regexField]) ? item[regexField] : (item[regexField] ? [item[regexField]] : [])
         };
       }
-      return { id: '', label: '', description: '' };
+      return { id: '', label: '', description: '', regex: [] };
     }).filter(item => item.id && item.label);
 
     // Update cache

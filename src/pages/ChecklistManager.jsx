@@ -299,7 +299,7 @@ export default function ChecklistManager() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
                   <div>
                     <span className="text-muted-foreground">Source:</span>
                     <div className="font-mono text-[11px] mt-0.5 truncate">
@@ -318,6 +318,12 @@ export default function ChecklistManager() {
                     <span className="text-muted-foreground">Value/Label:</span>
                     <div className="font-mono text-[11px] mt-0.5">
                       {source.value_field}/{source.label_field}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Regex:</span>
+                    <div className="font-mono text-[11px] mt-0.5">
+                      {source.regex_field || '(none)'}
                     </div>
                   </div>
                   <div>
@@ -460,6 +466,7 @@ export default function ChecklistManager() {
                               <th className="text-left px-3 py-2 font-medium">ID</th>
                               <th className="text-left px-3 py-2 font-medium">Label</th>
                               <th className="text-left px-3 py-2 font-medium">Description</th>
+                              <th className="text-left px-3 py-2 font-medium">Regex</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -468,6 +475,17 @@ export default function ChecklistManager() {
                                 <td className="px-3 py-2 font-mono">{item.id}</td>
                                 <td className="px-3 py-2 font-medium">{item.label}</td>
                                 <td className="px-3 py-2 text-muted-foreground max-w-xs truncate">{item.description || '—'}</td>
+                                <td className="px-3 py-2 font-mono text-[10px]">
+                                  {item.regex && item.regex.length > 0 ? (
+                                    <div className="flex flex-col gap-0.5">
+                                      {item.regex.map((r, i) => (
+                                        <span key={i} className="bg-muted px-1 py-0.5 rounded truncate max-w-[150px] block">{r}</span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -518,6 +536,7 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
     value_field: 'id',
     label_field: 'label',
     description_field: 'description',
+    regex_field: 'regex',
     inline_data: '',
     cache_duration_minutes: 60,
     is_active: true,
@@ -532,6 +551,7 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
         value_field: source.value_field || 'id',
         label_field: source.label_field || 'label',
         description_field: source.description_field || 'description',
+        regex_field: source.regex_field || 'regex',
         cache_duration_minutes: source.cache_duration_minutes || 60,
         is_active: source.is_active !== false,
       });
@@ -684,34 +704,43 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
               placeholder="e.g., $.items[*] or checklist"
             />
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="value_field">Value Field</Label>
-              <Input
-                id="value_field"
-                value={formData.value_field}
-                onChange={(e) => setFormData({ ...formData, value_field: e.target.value })}
-                placeholder="id"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="label_field">Label Field</Label>
-              <Input
-                id="label_field"
-                value={formData.label_field}
-                onChange={(e) => setFormData({ ...formData, label_field: e.target.value })}
-                placeholder="label"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description_field">Description Field</Label>
-              <Input
-                id="description_field"
-                value={formData.description_field}
-                onChange={(e) => setFormData({ ...formData, description_field: e.target.value })}
-                placeholder="description"
-              />
-            </div>
+          <div className="grid grid-cols-4 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="value_field">Value Field</Label>
+            <Input
+              id="value_field"
+              value={formData.value_field}
+              onChange={(e) => setFormData({ ...formData, value_field: e.target.value })}
+              placeholder="id"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="label_field">Label Field</Label>
+            <Input
+              id="label_field"
+              value={formData.label_field}
+              onChange={(e) => setFormData({ ...formData, label_field: e.target.value })}
+              placeholder="label"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="description_field">Description Field</Label>
+            <Input
+              id="description_field"
+              value={formData.description_field}
+              onChange={(e) => setFormData({ ...formData, description_field: e.target.value })}
+              placeholder="description"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="regex_field">Regex Field</Label>
+            <Input
+              id="regex_field"
+              value={formData.regex_field}
+              onChange={(e) => setFormData({ ...formData, regex_field: e.target.value })}
+              placeholder="regex"
+            />
+          </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="cache_duration_minutes">Cache Duration (minutes)</Label>
