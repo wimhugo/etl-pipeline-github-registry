@@ -24,6 +24,26 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
         queryFn: () => base44.entities.ChecklistSource.list('-created_date'),
     });
 
+    // Load existing analysis results from workflow instance on mount
+    useEffect(() => {
+        if (!instanceId) return;
+        
+        const loadExistingAnalysis = async () => {
+            try {
+                const instance = await base44.entities.WorkflowInstance.get(instanceId);
+                const step3Data = instance.step_data?.['step-3'];
+                if (step3Data && step3Data.status === 'completed' && step3Data.analysis_results) {
+                    console.log('Loaded existing analysis results from step-3');
+                    setAnalysisStatus(step3Data);
+                }
+            } catch (err) {
+                console.error('Failed to load existing analysis:', err);
+            }
+        };
+        
+        loadExistingAnalysis();
+    }, [instanceId]);
+
     const activeChecklists = checklists.filter(c => c.is_active);
 
     // Mutation to trigger analysis
@@ -33,7 +53,17 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
             return response.data;
         },
         onSuccess: (data) => {
+            console.log('Analysis completed successfully:', data);
             setIsPolling(false);
+            // Fetch the latest instance data to ensure we have the saved results
+            base44.entities.WorkflowInstance.get(instanceId).then(instance => {
+                const step3Data = instance.step_data?.['step-3'];
+                if (step3Data) {
+                    setAnalysisStatus(step3Data);
+                    console.log('Updated analysisStatus with saved data:', step3Data);
+                }
+            }).catch(err => console.error('Failed to fetch updated instance:', err));
+            
             if (onComplete) {
                 onComplete({ analysisComplete: true, results: data.results, summary: data.summary });
             }
@@ -89,30 +119,34 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
         let pollInterval = null;
 
         if (isPolling) {
-            pollInterval = setInterval(async () => {
-                try {
-                    const instance = await base44.entities.WorkflowInstance.get(instanceId);
-                    const step3Data = instance.step_data?.['step-3'];
-                    
-                    if (step3Data) {
-                        setAnalysisStatus(step3Data);
+            // Wait 3 seconds before first poll to give backend time to start
+            const initialDelay = setTimeout(async () => {
+                pollInterval = setInterval(async () => {
+                    try {
+                        const instance = await base44.entities.WorkflowInstance.get(instanceId);
+                        const step3Data = instance.step_data?.['step-3'];
                         
-                        // Stop polling if completed or errored
-                        if (step3Data.status === 'completed' || step3Data.status === 'error') {
-                            setIsPolling(false);
-                            if (onComplete && step3Data.status === 'completed') {
-                                onComplete({ 
-                                    analysisComplete: true, 
-                                    results: step3Data.analysis_results, 
-                                    summary: step3Data.summary 
-                                });
+                        if (step3Data) {
+                            setAnalysisStatus(step3Data);
+                            
+                            // Stop polling if completed or errored
+                            if (step3Data.status === 'completed' || step3Data.status === 'error') {
+                                clearInterval(pollInterval);
+                                setIsPolling(false);
+                                if (onComplete && step3Data.status === 'completed') {
+                                    onComplete({ 
+                                        analysisComplete: true, 
+                                        results: step3Data.analysis_results, 
+                                        summary: step3Data.summary 
+                                    });
+                                }
                             }
                         }
+                    } catch (error) {
+                        console.error('Polling error:', error);
                     }
-                } catch (error) {
-                    console.error('Polling error:', error);
-                }
-            }, 2000); // Poll every 2 seconds
+                }, 2000); // Poll every 2 seconds
+            }, 3000);
         }
 
         return () => {
