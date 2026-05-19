@@ -23,29 +23,41 @@ Deno.serve(async (req) => {
 
         // Step 2: Get content from Step 2 data
         const step2Data = workflowInstance.step_data?.['step-2'] || workflowInstance.step_data?.['resource'];
+        console.log('Workflow instance step_data:', JSON.stringify(workflowInstance.step_data));
+        console.log('Extracted step2Data:', step2Data);
         if (!step2Data) {
-            return Response.json({ error: 'No resource content found from Step 2' }, { status: 400 });
+            return Response.json({ 
+                error: 'No resource content found from Step 2',
+                details: 'step_data keys: ' + Object.keys(workflowInstance.step_data || {}).join(', ')
+            }, { status: 400 });
         }
 
         let contentToAnalyze = '';
+        console.log('step2Data structure:', { input_type: step2Data.input_type, object_url: step2Data.object_url, text_content: step2Data.text_content, file_url: step2Data.file_url });
+        
         if (step2Data.input_type === 'url' && step2Data.object_url) {
-            // Fetch URL content
+            console.log('Fetching URL:', step2Data.object_url);
             const response = await fetch(step2Data.object_url);
             if (!response.ok) {
                 return Response.json({ error: `Failed to fetch URL: ${response.status}` }, { status: 500 });
             }
             contentToAnalyze = await response.text();
+            console.log('URL content length:', contentToAnalyze.length);
         } else if (step2Data.input_type === 'text' && step2Data.text_content) {
+            console.log('Using text content, length:', step2Data.text_content.length);
             contentToAnalyze = step2Data.text_content;
         } else if (step2Data.input_type === 'file' && step2Data.file_url) {
-            // For files, we'll need to fetch the content - this assumes it's text-based
+            console.log('Fetching file:', step2Data.file_url);
             const response = await fetch(step2Data.file_url);
             if (!response.ok) {
                 return Response.json({ error: `Failed to fetch file: ${response.status}` }, { status: 500 });
             }
             contentToAnalyze = await response.text();
         } else {
-            return Response.json({ error: 'No valid content found to analyze' }, { status: 400 });
+            return Response.json({ 
+                error: 'No valid content found to analyze',
+                details: { input_type: step2Data.input_type, has_url: !!step2Data.object_url, has_text: !!step2Data.text_content, has_file: !!step2Data.file_url }
+            }, { status: 400 });
         }
 
         // Step 3: Fetch checklist sources and their items

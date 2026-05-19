@@ -44,23 +44,31 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
         }
     });
 
-    // Load saved selections from localStorage
+    // Load saved selections from localStorage (only once on mount)
     useEffect(() => {
+        if (activeChecklists.length === 0) return;
+        
         const saved = localStorage.getItem(
             instanceId ? `wf_${instanceId}_licence-checklists` : `workflow_${workflowId}_checklists`
         );
+        
+        let initialSelection = [];
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
-                setSelectedChecklists(parsed.length > 0 ? parsed : (activeChecklists.length === 1 ? [activeChecklists[0].id] : []));
+                initialSelection = parsed.length > 0 ? parsed : [];
             } catch {
-                setSelectedChecklists(activeChecklists.length === 1 ? [activeChecklists[0].id] : []);
+                initialSelection = [];
             }
-        } else if (activeChecklists.length === 1) {
-            // Auto-select single checklist by default
-            setSelectedChecklists([activeChecklists[0].id]);
         }
-    }, [activeChecklists]);
+        
+        // Auto-select if only one checklist exists and nothing saved
+        if (initialSelection.length === 0 && activeChecklists.length === 1) {
+            initialSelection = [activeChecklists[0].id];
+        }
+        
+        setSelectedChecklists(initialSelection);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleToggle = (checklistId) => {
         setSelectedChecklists(prev => {
