@@ -465,8 +465,8 @@ export default function VocabularyManager() {
                           <tbody>
                             {testResult.data.items.slice(0, 20).map((item, idx) => (
                               <tr key={idx} className="border-t hover:bg-muted/30">
-                                <td className="px-3 py-2 font-mono">{item[testResult.source.value_field]}</td>
-                                <td className="px-3 py-2">{item[testResult.source.label_field]}</td>
+                                <td className="px-3 py-2 font-mono">{item.value}</td>
+                                <td className="px-3 py-2">{item.label}</td>
                               </tr>
                             ))}
                           </tbody>
