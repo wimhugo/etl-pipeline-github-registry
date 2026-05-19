@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { ShieldCheck, ShieldOff, Gavel, Plus, Trash2, ExternalLink, X } from 'lucide-react';
+import { ShieldCheck, ShieldOff, Gavel, Plus, Trash2, ExternalLink, X, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 
 /**
  * PolicyEditor dialog – edit/add/delete actions and their constraints per rule section.
@@ -181,6 +185,28 @@ function ActionEditor({ item, idx, actionsMap, constraintsMap, onItemChange, onD
   );
 }
 
+function CollapsibleSection({ title, icon: Icon, color, children, defaultOpen = true }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="space-y-2">
+      <CollapsibleTrigger asChild>
+        <Button
+          variant="ghost"
+          className="w-full justify-start h-8 px-2 text-xs font-semibold uppercase tracking-wider hover:bg-muted/30"
+        >
+          {isOpen ? <ChevronDown className="w-3.5 h-3.5 mr-1" /> : <ChevronRight className="w-3.5 h-3.5 mr-1" />}
+          <Icon className={cn("w-3.5 h-3.5 mr-1.5", color)} />
+          {title}
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-2 pl-2 border-l border-border/50">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 function RuleSectionEditor({ sectionKey, label, icon: Icon, color, items, actionsMap, constraintsMap, onChange }) {
   const actionIds = Object.keys(actionsMap);
 
@@ -198,12 +224,7 @@ function RuleSectionEditor({ sectionKey, label, icon: Icon, color, items, action
 
   return (
     <div className="space-y-2">
-      <div className={`flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider ${color}`}>
-        <Icon className="w-3.5 h-3.5" />
-        {label}
-      </div>
-
-      <div className="space-y-2 pl-2 border-l border-border/50">
+      <div className="space-y-2">
         {items.length === 0 && (
           <p className="text-[11px] text-muted-foreground italic">No {label.toLowerCase()} defined.</p>
         )}
@@ -223,7 +244,7 @@ function RuleSectionEditor({ sectionKey, label, icon: Icon, color, items, action
       <Button
         variant="outline"
         size="sm"
-        className="h-7 text-xs gap-1.5 ml-2"
+        className="h-7 text-xs gap-1.5"
         onClick={handleAdd}
         disabled={actionIds.length === 0}
       >
@@ -245,6 +266,10 @@ export default function PolicyEditor({ policy, actionsMap, constraintsMap, onSav
     setDraft(prev => ({ ...prev, [sectionKey]: newItems }));
   };
 
+  const handlePolicyFieldChange = (field, value) => {
+    setDraft(prev => ({ ...prev, [field]: value }));
+  };
+
   const handleSave = () => {
     onSave({ ...draft, status: 'openrel:status/draft' });
     onClose();
@@ -264,18 +289,94 @@ export default function PolicyEditor({ policy, actionsMap, constraintsMap, onSav
         </DialogHeader>
 
         <div className="space-y-5 py-2">
+          {/* POLICY/LICENCE Section */}
+          <CollapsibleSection
+            title="Policy/Licence"
+            icon={FileText}
+            color="text-primary"
+            defaultOpen={true}
+          >
+            <div className="space-y-3 pt-1">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">ID</label>
+                <Input
+                  value={draft.id || ''}
+                  onChange={(e) => handlePolicyFieldChange('id', e.target.value)}
+                  placeholder="e.g. openrel:policy/001"
+                  className="h-8 text-xs font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Label</label>
+                <Input
+                  value={draft.label || ''}
+                  onChange={(e) => handlePolicyFieldChange('label', e.target.value)}
+                  placeholder="e.g. Open Dataset Licence"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Description</label>
+                <Textarea
+                  value={draft.description || ''}
+                  onChange={(e) => handlePolicyFieldChange('description', e.target.value)}
+                  placeholder="Brief description of this policy..."
+                  className="h-20 text-xs resize-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Type</label>
+                  <Input
+                    value={draft.type || ''}
+                    onChange={(e) => handlePolicyFieldChange('type', e.target.value)}
+                    placeholder="e.g. openrel:DatasetLicence"
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Status</label>
+                  <Input
+                    value={draft.status || ''}
+                    onChange={(e) => handlePolicyFieldChange('status', e.target.value)}
+                    placeholder="e.g. openrel:status/active"
+                    className="h-8 text-xs font-mono"
+                    disabled
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Language</label>
+                <Input
+                  value={draft.lang || ''}
+                  onChange={(e) => handlePolicyFieldChange('lang', e.target.value)}
+                  placeholder="e.g. en"
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* PERMISSIONS, PROHIBITIONS, DUTIES Sections */}
           {RULE_SECTIONS.map(({ key, label, icon, color }) => (
-            <RuleSectionEditor
+            <CollapsibleSection
               key={key}
-              sectionKey={key}
-              label={label}
+              title={label}
               icon={icon}
               color={color}
-              items={draft[key] || []}
-              actionsMap={actionsMap}
-              constraintsMap={constraintsMap}
-              onChange={handleSectionChange}
-            />
+              defaultOpen={false}
+            >
+              <RuleSectionEditor
+                sectionKey={key}
+                label={label}
+                icon={icon}
+                color={color}
+                items={draft[key] || []}
+                actionsMap={actionsMap}
+                constraintsMap={constraintsMap}
+                onChange={handleSectionChange}
+              />
+            </CollapsibleSection>
           ))}
         </div>
 
