@@ -103,27 +103,43 @@ Deno.serve(async (req) => {
         const path = checklistSource.github_path;
         const branch = checklistSource.github_branch || 'main';
         
-        const globalConfigs = await base44.entities.GlobalConfig.list();
-        const globalConfig = globalConfigs[0] || {};
-        const token = globalConfig.github_token;
+        // Fetch GitHub token using service role (more reliable)
+        let token = null;
+        try {
+          const globalConfigs = await base44.asServiceRole.entities.GlobalConfig.filter({});
+          if (globalConfigs && globalConfigs.length > 0 && globalConfigs[0].github_token) {
+            token = globalConfigs[0].github_token;
+          }
+        } catch (e) {
+          console.log('Could not fetch GlobalConfig:', e.message);
+        }
+        
+        // Fallback to environment variable
+        if (!token) {
+          token = Deno.env.get('GITHUB_TOKEN');
+        }
+        
+        if (!token) {
+          throw new Error('No GitHub token configured in GlobalConfig or environment');
+        }
         
         const githubUrl = `https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`;
         const headers = {
-          'Accept': 'application/vnd.github.v3+json',
+          'Authorization': `token ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json',
           'User-Agent': 'OpenREL-App'
         };
         
-        if (token) {
-          headers['Authorization'] = `token ${token}`;
-        }
-        
         const response = await fetch(githubUrl, { headers });
         if (!response.ok) {
-          throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(`GitHub API error (${response.status}): ${errorData.message || response.statusText}`);
         }
         
         const fileData = await response.json();
-        const content = atob(fileData.content);
+        const content = atob(fileData.content.replace(/\n/g, ''));
         
         if (checklistSource.data_format === 'yaml') {
           rawData = yaml.load(content);
