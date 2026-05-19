@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
           id: item[idField] || item.id || '',
           label: item[labelField] || item.label || item.name || item.title || String(item[idField] || ''),
           description: item[descField] || item.description || '',
-          regex: (regexValue && Array.isArray(regexValue)) ? regexValue : (regexValue ? [regexValue] : [])
+          regex: Array.isArray(regexValue) ? regexValue : []
         };
       }
       return { id: '', label: '', description: '', regex: [] };
