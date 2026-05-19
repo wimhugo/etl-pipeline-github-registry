@@ -200,14 +200,10 @@ Deno.serve(async (req) => {
           console.log('📄 First 100 chars:', content.substring(0, 100));
           
           // The source file has LaTeX-style escaping throughout (backslash before special chars)
-          // Remove ALL erroneous backslashes before special JSON characters
-          const cleanedContent = content
-            .replace(/\\_/g, '_')      // Remove backslash before underscore
-            .replace(/\\\[/g, '[')     // Remove backslash before [
-            .replace(/\\\]/g, ']')     // Remove backslash before ]
-            .replace(/\\\{/g, '{')     // Remove backslash before {
-            .replace(/\\\}/g, '}')     // Remove backslash before }
-            .replace(/\\,/g, ',');     // Remove backslash before comma
+          // Simple approach: remove ALL backslashes since none are legitimate in this broken JSON
+          console.log('🧹 Cleaning content - removing all backslashes...');
+          const cleanedContent = content.replace(/\\/g, '');
+          console.log('🧹 Cleaned content length:', cleanedContent.length);
           
           console.log('📄 Cleaned first 100 chars:', cleanedContent.substring(0, 100));
           console.log('📄 About to parse JSON...');
