@@ -447,7 +447,27 @@ export default function KBWorkflow() {
           <span className="text-xs text-muted-foreground">Step {currentStep + 1} of {steps.length}</span>
           <Button
             size="sm" className="gap-1.5"
-            onClick={() => setCurrentStep(s => s + 1)}
+            onClick={() => {
+              // Save step 4 selection before navigating to step 5
+              if (currentStep === 3 && openInstance) {
+                const selectedPolicies = JSON.parse(localStorage.getItem(`wf_${openInstance.id}_step-4`) || '{}')?.selected_policies || [];
+                if (selectedPolicies.length > 0) {
+                  const step4Data = { selected_policies: selectedPolicies };
+                  const stepData = openInstance.step_data || {};
+                  updateMutation.mutate({
+                    id: openInstance.id,
+                    source: openInstance._source,
+                    data: {
+                      step_data: {
+                        ...stepData,
+                        'step-4': step4Data,
+                      },
+                    },
+                  });
+                }
+              }
+              setCurrentStep(s => s + 1);
+            }}
             disabled={currentStep === steps.length - 1}
           >
             Next <ChevronRight className="w-3.5 h-3.5" />

@@ -12,6 +12,28 @@ import { toast } from '@/components/ui/use-toast';
 export default function WorkflowStep4Review({ instanceId, workflowId, onComplete }) {
     const [selectedPolicies, setSelectedPolicies] = useState([]);
 
+    // Load existing selection from localStorage on mount
+    useEffect(() => {
+        const saved = localStorage.getItem(`wf_${instanceId}_step-4`);
+        if (saved) {
+            try {
+                const step4Data = JSON.parse(saved);
+                if (step4Data.selected_policies && Array.isArray(step4Data.selected_policies)) {
+                    setSelectedPolicies(step4Data.selected_policies);
+                }
+            } catch (e) {
+                console.error('Failed to parse step-4 data:', e);
+            }
+        }
+    }, [instanceId]);
+
+    // Save selection to localStorage whenever it changes
+    useEffect(() => {
+        if (instanceId) {
+            localStorage.setItem(`wf_${instanceId}_step-4`, JSON.stringify({ selected_policies: selectedPolicies }));
+        }
+    }, [selectedPolicies, instanceId]);
+
     // Fetch the workflow instance to get step 3 analysis results
     const { data: workflowInstance, isLoading: instanceLoading } = useQuery({
         queryKey: ['workflow-instance', instanceId],
