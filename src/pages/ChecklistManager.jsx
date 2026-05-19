@@ -457,15 +457,17 @@ export default function ChecklistManager() {
                         <table className="w-full text-xs">
                           <thead className="bg-muted/50 sticky top-0">
                             <tr>
-                              <th className="text-left px-3 py-2 font-medium">Value</th>
+                              <th className="text-left px-3 py-2 font-medium">ID</th>
                               <th className="text-left px-3 py-2 font-medium">Label</th>
+                              <th className="text-left px-3 py-2 font-medium">Description</th>
                             </tr>
                           </thead>
                           <tbody>
                             {testResult.data.items.slice(0, 20).map((item, idx) => (
                               <tr key={idx} className="border-t hover:bg-muted/30">
-                                <td className="px-3 py-2 font-mono">{item.value}</td>
-                                <td className="px-3 py-2">{item.label}</td>
+                                <td className="px-3 py-2 font-mono">{item.id}</td>
+                                <td className="px-3 py-2 font-medium">{item.label}</td>
+                                <td className="px-3 py-2 text-muted-foreground max-w-xs truncate">{item.description || '—'}</td>
                               </tr>
                             ))}
                           </tbody>
