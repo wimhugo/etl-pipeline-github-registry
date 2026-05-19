@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Plus, Loader2, Edit, Trash2, RefreshCw, ExternalLink, Code, FileJson, Globe, Link2, Unlink, CheckSquare, CheckCircle, AlertCircle, Trash } from 'lucide-react';
@@ -561,39 +561,47 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: policies = [], isLoading: policiesLoading, error: policiesError } = useQuery({
-    queryKey: ['kb-policies', config.kb_search_data_url, fileList, config.kb_policy_file],
+  // Fetch the actual policy file content and extract policies
+  const { data: policyData = null, isLoading: policyDataLoading } = useQuery({
+    queryKey: ['kb-policy-file-content', config.kb_search_data_url, config.kb_policy_file],
     queryFn: async () => {
-      console.log('=== CHECKLIST MANAGER POLICY DEBUG ===');
-      console.log('config.kb_search_data_url:', config.kb_search_data_url);
-      console.log('config.kb_policy_file:', config.kb_policy_file);
-      console.log('fileList:', fileList);
-      const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
-      console.log('jsonFiles:', jsonFiles.map(f => f.name));
-      
-      // Use the configured policy file name (like KBUserDashboard does)
-      const policyFileName = config.kb_policy_file || jsonFiles.find(f => f.name.toLowerCase().includes('polic'))?.name;
-      console.log('policyFileName:', policyFileName);
-      
-      if (!policyFileName) {
-        console.log('No policy file found!');
-        return [];
-      }
-      
-      const policyFile = fileList.find(f => f.name === policyFileName);
-      console.log('policyFile:', policyFile);
-      
-      const result = policyFile ? [{
-        name: policyFile.name.replace('.json', ''),
-        path: policyFile.path
-      }] : [];
-      
-      console.log('FINAL POLICIES LIST:', result);
-      console.log('========================================');
-      return result;
+      const policyFileName = config.kb_policy_file;
+      if (!policyFileName || !config.kb_search_data_url) return null;
+      const r = await fetch(`${config.kb_search_data_url}/${policyFileName}`);
+      if (!r.ok) throw new Error(`Failed to fetch ${policyFileName}`);
+      return r.json();
     },
-    enabled: !!config.kb_search_data_url && fileList.length > 0,
+    enabled: !!config.kb_search_data_url && !!config.kb_policy_file,
+    staleTime: 5 * 60 * 1000,
   });
+
+  // Extract policies from the file content (same logic as KBUserDashboard)
+  const policies = React.useMemo(() => {
+    if (!policyData) return [];
+    console.log('=== CHECKLIST MANAGER POLICY DEBUG ===');
+    console.log('policyData:', policyData);
+    
+    // Handle both array format and object with policies key
+    const policiesArray = Array.isArray(policyData) 
+      ? policyData 
+      : (policyData.policies || policyData.items || []);
+    
+    console.log('policiesArray:', policiesArray);
+    
+    const result = policiesArray.map((p, idx) => ({
+      id: p['@id'] || p.uid || p.id || `policy_${idx}`,
+      name: p.label || p.name || p.title || `Policy ${idx + 1}`,
+      uid: p.uid || p['@id'] || p.id,
+      data: p
+    }));
+    
+    console.log('FINAL POLICIES LIST:', result);
+    console.log('========================================');
+    return result;
+  }, [policyData]);
+  
+  const policiesLoading = policyDataLoading;
+  const policiesError = null;
 
   React.useEffect(() => {
     if (source) {
