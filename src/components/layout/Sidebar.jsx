@@ -94,7 +94,10 @@ export default function Sidebar({ visible = false, onToggle }) {
       {/* Desktop toggle button */}
       <button
         onClick={() => setIsVisible(!isVisible)}
-        className="fixed top-20 lg:top-20 left-3 z-50 p-1.5 rounded-lg bg-card border border-border shadow-lg hover:bg-accent transition-all"
+        className={cn(
+          "fixed top-20 lg:top-20 z-50 p-1.5 rounded-lg bg-card border border-border shadow-lg hover:bg-accent transition-all duration-300",
+          isVisible ? "left-60" : "left-3"
+        )}
         title={isVisible ? 'Hide sidebar' : 'Show sidebar'}
       >
         {isVisible ? <ChevronRight className="w-4 h-4" /> : <ChevronRight className="w-4 h-4 rotate-180" />}
@@ -103,7 +106,7 @@ export default function Sidebar({ visible = false, onToggle }) {
       {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="lg:hidden fixed top-20 left-10 z-50 p-1.5 rounded-lg bg-card border border-border"
+        className="lg:hidden fixed top-20 left-3 z-50 p-1.5 rounded-lg bg-card border border-border"
       >
         {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
       </button>
