@@ -77,18 +77,29 @@ export default function KBPolicyList({ searchQuery = '', advancedFilters = {}, o
   const constraintsMap = Object.fromEntries(constraintsArray.map(c => [c.id, c]));
 
   const statesArray = Array.isArray(statesData) ? statesData : (statesData?.states || []);
-  const statesMap = Object.fromEntries(statesArray.map(s => [s.id, s]));
+  // Index by both full id and the last path/colon segment so prefixed values like "openrel:status/active" resolve correctly
+  const statesMap = statesArray.reduce((acc, s) => {
+    if (s.id) {
+      acc[s.id] = s;
+      const shortKey = s.id.split(/[:/]/).pop()?.toLowerCase();
+      if (shortKey && shortKey !== s.id) acc[shortKey] = s;
+    }
+    return acc;
+  }, {});
 
   const policies = fileData?.policies || (Array.isArray(fileData) ? fileData : []);
   const policiesMap = Object.fromEntries(policies.map(p => [p.id, p]));
 
   // Derive distinct filter values from data and notify parent
   useEffect(() => {
-    if (!policies.length || !onDataReady) return;
+    if (!onDataReady) return;
     const odrlTypes = [...new Set(policies.map(p => p.odrl_type).filter(Boolean))];
-    const statuses  = [...new Set(policies.map(p => p.status).filter(Boolean))];
+    // Include all statuses from states file, not just those present in current policies
+    const statusesFromStates = statesArray.map(s => s.id).filter(Boolean);
+    const statusesFromPolicies = policies.map(p => p.status).filter(Boolean);
+    const statuses = [...new Set([...statusesFromStates, ...statusesFromPolicies])];
     onDataReady({ odrlTypes, statuses });
-  }, [policies.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [policies.length, statesArray.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const matchFacet = (fieldValue, facet) => {
     if (!facet?.values?.length) return true;
