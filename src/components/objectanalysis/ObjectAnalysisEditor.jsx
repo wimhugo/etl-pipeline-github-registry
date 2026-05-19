@@ -93,7 +93,7 @@ export default function ObjectAnalysisEditor({ open, initialData, onClose, onSav
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] w-full max-h-[95vh] h-full overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isNew ? 'New Object Analysis' : 'Edit Object Analysis'}</DialogTitle>
         </DialogHeader>
