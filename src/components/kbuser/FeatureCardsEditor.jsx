@@ -17,18 +17,20 @@ const ICON_OPTIONS = [
 ];
 
 const LINKED_TYPE_OPTIONS = [
-  { label: '— None —', value: '__none__' },
+  { label: '— None —', value: '__none__', target_path: '' },
   ...WORKFLOW_TYPES_DEFAULT.map(wt => ({
     label: `Workflow: ${wt.label}`,
     value: wt.path,
+    target_path: '/kb-user/workflow',
   })),
   ...KB_USER_FEATURES_DEFAULT.map(f => ({
     label: `Feature: ${f.label}`,
     value: f.path,
+    target_path: f.path,
   })),
 ];
 
-const EMPTY_FORM = { title: '', description: '', icon_name: 'Star', target_path: '', linked_type: '', order: 0, is_active: true };
+const EMPTY_FORM = { title: '', description: '', icon_name: 'Star', linked_type: '', order: 0, is_active: true };
 
 export default function FeatureCardsEditor() {
   const queryClient = useQueryClient();
@@ -66,7 +68,7 @@ export default function FeatureCardsEditor() {
 
   const openEdit = (card) => {
     setEditingCard(card);
-    setForm({ title: card.title || '', description: card.description || '', icon_name: card.icon_name || 'Star', target_path: card.target_path || '', linked_type: card.linked_type || '', order: card.order ?? 0, is_active: card.is_active !== false });
+    setForm({ title: card.title || '', description: card.description || '', icon_name: card.icon_name || 'Star', linked_type: card.linked_type || '', order: card.order ?? 0, is_active: card.is_active !== false });
     setDialogOpen(true);
   };
 
@@ -74,11 +76,13 @@ export default function FeatureCardsEditor() {
 
   const handleSave = () => {
     if (!form.title.trim()) return;
+    const option = LINKED_TYPE_OPTIONS.find(o => o.value === form.linked_type);
+    const data = { ...form, target_path: option?.target_path || '' };
     if (editingCard) {
-      updateMutation.mutate({ id: editingCard.id, data: form });
+      updateMutation.mutate({ id: editingCard.id, data });
       closeDialog();
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate(data);
     }
   };
 
@@ -169,10 +173,6 @@ export default function FeatureCardsEditor() {
                 <Label className="text-xs text-muted-foreground">Order</Label>
                 <Input type="number" value={form.order} onChange={e => setField('order', Number(e.target.value))} className="bg-muted/50" />
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Navigate to (path)</Label>
-              <Input value={form.target_path} onChange={e => setField('target_path', e.target.value)} placeholder="/kb-user/workflow?type=licence" className="font-mono text-sm" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Permission filter (linked feature/workflow)</Label>
