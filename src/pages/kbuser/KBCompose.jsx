@@ -151,8 +151,15 @@ export default function KBCompose() {
 
   const policiesMap = useMemo(() => Object.fromEntries(allPolicies.map(p => [p.id, p])), [allPolicies]);
 
-  const odrlTypes = useMemo(() => [...new Set(allPolicies.map(p => p.odrl_type).filter(Boolean))], [allPolicies]);
-  const statuses  = useMemo(() => [...new Set(allPolicies.map(p => p.status).filter(Boolean))], [allPolicies]);
+  const odrlTypes = useMemo(() => {
+    const isPlaceholder = (value) => /^{{.*}}$|^<.*>$/.test(value);
+    return [...new Set(allPolicies.map(p => p.odrl_type).filter(Boolean).filter(v => !isPlaceholder(v)))];
+  }, [allPolicies]);
+  
+  const statuses = useMemo(() => {
+    const isPlaceholder = (value) => /^{{.*}}$|^<.*>$/.test(value);
+    return [...new Set(allPolicies.map(p => p.status).filter(Boolean).filter(v => !isPlaceholder(v)))];
+  }, [allPolicies]);
 
   const matchFacet = (fieldValue, facet) => {
     if (!facet?.values?.length) return true;
