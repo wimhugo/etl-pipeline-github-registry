@@ -20,6 +20,7 @@ import WorkflowNewDialog from '@/components/workflow/WorkflowNewDialog';
 import WorkflowEditDialog from '@/components/workflow/WorkflowEditDialog';
 import WorkflowStep1UserContext from '@/components/workflow/WorkflowStep1UserContext';
 import WorkflowStep2FindResource from '@/components/workflow/WorkflowStep2FindResource';
+import WorkflowStep2Resource from '@/components/workflow/WorkflowStep2Resource';
 import WorkflowStep3IntendedUse from '@/components/workflow/WorkflowStep3IntendedUse';
 import OAStepContentSource from '@/components/objectanalysis/OAStepContentSource';
 import OAStepRunAnalysis from '@/components/objectanalysis/OAStepRunAnalysis';
@@ -326,6 +327,9 @@ export default function KBWorkflow() {
           )}
           {steps[currentStep].id === 'find' && (
             <WorkflowStep2FindResource instanceId={openInstance.id} />
+          )}
+          {steps[currentStep].id === 'resource' && (
+            <WorkflowStep2Resource instanceId={openInstance.id} />
           )}
           {steps[currentStep].id === 'reuse-context' && (
             <WorkflowStep3IntendedUse instanceId={openInstance.id} workflowId={openInstance.workflow_type} />

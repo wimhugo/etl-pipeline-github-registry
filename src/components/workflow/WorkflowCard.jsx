@@ -14,7 +14,7 @@ export const WORKFLOW_TYPES = {
     bg: 'bg-primary/10',
     steps: [
       { id: 'user-context', label: 'User Context' },
-      { id: 'resource',     label: 'Resource',      placeholder: true },
+      { id: 'resource',     label: 'Resource' },
       { id: 'licence',      label: 'Licence',       placeholder: true },
       { id: 'review',       label: 'Review',        placeholder: true },
     ],
