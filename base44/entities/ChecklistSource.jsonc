@@ -1,0 +1,117 @@
+{
+  "name": "ChecklistSource",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Descriptive name for this checklist (e.g., 'FAIR Data Checklist', 'Reproducibility Checklist')"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of what this checklist evaluates"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "github",
+        "url",
+        "inline"
+      ],
+      "default": "github",
+      "description": "Where the checklist data is stored"
+    },
+    "source_url": {
+      "type": "string",
+      "description": "Full URL for external checklists (when source_type=url)"
+    },
+    "github_repo": {
+      "type": "string",
+      "description": "GitHub repository in format owner/repo (when source_type=github)"
+    },
+    "github_path": {
+      "type": "string",
+      "description": "Path to the checklist file in the GitHub repository"
+    },
+    "github_branch": {
+      "type": "string",
+      "default": "main",
+      "description": "GitHub branch name"
+    },
+    "data_format": {
+      "type": "string",
+      "enum": [
+        "json",
+        "json-ld",
+        "yaml",
+        "ttl"
+      ],
+      "default": "json",
+      "description": "Format of the checklist data"
+    },
+    "json_path_expression": {
+      "type": "string",
+      "description": "JSONPath or simple dot notation to extract checklist items (e.g., '$.items[*]' or 'checklist')"
+    },
+    "value_field": {
+      "type": "string",
+      "default": "id",
+      "description": "Field name to use as the value in form elements"
+    },
+    "label_field": {
+      "type": "string",
+      "default": "label",
+      "description": "Field name to use as the display label in form elements"
+    },
+    "description_field": {
+      "type": "string",
+      "default": "description",
+      "description": "Field name to use as the description for each checklist item"
+    },
+    "regex_field": {
+      "type": "string",
+      "default": "regex",
+      "description": "Field name to use for regex patterns in checklist items"
+    },
+    "recommended_policies": {
+      "type": "array",
+      "description": "List of policy IDs from the Policies file that are recommended for this checklist",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "inline_data": {
+      "type": "string",
+      "description": "JSON string with checklist data (when source_type=inline)"
+    },
+    "cache_duration_minutes": {
+      "type": "number",
+      "default": 60,
+      "description": "How long to cache the checklist data before re-fetching"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this checklist source is currently active"
+    },
+    "last_fetched_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last successful fetch"
+    },
+    "last_fetch_status": {
+      "type": "string",
+      "enum": [
+        "success",
+        "failed",
+        "pending"
+      ],
+      "default": "pending",
+      "description": "Status of the last fetch operation"
+    }
+  },
+  "required": [
+    "name",
+    "source_type"
+  ]
+}

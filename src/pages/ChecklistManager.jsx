@@ -537,9 +537,18 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
     label_field: 'label',
     description_field: 'description',
     regex_field: 'regex',
+    recommended_policies: [],
     inline_data: '',
     cache_duration_minutes: 60,
     is_active: true,
+  });
+
+  const { data: policies = [] } = useQuery({
+    queryKey: ['kb-policies'],
+    queryFn: () => base44.functions.invoke('githubFiles', {
+      path: 'input/v0.3',
+      file_pattern: 'policies'
+    }),
   });
 
   React.useEffect(() => {
@@ -552,6 +561,7 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
         label_field: source.label_field || 'label',
         description_field: source.description_field || 'description',
         regex_field: source.regex_field || 'regex',
+        recommended_policies: source.recommended_policies || [],
         cache_duration_minutes: source.cache_duration_minutes || 60,
         is_active: source.is_active !== false,
       });
@@ -741,6 +751,41 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
               placeholder="regex"
             />
           </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="recommended_policies">Recommended Policies</Label>
+            <Select
+              value={formData.recommended_policies.length > 0 ? formData.recommended_policies[0] : ''}
+              onValueChange={(value) => {
+                if (!formData.recommended_policies.includes(value)) {
+                  setFormData({ ...formData, recommended_policies: [...formData.recommended_policies, value] });
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a policy" />
+              </SelectTrigger>
+              <SelectContent>
+                {policies.map(policy => (
+                  <SelectItem key={policy.name} value={policy.name}>{policy.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {formData.recommended_policies.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {formData.recommended_policies.map(policyId => (
+                  <Badge key={policyId} variant="secondary" className="text-xs">
+                    {policyId}
+                    <button
+                      onClick={() => setFormData({ ...formData, recommended_policies: formData.recommended_policies.filter(p => p !== policyId) })}
+                      className="ml-1 hover:text-destructive"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="cache_duration_minutes">Cache Duration (minutes)</Label>
