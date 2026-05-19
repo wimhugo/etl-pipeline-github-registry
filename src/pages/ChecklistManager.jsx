@@ -564,14 +564,22 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
   const { data: policies = [], isLoading: policiesLoading, error: policiesError } = useQuery({
     queryKey: ['kb-policies', config.kb_search_data_url, fileList],
     queryFn: async () => {
+      console.log('=== CHECKLIST MANAGER POLICY DEBUG ===');
+      console.log('config.kb_search_data_url:', config.kb_search_data_url);
+      console.log('fileList:', fileList);
       const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
+      console.log('jsonFiles:', jsonFiles.map(f => f.name));
       const policyFiles = jsonFiles.filter(item => 
         item.name.toLowerCase().includes('policy') || item.name.toLowerCase().includes('licence')
       );
-      return policyFiles.map(file => ({
+      console.log('policyFiles:', policyFiles);
+      const result = policyFiles.map(file => ({
         name: file.name.replace('.json', ''),
         path: file.path
       }));
+      console.log('FINAL POLICIES LIST:', result);
+      console.log('========================================');
+      return result;
     },
     enabled: !!config.kb_search_data_url && fileList.length > 0,
   });
