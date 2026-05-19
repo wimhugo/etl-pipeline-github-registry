@@ -84,7 +84,15 @@ Deno.serve(async (req) => {
           throw new Error('GitHub repo and path are required');
         }
         
-        const repo = vocabSource.github_repo;
+        // Extract owner/repo from full URL if needed (handle both "owner/repo" and "https://github.com/owner/repo/")
+        let repo = vocabSource.github_repo;
+        if (repo.includes('github.com')) {
+          const match = repo.match(/github\.com[/:]([^/]+)\/([^/]+)/);
+          if (match) {
+            repo = `${match[1]}/${match[2]}`;
+          }
+        }
+        
         const path = vocabSource.github_path;
         const branch = vocabSource.github_branch || 'main';
         
