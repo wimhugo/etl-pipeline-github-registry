@@ -14,8 +14,7 @@ import ObjectAnalysisEditor from '@/components/objectanalysis/ObjectAnalysisEdit
 import EmptyState from '@/components/shared/EmptyState';
 
 export default function ObjectAnalysis() {
-  const [showEditor, setShowEditor] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
+  const [openItem, setOpenItem] = useState(null); // null = list view
   const [deletingItem, setDeletingItem] = useState(null);
   const [search, setSearch] = useState('');
   const [openrelActions, setOpenrelActions] = useState([]);
@@ -81,9 +80,9 @@ export default function ObjectAnalysis() {
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.ObjectAnalysis.create(data),
-    onSuccess: () => {
+    onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['object-analyses'] });
-      setShowEditor(false);
+      setOpenItem(created);
     },
   });
 
@@ -91,7 +90,6 @@ export default function ObjectAnalysis() {
     mutationFn: ({ id, data }) => base44.entities.ObjectAnalysis.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['object-analyses'] });
-      setEditingItem(null);
     },
   });
 
@@ -121,13 +119,39 @@ export default function ObjectAnalysis() {
   );
 
   const handleSave = (data) => {
-    if (editingItem) {
-      updateMutation.mutate({ id: editingItem.id, data: { ...data, last_analysed_at: data.analysis_result ? new Date().toISOString() : editingItem.last_analysed_at } });
+    if (openItem?.id) {
+      updateMutation.mutate({
+        id: openItem.id,
+        data: {
+          ...data,
+          last_analysed_at: data.analysis_result
+            ? new Date().toISOString()
+            : openItem.last_analysed_at,
+        },
+      });
     } else {
-      createMutation.mutate({ ...data, last_analysed_at: data.analysis_result ? new Date().toISOString() : undefined });
+      createMutation.mutate({
+        ...data,
+        last_analysed_at: data.analysis_result ? new Date().toISOString() : undefined,
+      });
     }
   };
 
+  // ── Detail view ───────────────────────────────────────────────
+  if (openItem !== null) {
+    return (
+      <ObjectAnalysisEditor
+        initialData={openItem?.id ? openItem : null}
+        onClose={() => setOpenItem(null)}
+        onSave={handleSave}
+        openrelActions={openrelActions}
+        openrelConstraints={openrelConstraints}
+        dataLoaded={dataLoaded}
+      />
+    );
+  }
+
+  // ── List view ─────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -138,7 +162,7 @@ export default function ObjectAnalysis() {
             Detect OpenREL/ODRL rules, actions, and constraints in objects and documents.
           </p>
         </div>
-        <Button onClick={() => { setEditingItem(null); setShowEditor(true); }} className="gap-2">
+        <Button onClick={() => setOpenItem({})} className="gap-2">
           <Plus className="w-4 h-4" />
           New Analysis
         </Button>
@@ -168,7 +192,7 @@ export default function ObjectAnalysis() {
           title={search ? 'No matches' : 'No analyses yet'}
           description={search ? 'Try a different search term.' : 'Create your first object analysis to detect OpenREL/ODRL patterns.'}
           actionLabel={!search ? 'New Analysis' : undefined}
-          onAction={!search ? () => { setEditingItem(null); setShowEditor(true); } : undefined}
+          onAction={!search ? () => setOpenItem({}) : undefined}
         />
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
@@ -176,24 +200,13 @@ export default function ObjectAnalysis() {
             <ObjectAnalysisCard
               key={a.id}
               analysis={a}
-              onEdit={(item) => { setEditingItem(item); setShowEditor(true); }}
+              onEdit={(item) => setOpenItem(item)}
               onCopy={(item) => copyMutation.mutate(item)}
               onDelete={(item) => setDeletingItem(item)}
             />
           ))}
         </div>
       )}
-
-      {/* Editor dialog */}
-      <ObjectAnalysisEditor
-        open={showEditor}
-        initialData={editingItem}
-        onClose={() => { setShowEditor(false); setEditingItem(null); }}
-        onSave={handleSave}
-        openrelActions={openrelActions}
-        openrelConstraints={openrelConstraints}
-        dataLoaded={dataLoaded}
-      />
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deletingItem} onOpenChange={() => setDeletingItem(null)}>
