@@ -566,11 +566,13 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
         const fileList = response.data?.items || [];
         console.log('File list from GitHub:', fileList);
         const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
+        console.log('JSON files:', jsonFiles.map(f => f.name));
         // Filter for policy files
         const policyFiles = jsonFiles.filter(item => 
           item.name.toLowerCase().includes('policy') || item.name.toLowerCase().includes('licence')
         );
         console.log('Policy files:', policyFiles);
+        console.log('Policy file names:', policyFiles.map(f => f.name));
         return policyFiles.map(file => ({
           name: file.name.replace('.json', ''),
           path: file.path
