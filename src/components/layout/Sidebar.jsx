@@ -21,6 +21,7 @@ const ICON_MAP = {
   'Annotation Notes':     FileEdit,
   'Populate Sub-Objects': Box,
   'Provenance Viewer':    Eye,
+  'Checklist Manager':    CheckSquare,
   'Settings':             Settings2,
   'Search':               Search,
   'Annotate':             Pencil,
