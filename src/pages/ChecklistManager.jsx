@@ -551,28 +551,34 @@ function ChecklistSourceEditor({ source, onSave, onClose }) {
   
   // Use the same approach as KBUserDashboard - fetch file list from GitHub API
   const { data: policies = [], isLoading: policiesLoading, error: policiesError } = useQuery({
-    queryKey: ['kb-policies', config.kb_search_data_api_url, config.github_token],
+    queryKey: ['kb-policies'],
     queryFn: async () => {
-      // Use githubFiles function like KBUserDashboard does internally
-      const apiUrl = config.kb_search_data_api_url || 'https://api.github.com/repos/wimhugo/openrel/contents/data/input/v0.3';
-      const response = await base44.functions.invoke('githubFiles', {
-        action: 'listFolder',
-        repo: 'wimhugo/openrel',
-        branch: 'main',
-        path: 'data/input/v0.3',
-        github_token: config.github_token
-      });
-      
-      const fileList = response.data.items || [];
-      const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
-      // Filter for policy files
-      const policyFiles = jsonFiles.filter(item => 
-        item.name.toLowerCase().includes('policy') || item.name.toLowerCase().includes('licence')
-      );
-      return policyFiles.map(file => ({
-        name: file.name.replace('.json', ''),
-        path: file.path
-      }));
+      try {
+        // Use githubFiles function - it will use token from GlobalConfig or env
+        const response = await base44.functions.invoke('githubFiles', {
+          action: 'listFolder',
+          repo: 'wimhugo/openrel',
+          branch: 'main',
+          path: 'data/input/v0.3'
+        });
+        
+        console.log('githubFiles response:', response);
+        const fileList = response.data?.items || [];
+        console.log('File list from GitHub:', fileList);
+        const jsonFiles = fileList.filter(f => f.name?.toLowerCase().endsWith('.json'));
+        // Filter for policy files
+        const policyFiles = jsonFiles.filter(item => 
+          item.name.toLowerCase().includes('policy') || item.name.toLowerCase().includes('licence')
+        );
+        console.log('Policy files:', policyFiles);
+        return policyFiles.map(file => ({
+          name: file.name.replace('.json', ''),
+          path: file.path
+        }));
+      } catch (err) {
+        console.error('Error fetching policies:', err);
+        throw err;
+      }
     },
   });
 
