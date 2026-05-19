@@ -17,14 +17,15 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
     const [analysisStatus, setAnalysisStatus] = useState(null);
     const [isPolling, setIsPolling] = useState(false);
     const [selectedChecklists, setSelectedChecklists] = useState([]);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     // Fetch active checklist sources
-    const { data: checklists = [], isLoading, error } = useQuery({
+    const { data: checklists = [], isLoading, error, refetch: refetchChecklists } = useQuery({
         queryKey: ['checklist-sources-active'],
         queryFn: () => base44.entities.ChecklistSource.list('-created_date'),
     });
 
-    // Load existing analysis results from workflow instance on mount
+    // Load existing analysis results from workflow instance on mount or when refreshKey changes
     useEffect(() => {
         if (!instanceId) return;
         
@@ -32,8 +33,9 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
             try {
                 const instance = await base44.entities.WorkflowInstance.get(instanceId);
                 const step3Data = instance.step_data?.['step-3'];
+                console.log('Step 3 mount/refresh - step_data:', step3Data);
                 if (step3Data && step3Data.analysis_results && step3Data.analysis_results.length > 0) {
-                    console.log('Loaded existing analysis results from step-3');
+                    console.log('Loaded existing analysis results from step-3, matches:', step3Data.analysis_results.filter(r => r.match).length);
                     setAnalysisStatus(step3Data);
                     // Also save to localStorage for backward compatibility
                     localStorage.setItem(`wf_${instanceId}_step-3`, JSON.stringify(step3Data));
@@ -44,7 +46,7 @@ export default function WorkflowStep3ExamineContent({ instanceId, workflowId, on
         };
         
         loadExistingAnalysis();
-    }, [instanceId]);
+    }, [instanceId, refreshKey]);
 
     const activeChecklists = checklists.filter(c => c.is_active);
 

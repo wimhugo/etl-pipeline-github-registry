@@ -339,6 +339,7 @@ export default function KBWorkflow() {
           )}
           {steps[currentStep].id === 'licence' && (
             <WorkflowStep3ExamineContent
+              key={`step3-${currentStep}-${openInstance.id}`}
               instanceId={openInstance.id}
               workflowId={openInstance.workflow_type}
               onComplete={(data) => {
