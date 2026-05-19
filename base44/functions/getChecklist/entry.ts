@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
 
     const checklistSource = checklistSources[0];
     
-    // Check cache
+    // Check cache - invalidate if schema changed (regex_field added)
     const now = new Date();
     if (checklistSource.last_fetched_at && checklistSource.cache_duration_minutes) {
       const lastFetched = new Date(checklistSource.last_fetched_at);
@@ -34,11 +34,17 @@ Deno.serve(async (req) => {
           try {
             const cached = JSON.parse(checklistSource.inline_data);
             if (cached && Array.isArray(cached) && cached.length > 0) {
-              return Response.json({ 
-                checklist: checklistSource.name,
-                items: cached,
-                cached: true
-              });
+              // Validate cache has the new schema (regex field)
+              const hasNewSchema = cached.every(item => item.hasOwnProperty('regex'));
+              if (hasNewSchema) {
+                return Response.json({ 
+                  checklist: checklistSource.name,
+                  items: cached,
+                  cached: true
+                });
+              }
+              // Schema mismatch - invalidate cache and re-fetch
+              console.log('Cache invalidated due to schema change');
             }
           } catch (e) {
             // Cache invalid, continue to fetch
@@ -84,10 +90,13 @@ Deno.serve(async (req) => {
         }
         
         let repo = checklistSource.github_repo;
+        // Handle full GitHub URLs with various formats
         if (repo.includes('github.com')) {
-          const match = repo.match(/github\.com[/:]([^/]+)\/([^/]+)/);
+          const match = repo.match(/github\.com[/:]([^/]+)\/([^/\s]+)/);
           if (match) {
             repo = `${match[1]}/${match[2]}`;
+          } else {
+            throw new Error('Invalid GitHub repository URL format. Expected: owner/repo or https://github.com/owner/repo');
           }
         }
         
@@ -155,11 +164,12 @@ Deno.serve(async (req) => {
         const labelField = checklistSource.label_field || 'label';
         const descField = checklistSource.description_field || 'description';
         const regexField = checklistSource.regex_field || 'regex';
+        const regexValue = item[regexField];
         return {
           id: item[idField] || item.id || '',
           label: item[labelField] || item.label || item.name || item.title || String(item[idField] || ''),
           description: item[descField] || item.description || '',
-          regex: Array.isArray(item[regexField]) ? item[regexField] : (item[regexField] ? [item[regexField]] : [])
+          regex: (regexValue && Array.isArray(regexValue)) ? regexValue : (regexValue ? [regexValue] : [])
         };
       }
       return { id: '', label: '', description: '', regex: [] };
