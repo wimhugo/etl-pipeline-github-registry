@@ -8,6 +8,11 @@ import { formatDistanceToNow } from 'date-fns';
 
 const INPUT_ICONS = { url: Link2, text: Type, file: File };
 
+const OA_STEPS = [
+  { id: 'content-source', label: 'Content Source' },
+  { id: 'run-analysis',   label: 'Run Analysis' },
+];
+
 export default function ObjectAnalysisCard({ analysis, onOpen, onEdit, onCopy, onDelete }) {
   const result = analysis.analysis_result;
   const Icon = INPUT_ICONS[analysis.input_type] || Link2;
@@ -90,6 +95,19 @@ export default function ObjectAnalysisCard({ analysis, onOpen, onEdit, onCopy, o
             <span>Analysed {formatDistanceToNow(new Date(analysis.last_analysed_at), { addSuffix: true })}</span>
           </div>
         )}
+
+        {/* Step pills */}
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {OA_STEPS.map((step, i) => (
+            <span
+              key={step.id}
+              className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-muted/50 text-muted-foreground border border-border/40"
+            >
+              <span className="text-[9px] font-bold">{i + 1}</span>
+              {step.label}
+            </span>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
