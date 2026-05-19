@@ -31,10 +31,11 @@ const ICON_MAP = {
   'My Workflows':         Workflow,
 };
 
-export default function Sidebar() {
+export default function Sidebar({ visible = false, onToggle }) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
+  const isVisible = visible;
+  const setIsVisible = onToggle;
   const { activeProject } = useProject();
   const { visibleFeatures, activeContainer } = useRole();
 
