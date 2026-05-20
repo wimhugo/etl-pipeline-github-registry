@@ -184,6 +184,7 @@ export default function ProvenanceViewer() {
 
   const queryClient = useQueryClient();
   const [batching, setBatching] = useState(false);
+  const [batchingDrafts, setBatchingDrafts] = useState(false);
 
   const { data: workflowInstances = [], isLoading: loadingWF } = useQuery({
     queryKey: ['provenance-workflow-instances'],
@@ -207,6 +208,24 @@ export default function ProvenanceViewer() {
       toast({ title: 'Batch update failed', description: e.message, variant: 'destructive' });
     } finally {
       setBatching(false);
+    }
+  }
+
+  async function handleBatchUpdateDrafts() {
+    setBatchingDrafts(true);
+    try {
+      const updated = localDrafts.map(p => ({
+        ...p,
+        created_by_orcid: RETROACTIVE_ORCID,
+        updated_by_orcid: RETROACTIVE_ORCID,
+      }));
+      localStorage.setItem('kbcompose_drafts', JSON.stringify(updated));
+      setLocalDrafts(updated);
+      toast({ title: 'Batch update complete', description: `${updated.length} draft(s) updated to ${RETROACTIVE_ORCID}.` });
+    } catch (e) {
+      toast({ title: 'Batch update failed', description: e.message, variant: 'destructive' });
+    } finally {
+      setBatchingDrafts(false);
     }
   }
 
@@ -268,6 +287,17 @@ export default function ProvenanceViewer() {
 
         {/* Draft Policies */}
         <TabsContent value="drafts" className="space-y-4">
+          {localDrafts.length > 0 && (
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-muted/30">
+              <span className="text-xs text-muted-foreground">
+                Set <span className="font-semibold">Created By</span> and <span className="font-semibold">Last Updated By</span> to{' '}
+                <span className="font-mono text-foreground">{RETROACTIVE_ORCID}</span> for all {localDrafts.length} drafts.
+              </span>
+              <Button size="sm" variant="secondary" onClick={handleBatchUpdateDrafts} disabled={batchingDrafts} className="ml-4 shrink-0">
+                {batchingDrafts ? <><RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" />Updating…</> : 'Batch Update All'}
+              </Button>
+            </div>
+          )}
           {localDrafts.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground text-sm">
               No local draft policies found. Create a draft in KB Compose or via a Workflow.
