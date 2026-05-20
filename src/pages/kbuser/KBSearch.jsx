@@ -6,8 +6,13 @@ import PolicyFilterSidePanel from '@/components/kbpolicy/PolicyFilterSidePanel';
 export default function KBSearch() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({});
-  const [filterOptions, setFilterOptions] = useState({ odrlTypes: [], statuses: [] });
+  const [dataByField, setDataByField] = useState({});
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+
+  // KBPolicyList calls this with { odrlTypes, statuses } — we remap to a field-keyed map
+  const handleDataReady = ({ odrlTypes, statuses }) => {
+    setDataByField({ odrl_type: odrlTypes, status: statuses });
+  };
 
   return (
     <div className="space-y-5">
@@ -22,7 +27,6 @@ export default function KBSearch() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         filters={filters}
-        onFiltersChange={setFilters}
         filterPanelOpen={filterPanelOpen}
         onToggleFilterPanel={() => setFilterPanelOpen(o => !o)}
       />
@@ -32,15 +36,14 @@ export default function KBSearch() {
           <PolicyFilterSidePanel
             filters={filters}
             onFiltersChange={setFilters}
-            odrlTypes={filterOptions.odrlTypes}
-            statuses={filterOptions.statuses}
+            dataByField={dataByField}
           />
         )}
         <div className="flex-1 min-w-0">
           <KBPolicyList
             searchQuery={searchQuery}
             advancedFilters={filters}
-            onDataReady={setFilterOptions}
+            onDataReady={handleDataReady}
           />
         </div>
       </div>
