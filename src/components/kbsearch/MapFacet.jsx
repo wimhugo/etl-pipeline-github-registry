@@ -79,7 +79,7 @@ const CENTROIDS = {
 
 // We fetch a simplified world GeoJSON from CDN and render it as SVG paths
 // using an equirectangular projection.
-const GEOJSON_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson';
+const GEOJSON_URL = 'https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson';
 
 // Project a GeoJSON geometry ring to SVG path commands
 function ringToPath(ring) {
@@ -162,13 +162,16 @@ export default function MapFacet({ facetKey, facet, counts = {}, facetState, onC
   }, [countriesWithData]);
 
   // Build per-country SVG path data from GeoJSON
+  // This GeoJSON uses f.id = ISO alpha-3 and f.properties.name = country name
   const countryPaths = useMemo(() => {
     if (!geoData) return [];
     return geoData.features.map(f => {
-      const a2 = f.properties?.ISO_A2 || f.properties?.iso_a2 || '';
-      const name = f.properties?.ADMIN || f.properties?.name || a2;
+      const a3 = (f.id || '').toUpperCase();
+      const name = f.properties?.name || a3;
+      // Convert alpha-3 → alpha-2
+      const a2 = Object.keys(A2_TO_A3).find(k => A2_TO_A3[k] === a3) || '';
       const paths = geometryToPaths(f.geometry);
-      return { a2: a2.toUpperCase(), name, paths };
+      return { a2, name, paths };
     });
   }, [geoData]);
 
