@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import ComposePolicyCard from '@/components/kbcompose/ComposePolicyCard';
 import PolicyFilterBar from '@/components/kbpolicy/PolicyFilterBar';
+import PolicyFilterSidePanel from '@/components/kbpolicy/PolicyFilterSidePanel';
 import NewPolicyFromTemplateDialog from '@/components/kbcompose/NewPolicyFromTemplateDialog';
 import { getCurrentOrcid, stampProvenance, backfillLocalDrafts } from '@/lib/provenance';
 
@@ -110,6 +111,9 @@ export default function KBCompose() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({});
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [dataByField, setDataByField] = useState({});
+  const [countsByField, setCountsByField] = useState({});
   const [showNewDialog, setShowNewDialog] = useState(false);
 
   // Auto-open from ?new=1 query param (triggered by dashboard card)
@@ -162,28 +166,43 @@ export default function KBCompose() {
 
   const policiesMap = useMemo(() => Object.fromEntries(allPolicies.map(p => [p.id, p])), [allPolicies]);
 
-  const odrlTypes = useMemo(() => {
+  // Derive countsByField dynamically from allPolicies (mirrors KBPolicyList logic)
+  const { dataByField: derivedDataByField, countsByField: derivedCountsByField } = useMemo(() => {
     const isPlaceholder = (value) => /^{{.*}}$|^<.*>$/.test(value);
-    return [...new Set(allPolicies.map(p => p.odrl_type).filter(Boolean).filter(v => !isPlaceholder(v)))];
-  }, [allPolicies]);
-  
-  const statuses = useMemo(() => {
-    const isPlaceholder = (value) => /^{{.*}}$|^<.*>$/.test(value);
-    return [...new Set(allPolicies.map(p => p.status).filter(Boolean).filter(v => !isPlaceholder(v)))];
+    const countField = (key) =>
+      allPolicies.reduce((acc, p) => {
+        const raw = p[key];
+        const values = Array.isArray(raw) ? raw : [raw];
+        values.forEach(v => {
+          if (v && typeof v === 'string' && !isPlaceholder(v)) acc[v] = (acc[v] || 0) + 1;
+        });
+        return acc;
+      }, {});
+    const allKeys = [...new Set(allPolicies.flatMap(p => Object.keys(p)))];
+    const counts = Object.fromEntries(allKeys.map(k => [k, countField(k)]));
+    const odrlTypes = Object.keys(counts.odrl_type || {});
+    const statuses = Object.keys(counts.status || {});
+    return {
+      dataByField: { odrl_type: odrlTypes, status: statuses },
+      countsByField: counts,
+    };
   }, [allPolicies]);
 
   const matchFacet = (fieldValue, facet) => {
     if (!facet?.values?.length) return true;
-    if (facet.logic === 'AND') return facet.values.every(v => v === fieldValue);
-    return facet.values.includes(fieldValue);
+    // support array fields (e.g. jurisdiction: ["NL","FR"])
+    const values = Array.isArray(fieldValue) ? fieldValue : [fieldValue];
+    if (facet.logic === 'AND') return facet.values.every(v => values.includes(v));
+    return facet.values.some(v => values.includes(v));
   };
 
   const filtered = useMemo(() => {
     return allPolicies.filter(p => {
       const q = searchQuery.toLowerCase();
       if (q && !(p.label || '').toLowerCase().includes(q) && !(p.id || '').toLowerCase().includes(q)) return false;
-      if (!matchFacet(p.odrl_type, filters.odrl_type)) return false;
-      if (!matchFacet(p.status, filters.status)) return false;
+      for (const [key, facet] of Object.entries(filters)) {
+        if (!matchFacet(p[key], facet)) return false;
+      }
       return true;
     });
   }, [allPolicies, searchQuery, filters]);
@@ -292,9 +311,8 @@ export default function KBCompose() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         filters={filters}
-        onFiltersChange={setFilters}
-        odrlTypes={odrlTypes}
-        statuses={statuses}
+        filterPanelOpen={filterPanelOpen}
+        onToggleFilterPanel={() => setFilterPanelOpen(o => !o)}
       />
 
       {policiesLoading && (
@@ -315,34 +333,44 @@ export default function KBCompose() {
       />
 
       {!policiesLoading && !policiesError && (
-        <>
-          <div className="space-y-2">
-            {filtered.map(policy => (
-              <ComposePolicyCard
-                key={policy.id}
-                policy={policy}
-                actionsMap={actionsMap}
-                constraintsMap={constraintsMap}
-                statesMap={statesMap}
-                policiesMap={policiesMap}
-                onEdit={handleEdit}
-                onCopy={handleCopy}
-                onDelete={handleDelete}
-                onSubmitPR={handleSubmitPR}
-              />
-            ))}
-            {filtered.length === 0 && (
-              <div className="text-sm text-muted-foreground py-8 text-center">
-                {searchQuery ? 'No policies match your search.' : 'No policies found.'}
-              </div>
+        <div className="flex gap-4 items-start">
+          {filterPanelOpen && (
+            <PolicyFilterSidePanel
+              filters={filters}
+              onFiltersChange={setFilters}
+              dataByField={derivedDataByField}
+              countsByField={derivedCountsByField}
+            />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="space-y-2">
+              {filtered.map(policy => (
+                <ComposePolicyCard
+                  key={policy.id}
+                  policy={policy}
+                  actionsMap={actionsMap}
+                  constraintsMap={constraintsMap}
+                  statesMap={statesMap}
+                  policiesMap={policiesMap}
+                  onEdit={handleEdit}
+                  onCopy={handleCopy}
+                  onDelete={handleDelete}
+                  onSubmitPR={handleSubmitPR}
+                />
+              ))}
+              {filtered.length === 0 && (
+                <div className="text-sm text-muted-foreground py-8 text-center">
+                  {searchQuery ? 'No policies match your search.' : 'No policies found.'}
+                </div>
+              )}
+            </div>
+            {filtered.length > 0 && (
+              <p className="text-xs text-muted-foreground text-right pt-1">
+                {filtered.length} of {allPolicies.length} policies
+              </p>
             )}
           </div>
-          {filtered.length > 0 && (
-            <p className="text-xs text-muted-foreground text-right pt-1">
-              {filtered.length} of {allPolicies.length} policies
-            </p>
-          )}
-        </>
+        </div>
       )}
     </div>
   );
