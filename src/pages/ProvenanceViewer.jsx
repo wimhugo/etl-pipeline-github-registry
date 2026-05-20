@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RETROACTIVE_ORCID } from '@/lib/provenance';
-import { GitBranch, FileText, User, Calendar, RefreshCw, Tag, Layers } from 'lucide-react';
+import { GitBranch, FileText, User, Calendar, RefreshCw, Tag, Layers, ChevronDown, ChevronRight } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from '@/components/ui/use-toast';
 
@@ -58,50 +58,59 @@ const WORKFLOW_TYPE_LABELS = {
 };
 
 function WorkflowInstanceCard({ record }) {
+  const [open, setOpen] = useState(false);
   return (
     <Card className="border-border/50 bg-card">
-      <CardHeader className="pb-3 flex flex-row items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <CardTitle className="text-base font-semibold text-foreground truncate">{record.name}</CardTitle>
-          {record.description && (
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{record.description}</p>
-          )}
+      <CardHeader
+        className="pb-3 flex flex-row items-start justify-between gap-4 cursor-pointer select-none"
+        onClick={() => setOpen(o => !o)}
+      >
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {open ? <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />}
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-base font-semibold text-foreground truncate">{record.name}</CardTitle>
+            {record.description && (
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{record.description}</p>
+            )}
+          </div>
         </div>
         <Badge variant="secondary" className="shrink-0 text-xs">
           {WORKFLOW_TYPE_LABELS[record.workflow_type] ?? record.workflow_type}
         </Badge>
       </CardHeader>
-      <CardContent className="pt-0">
-        <ProvenanceRow label="Record ID" icon={Tag}>
-          <span className="font-mono text-xs text-muted-foreground">{record.id}</span>
-        </ProvenanceRow>
-        <ProvenanceRow label="Created by" icon={User}>
-          <OrcidPill orcid={record.created_by_orcid} />
-        </ProvenanceRow>
-        <ProvenanceRow label="Last updated by" icon={User}>
-          <OrcidPill orcid={record.updated_by_orcid} />
-        </ProvenanceRow>
-        <ProvenanceRow label="Account email" icon={User}>
-          <span className="text-xs">{record.created_by || <span className="text-muted-foreground italic">unknown</span>}</span>
-        </ProvenanceRow>
-        <ProvenanceRow label="Created date" icon={Calendar}>
-          <span className="text-xs">{formatDate(record.created_date) ?? <span className="text-muted-foreground italic">—</span>}</span>
-        </ProvenanceRow>
-        <ProvenanceRow label="Last modified" icon={RefreshCw}>
-          <span className="text-xs">{formatDate(record.updated_date) ?? <span className="text-muted-foreground italic">—</span>}</span>
-        </ProvenanceRow>
-        <ProvenanceRow label="Last opened" icon={Calendar}>
-          <span className="text-xs">{formatDate(record.last_opened_at) ?? <span className="text-muted-foreground italic">—</span>}</span>
-        </ProvenanceRow>
-        <ProvenanceRow label="Workflow type" icon={GitBranch}>
-          <span className="text-xs">{WORKFLOW_TYPE_LABELS[record.workflow_type] ?? record.workflow_type}</span>
-        </ProvenanceRow>
-        <ProvenanceRow label="Steps completed" icon={Layers}>
-          <span className="text-xs">
-            {record.step_data ? Object.keys(record.step_data).length : 0} step(s) recorded
-          </span>
-        </ProvenanceRow>
-      </CardContent>
+      {open && (
+        <CardContent className="pt-0">
+          <ProvenanceRow label="Record ID" icon={Tag}>
+            <span className="font-mono text-xs text-muted-foreground">{record.id}</span>
+          </ProvenanceRow>
+          <ProvenanceRow label="Created by" icon={User}>
+            <OrcidPill orcid={record.created_by_orcid} />
+          </ProvenanceRow>
+          <ProvenanceRow label="Last updated by" icon={User}>
+            <OrcidPill orcid={record.updated_by_orcid} />
+          </ProvenanceRow>
+          <ProvenanceRow label="Account email" icon={User}>
+            <span className="text-xs">{record.created_by || <span className="text-muted-foreground italic">unknown</span>}</span>
+          </ProvenanceRow>
+          <ProvenanceRow label="Created date" icon={Calendar}>
+            <span className="text-xs">{formatDate(record.created_date) ?? <span className="text-muted-foreground italic">—</span>}</span>
+          </ProvenanceRow>
+          <ProvenanceRow label="Last modified" icon={RefreshCw}>
+            <span className="text-xs">{formatDate(record.updated_date) ?? <span className="text-muted-foreground italic">—</span>}</span>
+          </ProvenanceRow>
+          <ProvenanceRow label="Last opened" icon={Calendar}>
+            <span className="text-xs">{formatDate(record.last_opened_at) ?? <span className="text-muted-foreground italic">—</span>}</span>
+          </ProvenanceRow>
+          <ProvenanceRow label="Workflow type" icon={GitBranch}>
+            <span className="text-xs">{WORKFLOW_TYPE_LABELS[record.workflow_type] ?? record.workflow_type}</span>
+          </ProvenanceRow>
+          <ProvenanceRow label="Steps completed" icon={Layers}>
+            <span className="text-xs">
+              {record.step_data ? Object.keys(record.step_data).length : 0} step(s) recorded
+            </span>
+          </ProvenanceRow>
+        </CardContent>
+      )}
     </Card>
   );
 }
@@ -115,6 +124,7 @@ const ODRL_TYPE_LABELS = {
 };
 
 function DraftPolicyCard({ policy }) {
+  const [open, setOpen] = useState(false);
   const rulesCount = [
     ...(policy.permission  ?? []),
     ...(policy.prohibition ?? []),
@@ -123,48 +133,56 @@ function DraftPolicyCard({ policy }) {
 
   return (
     <Card className="border-border/50 bg-card">
-      <CardHeader className="pb-3 flex flex-row items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <CardTitle className="text-base font-semibold text-foreground truncate">
-            {policy.label ?? policy.id ?? 'Untitled Draft'}
-          </CardTitle>
-          {policy.description && (
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{policy.description}</p>
-          )}
+      <CardHeader
+        className="pb-3 flex flex-row items-start justify-between gap-4 cursor-pointer select-none"
+        onClick={() => setOpen(o => !o)}
+      >
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {open ? <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />}
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-base font-semibold text-foreground truncate">
+              {policy.label ?? policy.id ?? 'Untitled Draft'}
+            </CardTitle>
+            {policy.description && (
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{policy.description}</p>
+            )}
+          </div>
         </div>
         <Badge variant="outline" className="shrink-0 text-xs border-amber-500/40 text-amber-400">
           Draft
         </Badge>
       </CardHeader>
-      <CardContent className="pt-0">
-        <ProvenanceRow label="Policy ID" icon={Tag}>
-          <span className="font-mono text-xs text-muted-foreground break-all">{policy.id ?? '—'}</span>
-        </ProvenanceRow>
-        <ProvenanceRow label="ODRL type" icon={FileText}>
-          <span className="text-xs">{ODRL_TYPE_LABELS[policy['@type']] ?? policy['@type'] ?? '—'}</span>
-        </ProvenanceRow>
-        <ProvenanceRow label="Status" icon={Tag}>
-          <span className="text-xs">{policy.status ?? '—'}</span>
-        </ProvenanceRow>
-        <ProvenanceRow label="Created by" icon={User}>
-          <OrcidPill orcid={policy.created_by_orcid} />
-        </ProvenanceRow>
-        <ProvenanceRow label="Last updated by" icon={User}>
-          <OrcidPill orcid={policy.updated_by_orcid} />
-        </ProvenanceRow>
-        <ProvenanceRow label="Derived from" icon={GitBranch}>
-          {policy.derived_from
-            ? <span className="font-mono text-xs text-muted-foreground break-all">{policy.derived_from}</span>
-            : <span className="text-muted-foreground italic text-xs">original</span>
-          }
-        </ProvenanceRow>
-        <ProvenanceRow label="Rules" icon={Layers}>
-          <span className="text-xs">{rulesCount} rule(s) — {(policy.permission ?? []).length} permission, {(policy.prohibition ?? []).length} prohibition, {(policy.duty ?? []).length} duty</span>
-        </ProvenanceRow>
-        <ProvenanceRow label="Storage" icon={FileText}>
-          <span className="text-xs text-muted-foreground italic">Local draft (browser storage)</span>
-        </ProvenanceRow>
-      </CardContent>
+      {open && (
+        <CardContent className="pt-0">
+          <ProvenanceRow label="Policy ID" icon={Tag}>
+            <span className="font-mono text-xs text-muted-foreground break-all">{policy.id ?? '—'}</span>
+          </ProvenanceRow>
+          <ProvenanceRow label="ODRL type" icon={FileText}>
+            <span className="text-xs">{ODRL_TYPE_LABELS[policy['@type']] ?? policy['@type'] ?? '—'}</span>
+          </ProvenanceRow>
+          <ProvenanceRow label="Status" icon={Tag}>
+            <span className="text-xs">{policy.status ?? '—'}</span>
+          </ProvenanceRow>
+          <ProvenanceRow label="Created by" icon={User}>
+            <OrcidPill orcid={policy.created_by_orcid} />
+          </ProvenanceRow>
+          <ProvenanceRow label="Last updated by" icon={User}>
+            <OrcidPill orcid={policy.updated_by_orcid} />
+          </ProvenanceRow>
+          <ProvenanceRow label="Derived from" icon={GitBranch}>
+            {policy.derived_from
+              ? <span className="font-mono text-xs text-muted-foreground break-all">{policy.derived_from}</span>
+              : <span className="text-muted-foreground italic text-xs">original</span>
+            }
+          </ProvenanceRow>
+          <ProvenanceRow label="Rules" icon={Layers}>
+            <span className="text-xs">{rulesCount} rule(s) — {(policy.permission ?? []).length} permission, {(policy.prohibition ?? []).length} prohibition, {(policy.duty ?? []).length} duty</span>
+          </ProvenanceRow>
+          <ProvenanceRow label="Storage" icon={FileText}>
+            <span className="text-xs text-muted-foreground italic">Local draft (browser storage)</span>
+          </ProvenanceRow>
+        </CardContent>
+      )}
     </Card>
   );
 }
