@@ -100,18 +100,23 @@ export default function KBPolicyList({ searchQuery = '', advancedFilters = {}, o
     const statusesFromPolicies = policies.map(p => p.status).filter(Boolean).filter(v => !isPlaceholder(v));
     const statuses = [...new Set([...statusesFromStates, ...statusesFromPolicies])];
 
-    // Count occurrences per field value across all policies
-    const countField = (fieldFn) =>
+    // Count occurrences per field value across all policies — covers any string field
+    const countField = (key) =>
       policies.reduce((acc, p) => {
-        const v = fieldFn(p);
-        if (v && !isPlaceholder(v)) acc[v] = (acc[v] || 0) + 1;
+        const raw = p[key];
+        // support arrays (e.g. jurisdictions: ["DE","FR"]) or single values
+        const values = Array.isArray(raw) ? raw : [raw];
+        values.forEach(v => {
+          if (v && typeof v === 'string' && !isPlaceholder(v)) acc[v] = (acc[v] || 0) + 1;
+        });
         return acc;
       }, {});
 
-    const countsByField = {
-      odrl_type: countField(p => p.odrl_type),
-      status: countField(p => p.status),
-    };
+    // Collect all string field keys present across policies
+    const allKeys = [...new Set(policies.flatMap(p => Object.keys(p)))];
+    const countsByField = Object.fromEntries(
+      allKeys.map(k => [k, countField(k)])
+    );
 
     onDataReady({ odrlTypes, statuses, countsByField });
   }, [policies.length, statesArray.length]); // eslint-disable-line react-hooks/exhaustive-deps

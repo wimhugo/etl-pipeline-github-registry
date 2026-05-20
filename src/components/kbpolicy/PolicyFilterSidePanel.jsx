@@ -7,6 +7,7 @@ import { base44 } from '@/api/base44Client';
 import { useRole } from '@/lib/RoleContext';
 import { useNavigate } from 'react-router-dom';
 import ChartFacet from '@/components/kbsearch/ChartFacet';
+import MapFacet from '@/components/kbsearch/MapFacet';
 
 // ── Facet renderers ────────────────────────────────────────────────
 
@@ -163,7 +164,7 @@ export default function PolicyFilterSidePanel({ filters = {}, onFiltersChange, d
       case 'timeline':
         return <PlaceholderFacet key={facet.id} facet={facet} typeName="Timeline" />;
       case 'map':
-        return <PlaceholderFacet key={facet.id} facet={facet} typeName="Map" />;
+        return <MapFacet key={facet.id} facetKey={facet.field_key} facet={facet} counts={countsByField[facet.field_key] || {}} facetState={facetState} onChange={handleFacetChange} />;
       default:
         return null;
     }
