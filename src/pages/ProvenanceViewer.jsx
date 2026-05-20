@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RETROACTIVE_ORCID } from '@/lib/provenance';
 import { GitBranch, FileText, User, Calendar, RefreshCw, Tag, Layers } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { toast } from '@/components/ui/use-toast';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -180,10 +182,33 @@ export default function ProvenanceViewer() {
     } catch { setLocalDrafts([]); }
   }, []);
 
+  const queryClient = useQueryClient();
+  const [batching, setBatching] = useState(false);
+
   const { data: workflowInstances = [], isLoading: loadingWF } = useQuery({
     queryKey: ['provenance-workflow-instances'],
     queryFn: () => base44.entities.WorkflowInstance.list('-created_date', 200),
   });
+
+  async function handleBatchUpdate() {
+    setBatching(true);
+    try {
+      await Promise.all(
+        workflowInstances.map(w =>
+          base44.entities.WorkflowInstance.update(w.id, {
+            created_by_orcid: RETROACTIVE_ORCID,
+            updated_by_orcid: RETROACTIVE_ORCID,
+          })
+        )
+      );
+      queryClient.invalidateQueries({ queryKey: ['provenance-workflow-instances'] });
+      toast({ title: 'Batch update complete', description: `${workflowInstances.length} record(s) updated to ${RETROACTIVE_ORCID}.` });
+    } catch (e) {
+      toast({ title: 'Batch update failed', description: e.message, variant: 'destructive' });
+    } finally {
+      setBatching(false);
+    }
+  }
 
   const totalRecords = workflowInstances.length + localDrafts.length;
 
@@ -217,6 +242,17 @@ export default function ProvenanceViewer() {
 
         {/* Workflow Instances */}
         <TabsContent value="workflows" className="space-y-4">
+          {workflowInstances.length > 0 && (
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-muted/30">
+              <span className="text-xs text-muted-foreground">
+                Set <span className="font-semibold">Created By</span> and <span className="font-semibold">Last Updated By</span> to{' '}
+                <span className="font-mono text-foreground">{RETROACTIVE_ORCID}</span> for all {workflowInstances.length} records.
+              </span>
+              <Button size="sm" variant="secondary" onClick={handleBatchUpdate} disabled={batching} className="ml-4 shrink-0">
+                {batching ? <><RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" />Updating…</> : 'Batch Update All'}
+              </Button>
+            </div>
+          )}
           {loadingWF ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-12 justify-center">
               <RefreshCw className="w-4 h-4 animate-spin" /> Loading records…
