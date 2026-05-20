@@ -27,6 +27,14 @@
       "type": "string",
       "format": "date-time",
       "description": "Timestamp of last time this workflow was opened"
+    },
+    "created_by_orcid": {
+      "type": "string",
+      "description": "ORCID of the user who created this workflow instance"
+    },
+    "updated_by_orcid": {
+      "type": "string",
+      "description": "ORCID of the user who last updated this workflow instance"
     }
   },
   "required": [
