@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useRole } from '@/lib/RoleContext';
 import { useNavigate } from 'react-router-dom';
+import ChartFacet from '@/components/kbsearch/ChartFacet';
 
 // ── Facet renderers ────────────────────────────────────────────────
 
@@ -119,7 +120,7 @@ function PlaceholderFacet({ facet, typeName }) {
 
 // ── Main panel ────────────────────────────────────────────────────
 
-export default function PolicyFilterSidePanel({ filters = {}, onFiltersChange, dataByField = {} }) {
+export default function PolicyFilterSidePanel({ filters = {}, onFiltersChange, dataByField = {}, countsByField = {} }) {
   const { activeRole } = useRole();
   const navigate = useNavigate();
   const isAdmin = activeRole === 'Administrator';
@@ -158,7 +159,7 @@ export default function PolicyFilterSidePanel({ filters = {}, onFiltersChange, d
       case 'search_list':
         return <SearchListFacet key={facet.id} facetKey={facet.field_key} facet={facet} items={items} facetState={facetState} onChange={handleFacetChange} />;
       case 'chart':
-        return <PlaceholderFacet key={facet.id} facet={facet} typeName={`Chart (${facet.chart_subtype || 'bar'})`} />;
+        return <ChartFacet key={facet.id} facetKey={facet.field_key} facet={facet} counts={countsByField[facet.field_key] || {}} facetState={facetState} onChange={handleFacetChange} />;
       case 'timeline':
         return <PlaceholderFacet key={facet.id} facet={facet} typeName="Timeline" />;
       case 'map':

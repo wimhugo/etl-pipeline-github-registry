@@ -7,11 +7,12 @@ export default function KBSearch() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({});
   const [dataByField, setDataByField] = useState({});
+  const [countsByField, setCountsByField] = useState({});
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
 
-  // KBPolicyList calls this with { odrlTypes, statuses } — we remap to a field-keyed map
-  const handleDataReady = ({ odrlTypes, statuses }) => {
+  const handleDataReady = ({ odrlTypes, statuses, countsByField: counts = {} }) => {
     setDataByField({ odrl_type: odrlTypes, status: statuses });
+    setCountsByField(counts);
   };
 
   return (
@@ -37,6 +38,7 @@ export default function KBSearch() {
             filters={filters}
             onFiltersChange={setFilters}
             dataByField={dataByField}
+            countsByField={countsByField}
           />
         )}
         <div className="flex-1 min-w-0">

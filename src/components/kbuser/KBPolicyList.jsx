@@ -90,18 +90,30 @@ export default function KBPolicyList({ searchQuery = '', advancedFilters = {}, o
   const policies = fileData?.policies || (Array.isArray(fileData) ? fileData : []);
   const policiesMap = Object.fromEntries(policies.map(p => [p.id, p]));
 
-  // Derive distinct filter values from data and notify parent
+  // Derive distinct filter values + counts from data and notify parent
   useEffect(() => {
     if (!onDataReady) return;
-    // Skip obvious placeholders like "<...>" or "{{...}}"
     const isPlaceholder = (value) => /^{{.*}}$|^<.*>$/.test(value);
-    
+
     const odrlTypes = [...new Set(policies.map(p => p.odrl_type).filter(Boolean).filter(v => !isPlaceholder(v)))];
-    // Include all statuses from states file, not just those present in current policies
     const statusesFromStates = statesArray.map(s => s.id).filter(Boolean).filter(v => !isPlaceholder(v));
     const statusesFromPolicies = policies.map(p => p.status).filter(Boolean).filter(v => !isPlaceholder(v));
     const statuses = [...new Set([...statusesFromStates, ...statusesFromPolicies])];
-    onDataReady({ odrlTypes, statuses });
+
+    // Count occurrences per field value across all policies
+    const countField = (fieldFn) =>
+      policies.reduce((acc, p) => {
+        const v = fieldFn(p);
+        if (v && !isPlaceholder(v)) acc[v] = (acc[v] || 0) + 1;
+        return acc;
+      }, {});
+
+    const countsByField = {
+      odrl_type: countField(p => p.odrl_type),
+      status: countField(p => p.status),
+    };
+
+    onDataReady({ odrlTypes, statuses, countsByField });
   }, [policies.length, statesArray.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const matchFacet = (fieldValue, facet) => {
