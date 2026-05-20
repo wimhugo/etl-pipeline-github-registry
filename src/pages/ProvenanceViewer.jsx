@@ -254,7 +254,7 @@ export default function ProvenanceViewer() {
             <Badge variant="outline" className="ml-2 text-xs">{workflowInstances.length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="drafts">
-            Draft Policies
+            Policies
             <Badge variant="outline" className="ml-2 text-xs">{localDrafts.length}</Badge>
           </TabsTrigger>
         </TabsList>
