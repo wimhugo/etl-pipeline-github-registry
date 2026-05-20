@@ -89,9 +89,7 @@ function WorkflowInstanceCard({ record }) {
           <ProvenanceRow label="Last updated by" icon={User}>
             <OrcidPill orcid={record.updated_by_orcid} />
           </ProvenanceRow>
-          <ProvenanceRow label="Account email" icon={User}>
-            <span className="text-xs">{record.created_by || <span className="text-muted-foreground italic">unknown</span>}</span>
-          </ProvenanceRow>
+
           <ProvenanceRow label="Created date" icon={Calendar}>
             <span className="text-xs">{formatDate(record.created_date) ?? <span className="text-muted-foreground italic">—</span>}</span>
           </ProvenanceRow>
