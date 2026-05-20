@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Gavel, Copy, Trash2, Pencil, ExternalLink, GitPullRequest, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Gavel, Copy, Trash2, Pencil, ExternalLink, GitPullRequest, Loader2, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -154,6 +154,13 @@ function DerivedFrom({ derivedFromId, policiesMap }) {
   );
 }
 
+function downloadPolicyJson(policy) {
+  const json = JSON.stringify(policy, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+}
+
 export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, statesMap, policiesMap, onEdit, onCopy, onDelete, onSubmitPR }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -209,6 +216,15 @@ export default function ComposePolicyCard({ policy, actionsMap, constraintsMap, 
               Submit PR
             </Button>
           )}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            title="Export policy JSON"
+            onClick={() => downloadPolicyJson(policy)}
+          >
+            <Download className="w-3.5 h-3.5" />
+          </Button>
           <Button
             size="icon"
             variant="ghost"

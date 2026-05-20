@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Gavel, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronRight, ShieldCheck, ShieldOff, Gavel, ExternalLink, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -163,19 +164,26 @@ function DerivedFrom({ derivedFromId, policiesMap }) {
   );
 }
 
+function downloadPolicyJson(policy) {
+  const json = JSON.stringify(policy, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+}
+
 export default function PolicyCard({ policy, actionsMap, constraintsMap, statesMap, policiesMap }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-      <button
-        className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
-        onClick={() => setExpanded(e => !e)}
-      >
-        <span className="mt-0.5 text-muted-foreground">
+      <div className="flex items-start gap-3 px-4 py-3">
+        <button
+          className="mt-0.5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          onClick={() => setExpanded(e => !e)}
+        >
           {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        </span>
-        <div className="flex-1 min-w-0">
+        </button>
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpanded(e => !e)}>
           <span className="font-medium text-sm text-foreground">{policy.label}</span>
           {(policy.odrl_type || policy.status) && (
             <div className="flex items-center gap-1.5 flex-wrap mt-1">
@@ -191,7 +199,16 @@ export default function PolicyCard({ policy, actionsMap, constraintsMap, statesM
           )}
           <div className="font-mono text-[11px] text-muted-foreground mt-0.5 truncate">{policy.id}</div>
         </div>
-      </button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+          title="Export policy JSON"
+          onClick={() => downloadPolicyJson(policy)}
+        >
+          <Download className="w-3.5 h-3.5" />
+        </Button>
+      </div>
 
       {expanded && (
         <div className="px-4 pb-4 pt-1 border-t border-border/40 bg-muted/10">
