@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import { useRole } from '@/lib/RoleContext';
+import { getCurrentOrcid, RETROACTIVE_ORCID } from '@/lib/provenance';
 import WorkflowCard, { WORKFLOW_TYPES } from '@/components/workflow/WorkflowCard';
 import WorkflowNewDialog from '@/components/workflow/WorkflowNewDialog';
 import WorkflowEditDialog from '@/components/workflow/WorkflowEditDialog';
@@ -37,6 +38,27 @@ const TYPE_LABELS = Object.fromEntries(
 export default function KBWorkflow() {
   const queryClient = useQueryClient();
   const { allowedWorkflowTypes } = useRole();
+  const [currentOrcid, setCurrentOrcid] = useState(null);
+
+  // Load ORCID and retroactively backfill any workflow instances missing it
+  useEffect(() => {
+    getCurrentOrcid(base44).then(async orcid => {
+      setCurrentOrcid(orcid);
+      // Retroactively patch DB workflow instances that have no created_by_orcid
+      try {
+        const all = await base44.entities.WorkflowInstance.list();
+        const toBackfill = all.filter(w => !w.created_by_orcid);
+        if (toBackfill.length > 0) {
+          await Promise.all(
+            toBackfill.map(w =>
+              base44.entities.WorkflowInstance.update(w.id, { created_by_orcid: RETROACTIVE_ORCID })
+            )
+          );
+          queryClient.invalidateQueries({ queryKey: ['workflow-instances'] });
+        }
+      } catch { /* silent — provenance is best-effort */ }
+    });
+  }, []);
 
   // Auto-open new dialog from ?new= query param
   useEffect(() => {
@@ -576,7 +598,7 @@ export default function KBWorkflow() {
       <WorkflowNewDialog
         open={showNew}
         onClose={() => { setShowNew(false); setPreselectedType(null); }}
-        onCreate={(data) => createMutation.mutate(data)}
+        onCreate={(data) => createMutation.mutate({ ...data, created_by_orcid: currentOrcid || RETROACTIVE_ORCID })}
         allowedTypes={allowedWorkflowTypes}
         preselectedType={preselectedType}
       />

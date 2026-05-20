@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import PolicyEditor from '@/components/kbcompose/PolicyEditor';
+import { getCurrentOrcid, stampProvenance } from '@/lib/provenance';
 
 /**
  * Merge multiple policies into a single draft policy.
@@ -220,25 +221,26 @@ export default function WorkflowStep5Generate({ instanceId, workflowId, onComple
         
         // Merge multiple selected policies
         const mergedPolicy = mergePolicies(selectedPolicies);
-        
-        // Save to localStorage as a draft (same as Compose)
-        const existingDrafts = JSON.parse(localStorage.getItem('kbcompose_drafts') || '[]');
-        localStorage.setItem('kbcompose_drafts', JSON.stringify([...existingDrafts, mergedPolicy]));
-        
-        setDraftPolicy(mergedPolicy);
-        setShowEditor(true);
-        
-        // Notify parent that step 5 is complete with the draft
-        if (onComplete) {
-            onComplete({
-                draft_policy: mergedPolicy,
-                status: 'draft',
-            });
-        }
-        
-        toast({
+
+        // Stamp provenance
+        getCurrentOrcid(base44).then(orcid => {
+          const stamped = stampProvenance(mergedPolicy, orcid);
+
+          // Save to localStorage as a draft (same as Compose)
+          const existingDrafts = JSON.parse(localStorage.getItem('kbcompose_drafts') || '[]');
+          localStorage.setItem('kbcompose_drafts', JSON.stringify([...existingDrafts, stamped]));
+
+          setDraftPolicy(stamped);
+          setShowEditor(true);
+
+          if (onComplete) {
+            onComplete({ draft_policy: stamped, status: 'draft' });
+          }
+
+          toast({
             title: "Draft policy created",
-            description: `"${mergedPolicy.label}" merged from ${selectedPolicies.length} policies.`,
+            description: `"${stamped.label}" merged from ${selectedPolicies.length} policies.`,
+          });
         });
     }, [selectedPolicies.length, instanceId, prefillData.assignee, prefillData.target]);
 

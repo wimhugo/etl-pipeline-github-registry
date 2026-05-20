@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/use-toast';
 import ComposePolicyCard from '@/components/kbcompose/ComposePolicyCard';
 import PolicyFilterBar from '@/components/kbpolicy/PolicyFilterBar';
 import NewPolicyFromTemplateDialog from '@/components/kbcompose/NewPolicyFromTemplateDialog';
+import { getCurrentOrcid, stampProvenance, backfillLocalDrafts } from '@/lib/provenance';
 
 function useComposeData() {
   const { data: globalConfigs = [] } = useQuery({
@@ -119,15 +120,25 @@ export default function KBCompose() {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
+  const [currentOrcid, setCurrentOrcid] = useState(null);
+
   // Local overlay: deleted ids + cloned additions
   const [deletedIds, setDeletedIds] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('kbcompose_deletedIds') || '[]')); }
     catch { return new Set(); }
   });
   const [cloned, setCloned] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('kbcompose_drafts') || '[]'); }
-    catch { return []; }
+    // Load and immediately retroactively backfill with the known historical ORCID
+    return backfillLocalDrafts();
   });
+
+  // Once we know the current user's ORCID, backfill again with the real value
+  useEffect(() => {
+    getCurrentOrcid(base44).then(orcid => {
+      setCurrentOrcid(orcid);
+      setCloned(backfillLocalDrafts(orcid));
+    });
+  }, []);
 
   const { remotePolicies, actionsMap, constraintsMap, statesMap, policiesLoading, policiesError, noConfig, config, policyFile } = useComposeData();
 
@@ -187,26 +198,31 @@ export default function KBCompose() {
   };
 
   const handleEdit = (updatedPolicy) => {
-    const isClone = cloned.some(c => c.id === updatedPolicy.id);
+    const stamped = stampProvenance(updatedPolicy, currentOrcid);
+    const isClone = cloned.some(c => c.id === stamped.id);
     if (isClone) {
-      persistCloned(cloned.map(c => c.id === updatedPolicy.id ? updatedPolicy : c));
+      persistCloned(cloned.map(c => c.id === stamped.id ? stamped : c));
     } else {
-      persistDeletedIds(new Set([...deletedIds, updatedPolicy.id]));
-      persistCloned([...cloned, updatedPolicy]);
+      persistDeletedIds(new Set([...deletedIds, stamped.id]));
+      persistCloned([...cloned, stamped]);
     }
-    toast({ title: 'Policy updated', description: `"${updatedPolicy.label}" saved as draft.` });
+    toast({ title: 'Policy updated', description: `"${stamped.label}" saved as draft.` });
   };
 
   const handleCopy = (policy) => {
     const newId = `${policy.id}-copy-${Date.now()}`;
-    const copy = { ...policy, id: newId, label: `${policy.label} (copy)`, status: 'openrel:status/draft', derived_from: policy.id, _createdLocally: Date.now() };
+    const copy = stampProvenance(
+      { ...policy, id: newId, label: `${policy.label} (copy)`, status: 'openrel:status/draft', derived_from: policy.id, _createdLocally: Date.now() },
+      currentOrcid
+    );
     persistCloned([...cloned, copy]);
     toast({ title: 'Policy copied', description: `Created "${copy.label}"` });
   };
 
   const handleNewFromTemplate = (draft) => {
-    persistCloned([...cloned, draft]);
-    toast({ title: 'Draft created', description: `"${draft.label}" added to the top of the list.` });
+    const stamped = stampProvenance(draft, currentOrcid);
+    persistCloned([...cloned, stamped]);
+    toast({ title: 'Draft created', description: `"${stamped.label}" added to the top of the list.` });
   };
 
   const handleSubmitPR = async (policy) => {
