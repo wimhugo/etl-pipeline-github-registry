@@ -1,6 +1,6 @@
 # Applicable User Stories, Design Considerations, and Scenarios
 
-*These user stories can come from more than one driver: concept, project requirement, collaboration requirement, mandatory implementation, ...*
+*These user stories can come from more than one driver: concept, project requirement, collaboration requirement, mandatory implementation due to legislation, ...*
 
 ## User Stories
 
