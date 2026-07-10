@@ -131,11 +131,13 @@ function parseTtl(text, memberIdentifier) {
       for (const o of objs) {
         if (!o) continue;
         const objValue = extractTerm(o);
+        const isLiteral = o.trim().startsWith('"');
 
         if (predResolved === RDF_TYPE && objValue === memberIri) {
-          if (!members[subject]) members[subject] = { iri: subject, label: '', definition: '' };
+          if (!members[subject]) members[subject] = { iri: subject, label: '', definition: '', properties: [] };
         }
         if (members[subject]) {
+          members[subject].properties.push({ predicate: predResolved, object: objValue, is_literal: isLiteral });
           if (predResolved === SKOS_PREF_LABEL && !members[subject].label) {
             members[subject].label = objValue;
           } else if (predResolved === RDFS_LABEL && !members[subject].label) {
@@ -182,6 +184,7 @@ function parseJsonContent(text, memberIdentifier) {
     iri: item['@id'] || item['id'] || item['iri'] || '',
     label: item['prefLabel'] || item['label'] || item['name'] || item['skos:prefLabel'] || '',
     definition: item['definition'] || item['description'] || item['skos:definition'] || '',
+    properties: item,
   }));
 
   return { members, memberIdentifierResolved: memberIdentifier };
@@ -220,6 +223,7 @@ function parseYamlContent(text, memberIdentifier) {
     iri: item.id || item.iri || item['@id'] || '',
     label: item.label || item.name || item.prefLabel || '',
     definition: item.definition || item.description || '',
+    properties: item,
   }));
 
   return { members, memberIdentifierResolved: memberIdentifier };
@@ -237,15 +241,41 @@ function escapeTtlLiteral(str) {
 
 function membersToTtl(members, memberIdentifierResolved, prefixes) {
   prefixes = prefixes || {};
+  const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 
-  // Collect prefixes actually used by member IRIs (CURIEs like "openrel:use")
+  function iriToCurie(iri) {
+    // Already a CURIE (e.g. "openrel:use", ":Action") — return as-is
+    if (!iri.startsWith('http') && !iri.startsWith('www') && iri.includes(':')) {
+      return iri;
+    }
+    for (const [prefix, ns] of Object.entries(prefixes)) {
+      if (iri.startsWith(ns)) {
+        return `${prefix}:${iri.substring(ns.length)}`;
+      }
+    }
+    return `<${iri}>`;
+  }
+
+  // Collect all prefixes actually used (member IRIs + property predicates/objects)
   const usedPrefixes = new Set();
-  for (const m of members) {
-    const iri = m.iri || '';
+  function collectFromIri(iri) {
     const colonIdx = iri.indexOf(':');
     if (colonIdx > 0) {
       const prefix = iri.substring(0, colonIdx);
       if (prefixes[prefix]) usedPrefixes.add(prefix);
+    }
+    for (const [prefix, ns] of Object.entries(prefixes)) {
+      if (iri.startsWith(ns)) { usedPrefixes.add(prefix); break; }
+    }
+  }
+
+  for (const m of members) {
+    if (m.iri) collectFromIri(m.iri);
+    if (m.properties && Array.isArray(m.properties)) {
+      for (const p of m.properties) {
+        collectFromIri(p.predicate);
+        if (!p.is_literal) collectFromIri(p.object);
+      }
     }
   }
 
@@ -266,18 +296,35 @@ function membersToTtl(members, memberIdentifierResolved, prefixes) {
     '@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .',
     '@prefix skos: <http://www.w3.org/2004/02/skos/core#> .',
   ];
+  const hardcoded = new Set(['rdf', 'rdfs', 'skos']);
   for (const prefix of usedPrefixes) {
-    lines.push(`@prefix ${prefix}: <${prefixes[prefix]}> .`);
+    if (!hardcoded.has(prefix)) {
+      lines.push(`@prefix ${prefix}: <${prefixes[prefix]}> .`);
+    }
   }
   lines.push('');
 
   for (const m of members) {
     const iri = m.iri || '';
     if (!iri) continue;
-    const parts = [`${iri} a ${typeCurie}`];
-    if (m.label) parts.push(`    skos:prefLabel "${escapeTtlLiteral(m.label)}"`);
-    if (m.definition) parts.push(`    skos:definition "${escapeTtlLiteral(m.definition)}"`);
-    lines.push(parts.join(' ;\n') + ' .');
+
+    if (m.properties && Array.isArray(m.properties) && m.properties.length > 0) {
+      // Detail view: serialize all properties
+      const parts = m.properties.map(p => {
+        const predDisplay = p.predicate === RDF_TYPE ? 'a' : iriToCurie(p.predicate);
+        const objDisplay = p.is_literal
+          ? `"${escapeTtlLiteral(p.object)}"`
+          : iriToCurie(p.object);
+        return `    ${predDisplay} ${objDisplay}`;
+      });
+      lines.push(`${iri} ${parts.join(' ;\n')} .`);
+    } else {
+      // List view: only type, label, definition
+      const parts = [`${iri} a ${typeCurie}`];
+      if (m.label) parts.push(`    skos:prefLabel "${escapeTtlLiteral(m.label)}"`);
+      if (m.definition) parts.push(`    skos:definition "${escapeTtlLiteral(m.definition)}"`);
+      lines.push(parts.join(' ;\n') + ' .');
+    }
     lines.push('');
   }
 
@@ -398,6 +445,12 @@ Deno.serve(async (req) => {
     if (prefix) {
       members = members.filter(m => String(m.iri).startsWith(prefix));
       appliedPrefix = prefix;
+    }
+
+    // For list views (no id), strip properties to keep payload small.
+    // Detail views (with id) retain all properties.
+    if (!id) {
+      members = members.map(({ iri, label, definition }) => ({ iri, label, definition }));
     }
 
     const meta = {
