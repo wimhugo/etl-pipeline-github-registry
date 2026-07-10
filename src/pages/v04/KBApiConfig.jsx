@@ -4,10 +4,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, FileCode2, Settings } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileCode2, Settings, Code2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import ApiSourceFileEditor from '@/components/kbapi/ApiSourceFileEditor';
 import ApiSourceFilePreview from '@/components/kbapi/ApiSourceFilePreview';
+import ApiEndpointPanel from '@/components/kbapi/ApiEndpointPanel';
+import SwaggerYamlPreview from '@/components/kbapi/SwaggerYamlPreview';
 
 export default function KBApiConfig() {
   const queryClient = useQueryClient();
@@ -147,6 +149,20 @@ export default function KBApiConfig() {
         onSave={handleSave}
         sourceFile={editingItem}
       />
+
+      <div className="pt-2">
+        <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+          <Code2 className="w-5 h-5 text-accent" />
+          Export API
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Define API endpoints for each source file section. Two standard GET methods (list and list/&#123;id&#125;) are generated per section, each with a prefix query parameter.
+        </p>
+      </div>
+
+      <ApiEndpointPanel sourceFiles={sortedFiles} />
+
+      <SwaggerYamlPreview />
     </div>
   );
 }

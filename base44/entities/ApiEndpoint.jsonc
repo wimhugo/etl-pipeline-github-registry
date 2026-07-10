@@ -1,0 +1,90 @@
+{
+  "name": "ApiEndpoint",
+  "type": "object",
+  "properties": {
+    "section": {
+      "type": "string",
+      "description": "API section name this endpoint belongs to (matches ApiSourceFile.section)"
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE"
+      ],
+      "default": "GET",
+      "description": "HTTP method"
+    },
+    "path": {
+      "type": "string",
+      "description": "API path, e.g. 'openrel/api/v0.4/actions' or 'openrel/api/v0.4/actions/{id}'"
+    },
+    "endpoint_type": {
+      "type": "string",
+      "enum": [
+        "list",
+        "detail"
+      ],
+      "default": "list",
+      "description": "list returns an array of members; detail returns a single member object"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Short summary shown in Swagger"
+    },
+    "description": {
+      "type": "string",
+      "description": "Longer description shown in Swagger"
+    },
+    "parameters": {
+      "type": "array",
+      "description": "Query/path/header parameters for this endpoint",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "in": {
+            "type": "string",
+            "enum": [
+              "query",
+              "path",
+              "header"
+            ],
+            "default": "query"
+          },
+          "required": {
+            "type": "boolean",
+            "default": false
+          },
+          "schema_type": {
+            "type": "string",
+            "default": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "sort_order": {
+      "type": "number",
+      "default": 0,
+      "description": "Display order"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this endpoint is included in the Swagger output"
+    }
+  },
+  "required": [
+    "section",
+    "method",
+    "path"
+  ]
+}
