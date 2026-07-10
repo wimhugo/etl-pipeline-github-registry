@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useRole } from '@/lib/RoleContext';
 import { useProject } from '@/lib/ProjectContext';
-import { Menu, X, ChevronRight, ChevronLeft, LayoutDashboard, FolderOpen, Database, GitBranch, CheckSquare, FileText, Layers, RefreshCw, BookOpen, PenTool, Link2, FileEdit, Box, Eye, Settings2, Search, Pencil, Shuffle, BookMarked, Sliders, SlidersHorizontal, Workflow, BookKey, KeyRound } from 'lucide-react';
+import { Menu, X, ChevronRight, ChevronLeft, LayoutDashboard, FolderOpen, Database, GitBranch, CheckSquare, FileText, Layers, RefreshCw, BookOpen, PenTool, Link2, FileEdit, Box, Eye, Settings2, Search, Pencil, Shuffle, BookMarked, Sliders, SlidersHorizontal, Workflow, BookKey, KeyRound, Code2 } from 'lucide-react';
 
 const ICON_MAP = {
   'Dashboard':            LayoutDashboard,
@@ -28,6 +28,7 @@ const ICON_MAP = {
   'Match':                Shuffle,
   'Compose':              BookMarked,
   'Preferences':          Sliders,
+  'API Definition':      Code2,
   'Configuration':        SlidersHorizontal,
   'My Workflows':         Workflow,
 };

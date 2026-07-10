@@ -54,6 +54,7 @@ export const KB_USER_V04_FEATURES = [
 
 export const KB_API_V04_FEATURES = [
   { label: 'Dashboard', path: '/v0.4/kb-api', access: { Administrator: true, Curator: true, Contributor: true, 'End User': true } },
+  { label: 'API Definition', path: '/v0.4/kb-api/definition', access: { Administrator: true, Curator: true, Contributor: false, 'End User': false } },
   { label: 'Configuration', path: '/v0.4/kb-api/configuration', access: { Administrator: true, Curator: true, Contributor: false, 'End User': false } },
 ];
 
