@@ -28,9 +28,8 @@ export default function ApiSourceFilePreview({ item }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['previewApiSourceFile', item.id],
     queryFn: async () => {
-      const res = await base44.functions.invoke('previewApiSourceFile', {
-        file_path: item.file_path,
-        member_identifier: item.member_identifier || 'skos:Concept',
+      const res = await base44.functions.invoke('fetchApiSourceContent', {
+        section: item.section,
       });
       return res.data;
     },
