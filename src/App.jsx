@@ -122,8 +122,8 @@ const AuthenticatedApp = () => {
         <Route path="/v0.4/kb-api/configuration" element={<V04KBApiConfig />} />
         <Route path="/v0.4/kb-api/definition" element={<V04KBApiDefinition />} />
         <Route path="/v0.4/kb-api/preview" element={<V04KBApiPreview />} />
+        <Route path="/v0.4/kb-api/preview-standalone" element={<V04KBApiPreviewStandalone />} />
       </Route>
-      <Route path="/v0.4/kb-api/preview-standalone" element={<V04KBApiPreviewStandalone />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
