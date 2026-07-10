@@ -4,7 +4,9 @@ export function generateSwaggerSpec(endpoints, meta = {}) {
   const desc = meta.description || 'API for accessing OpenREL knowledge base vocabulary sources';
   const serverUrl = meta.serverUrl || '';
 
-  const active = (endpoints || []).filter(e => e.is_active !== false);
+  const active = (endpoints || [])
+    .filter(e => e.is_active !== false)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   const pathMap = {};
   const tagOrder = [];

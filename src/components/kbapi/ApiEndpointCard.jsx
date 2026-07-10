@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronDown, ChevronRight, Trash2, Plus, Copy } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, Plus, Copy, GripVertical } from 'lucide-react';
 import WiringConfig from './WiringConfig';
 import { LOGIC_TYPES } from '@/lib/apiLogicTypes';
 
@@ -20,7 +20,7 @@ const methodColor = {
   DELETE: 'bg-red-500/15 text-red-400 border-red-500/30',
 };
 
-export default function ApiEndpointCard({ endpoint, onSave, onDelete, onClone, sourceFiles = [], availableTags = [] }) {
+export default function ApiEndpointCard({ endpoint, onSave, onDelete, onClone, sourceFiles = [], availableTags = [], dragHandleProps }) {
   const [expanded, setExpanded] = useState(false);
   const [form, setForm] = useState({});
 
@@ -53,6 +53,11 @@ export default function ApiEndpointCard({ endpoint, onSave, onDelete, onClone, s
   return (
     <div className="rounded-lg border border-border/40 bg-muted/20 overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-2.5">
+        {dragHandleProps && (
+          <span {...dragHandleProps} className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors">
+            <GripVertical className="w-4 h-4" />
+          </span>
+        )}
         <button onClick={() => setExpanded(v => !v)} className="shrink-0">
           {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
         </button>

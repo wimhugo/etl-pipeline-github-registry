@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap, Plus } from 'lucide-react';
@@ -88,6 +89,27 @@ export default function ApiEndpointPanel({ sourceFiles = [] }) {
       toast({ title: 'Deleted', description: 'Endpoint removed.' });
     },
   });
+
+  const reorderEndpoints = useMutation({
+    mutationFn: (updates) => base44.entities.ApiEndpoint.bulkUpdate(updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['apiEndpoints'] });
+    },
+  });
+
+  const handleDragEnd = (result) => {
+    if (!result.destination || result.destination.index === result.source.index) return;
+    const reordered = [...sorted];
+    const [moved] = reordered.splice(result.source.index, 1);
+    reordered.splice(result.destination.index, 0, moved);
+    const updates = reordered.map((ep, i) => ({ id: ep.id, sort_order: i * 10 }));
+    // Optimistically update cache
+    queryClient.setQueryData(['apiEndpoints'], (old = []) => old.map(ep => {
+      const upd = updates.find(u => u.id === ep.id);
+      return upd ? { ...ep, sort_order: upd.sort_order } : ep;
+    }));
+    reorderEndpoints.mutate(updates);
+  };
 
   const [draft, setDraft] = useState(null);
 
@@ -179,17 +201,36 @@ export default function ApiEndpointPanel({ sourceFiles = [] }) {
                 onClone={handleClone}
               />
             )}
-            {sorted.map(ep => (
-              <ApiEndpointCard
-                key={ep.id}
-                endpoint={ep}
-                sourceFiles={sourceFiles}
-                availableTags={availableTags}
-                onSave={(data) => saveEndpoint.mutate({ id: ep.id, data })}
-                onDelete={() => { if (window.confirm('Delete this endpoint?')) deleteEndpoint.mutate(ep.id); }}
-                onClone={handleClone}
-              />
-            ))}
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="endpoints">
+                {(provided) => (
+                  <div ref={provided.innerRef} {...provided.droppableProps}>
+                    {sorted.map((ep, index) => (
+                      <Draggable key={ep.id} draggableId={ep.id} index={index}>
+                        {(dragProvided) => (
+                          <div
+                            ref={dragProvided.innerRef}
+                            {...dragProvided.draggableProps}
+                            className="mb-2"
+                          >
+                            <ApiEndpointCard
+                              endpoint={ep}
+                              sourceFiles={sourceFiles}
+                              availableTags={availableTags}
+                              dragHandleProps={dragProvided.dragHandleProps}
+                              onSave={(data) => saveEndpoint.mutate({ id: ep.id, data })}
+                              onDelete={() => { if (window.confirm('Delete this endpoint?')) deleteEndpoint.mutate(ep.id); }}
+                              onClone={handleClone}
+                            />
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </DragDropContext>
           </div>
         )}
       </CardContent>
