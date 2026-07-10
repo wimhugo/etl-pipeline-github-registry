@@ -130,14 +130,15 @@ function parseTtl(text, memberIdentifier) {
 
       for (const o of objs) {
         if (!o) continue;
-        const objValue = extractTerm(o);
+        const objValue = extractTerm(o);       // resolved — for type check & label/definition
+        const objRaw = extractTerm(o, true);   // raw CURIE — for property storage & filtering
         const isLiteral = o.trim().startsWith('"');
 
         if (predResolved === RDF_TYPE && objValue === memberIri) {
           if (!members[subject]) members[subject] = { iri: subject, label: '', definition: '', properties: [] };
         }
         if (members[subject]) {
-          members[subject].properties.push({ predicate: predResolved, object: objValue, is_literal: isLiteral });
+          members[subject].properties.push({ predicate: predResolved, object: objRaw, is_literal: isLiteral });
           if (predResolved === SKOS_PREF_LABEL && !members[subject].label) {
             members[subject].label = objValue;
           } else if (predResolved === RDFS_LABEL && !members[subject].label) {
@@ -425,47 +426,16 @@ Deno.serve(async (req) => {
 
     // --- Step 2: Apply parameter-based filters ---
 
-    // Detail filter: match a single member by id.  The id may be a prefixed
-    // term (e.g. "odrl:move") or a full IRI.  We compare on the local name
-    // (after the last ':', '/', or '#') as a fallback for prefix differences.
+    // Detail filter: match by exact CURIE string.  Searches both member IRIs
+    // and property object values (e.g. skos:exactMatch, odrl:includedIn).
     if (id) {
-      const prefixes = parsed.prefixes || {};
-
-      // Resolve a CURIE (e.g. "odrl:use") to a full IRI using parsed prefixes
-      const resolveIri = (term) => {
-        term = String(term).trim();
-        if (term.startsWith('<') && term.endsWith('>')) return term.slice(1, -1);
-        if (term.startsWith('http')) return term;
-        const colonIdx = term.indexOf(':');
-        if (colonIdx > 0) {
-          const prefix = term.substring(0, colonIdx);
-          const local = term.substring(colonIdx + 1);
-          if (prefixes[prefix]) return prefixes[prefix] + local;
+      members = members.filter(m => {
+        if (m.iri === id) return true;
+        if (m.properties && Array.isArray(m.properties)) {
+          return m.properties.some(p => p.object === id);
         }
-        return term;
-      };
-
-      const localName = (term) => {
-        const t = String(term);
-        const idx = Math.max(t.lastIndexOf(':'), t.lastIndexOf('/'), t.lastIndexOf('#'));
-        return idx >= 0 ? t.substring(idx + 1) : t;
-      };
-
-      const idResolved = resolveIri(id);
-      const idLocal = localName(id);
-      const idHasPrefix = id.includes(':') && !id.startsWith('http');
-
-      // First pass: match on full IRI (exact or resolved CURIE)
-      let filtered = members.filter(m =>
-        m.iri === id || resolveIri(m.iri) === idResolved
-      );
-
-      // Fall back to local-name matching only when id has no prefix
-      if (filtered.length === 0 && !idHasPrefix) {
-        filtered = members.filter(m => localName(m.iri) === idLocal);
-      }
-
-      members = filtered;
+        return false;
+      });
       appliedId = id;
     }
 
