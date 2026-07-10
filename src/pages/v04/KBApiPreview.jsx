@@ -42,8 +42,18 @@ function createRequestInterceptor(serverUrl) {
         params[key] = value;
       });
 
-      // Pass the Accept header through for content negotiation
-      const acceptHeader = options?.headers?.Accept || options?.headers?.accept;
+      // Pass the Accept header through for content negotiation.
+      // Swagger UI may pass headers as a Headers object (use .get()) or
+      // as a plain object (use property access).
+      let acceptHeader;
+      const headers = options?.headers;
+      if (headers) {
+        if (typeof headers.get === 'function') {
+          acceptHeader = headers.get('Accept') || headers.get('accept');
+        } else {
+          acceptHeader = headers.Accept || headers.accept;
+        }
+      }
       if (acceptHeader) {
         params._accept = acceptHeader;
       }
