@@ -34,11 +34,25 @@ export function generateSwaggerSpec(endpoints, meta = {}) {
         ? memberSchema
         : { type: 'array', items: memberSchema };
 
+      // Auto-extract path template parameters (e.g. {id} from /actionclasses/{id})
+      const pathParamNames = (path.match(/\{([^}]+)\}/g) || []).map(p => p.slice(1, -1));
+      const existingNames = new Set((ep.parameters || []).map(p => p.name));
+      const autoPathParams = pathParamNames
+        .filter(name => !existingNames.has(name))
+        .map(name => ({
+          name,
+          in: 'path',
+          required: true,
+          schema: { type: 'string' },
+          description: `The ${name} of the resource to retrieve`,
+        }));
+
       paths[path][m] = {
         tags: [ep.tag || 'default'],
         summary: ep.summary || '',
         description: ep.description || '',
         parameters: [
+          ...autoPathParams,
           ...(ep.parameters || []).map(p => ({
             name: p.name,
             in: p.in || 'query',

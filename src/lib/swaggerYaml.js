@@ -57,7 +57,14 @@ export function generateSwaggerYaml(endpoints, meta = {}) {
         L.push(`      description: ${yamlStr(ep.description)}`);
       }
 
-      const params = ep.parameters || [];
+      // Auto-extract path template parameters (e.g. {id} from /actionclasses/{id})
+      const pathParamNames = (path.match(/\{([^}]+)\}/g) || []).map(p => p.slice(1, -1));
+      const existingNames = new Set((ep.parameters || []).map(p => p.name));
+      const autoPathParams = pathParamNames
+        .filter(name => !existingNames.has(name))
+        .map(name => ({ name, in: 'path', required: true, schema_type: 'string', description: `The ${name} of the resource to retrieve` }));
+
+      const params = [...autoPathParams, ...(ep.parameters || [])];
       if (params.length > 0) {
         L.push('      parameters:');
         for (const p of params) {
