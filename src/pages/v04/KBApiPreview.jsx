@@ -25,6 +25,23 @@ function createRequestInterceptor(serverUrl) {
   const serverPathname = new URL(serverUrl, window.location.origin).pathname;
 
   return (req) => {
+    // Extract the Accept header HERE (in the requestInterceptor) where we
+    // have the full req object.  Swagger UI sets the Accept header based on
+    // the "Response content type" selector or the Accept header parameter.
+    // By the time userFetch runs, options.headers may not carry it reliably.
+    let acceptHeader = null;
+    const h = req.headers;
+    if (h) {
+      if (typeof h.get === 'function') {
+        acceptHeader = h.get('Accept') || h.get('accept');
+      }
+      if (!acceptHeader && typeof h === 'object') {
+        for (const k of Object.keys(h)) {
+          if (k.toLowerCase() === 'accept') { acceptHeader = h[k]; break; }
+        }
+      }
+    }
+
     req.userFetch = async (url, options) => {
       const parsedUrl = new URL(url, window.location.origin);
 
@@ -42,18 +59,7 @@ function createRequestInterceptor(serverUrl) {
         params[key] = value;
       });
 
-      // Pass the Accept header through for content negotiation.
-      // Swagger UI may pass headers as a Headers object (use .get()) or
-      // as a plain object (use property access).
-      let acceptHeader;
-      const headers = options?.headers;
-      if (headers) {
-        if (typeof headers.get === 'function') {
-          acceptHeader = headers.get('Accept') || headers.get('accept');
-        } else {
-          acceptHeader = headers.Accept || headers.accept;
-        }
-      }
+      // Use the Accept header captured from the requestInterceptor
       if (acceptHeader) {
         params._accept = acceptHeader;
       }
