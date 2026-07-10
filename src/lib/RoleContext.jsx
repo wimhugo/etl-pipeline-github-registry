@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { useVersion } from './VersionContext';
 
 export const ROLES = ['Administrator', 'Curator', 'Contributor', 'End User'];
 export const NON_ADMIN_ROLES = ['Curator', 'Contributor', 'End User'];
@@ -42,6 +43,19 @@ export const KB_USER_FEATURES_DEFAULT = [
   { label: 'Configuration',  path: '/kb-user/configuration',  access: { Administrator: true, Curator: true, Contributor: false, 'End User': false } },
 ];
 
+export const KB_MANAGER_V04_FEATURES = [
+  { label: 'Dashboard', path: '/v0.4/dashboard', access: { Administrator: true, Curator: true, Contributor: true, 'End User': true } },
+  { label: 'Settings',  path: '/v0.4/settings',  access: { Administrator: true, Curator: false, Contributor: false, 'End User': false } },
+];
+
+export const KB_USER_V04_FEATURES = [
+  { label: 'Dashboard', path: '/v0.4/kb-user/dashboard', access: { Administrator: true, Curator: true, Contributor: true, 'End User': true } },
+];
+
+export const KB_API_V04_FEATURES = [
+  { label: 'Dashboard', path: '/v0.4/kb-api', access: { Administrator: true, Curator: true, Contributor: true, 'End User': true } },
+];
+
 const PERMISSIONS_KEY = 'openrel_permissions';
 const ROLE_KEY = 'openrel_active_role';
 const CONTAINER_KEY = 'openrel_app_container';
@@ -75,6 +89,7 @@ function applyPermissions(defaults, overrides) {
 }
 
 export function RoleProvider({ children }) {
+  const { version } = useVersion();
   const [activeRole, setActiveRole] = useState(
     () => localStorage.getItem(ROLE_KEY) || 'Administrator'
   );
@@ -102,7 +117,22 @@ export function RoleProvider({ children }) {
   const kbUserFeatures = applyPermissions(KB_USER_FEATURES_DEFAULT, permissionOverrides);
   const workflowTypes = applyPermissions(WORKFLOW_TYPES_DEFAULT, permissionOverrides);
 
-  const features = activeContainer === 'KB Manager' ? kbManagerFeatures : kbUserFeatures;
+  const kbManagerV04 = applyPermissions(KB_MANAGER_V04_FEATURES, permissionOverrides);
+  const kbUserV04 = applyPermissions(KB_USER_V04_FEATURES, permissionOverrides);
+  const kbApiV04 = applyPermissions(KB_API_V04_FEATURES, permissionOverrides);
+
+  const appContainers = version === 'v0.4'
+    ? ['KB Manager', 'KB User', 'KB API']
+    : ['KB Manager', 'KB User'];
+
+  let features;
+  if (version === 'v0.4') {
+    features = activeContainer === 'KB Manager' ? kbManagerV04
+      : activeContainer === 'KB User' ? kbUserV04
+      : kbApiV04;
+  } else {
+    features = activeContainer === 'KB Manager' ? kbManagerFeatures : kbUserFeatures;
+  }
   const visibleFeatures = features.filter(f => f.access[activeRole]);
 
   const allowedWorkflowTypes = workflowTypes
@@ -117,6 +147,7 @@ export function RoleProvider({ children }) {
       kbManagerFeatures, kbUserFeatures,
       workflowTypes, allowedWorkflowTypes,
       permissionOverrides, savePermissions,
+      appContainers,
     }}>
       {children}
     </RoleContext.Provider>

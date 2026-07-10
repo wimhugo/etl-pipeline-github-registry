@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { ProjectProvider } from '@/lib/ProjectContext'
 import { RoleProvider } from '@/lib/RoleContext'
+import { VersionProvider } from '@/lib/VersionContext'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
@@ -44,6 +45,12 @@ import KBDetailPolicies from './pages/kbuser/KBDetailPolicies';
 import KBDetailActions from './pages/kbuser/KBDetailActions';
 import KBDetailConstraints from './pages/kbuser/KBDetailConstraints';
 import KBWorkflow from './pages/kbuser/KBWorkflow';
+
+// V0.4 pages
+import V04Dashboard from './pages/v04/Dashboard';
+import V04Settings from './pages/v04/Settings';
+import V04KBUserDashboard from './pages/v04/KBUserDashboard';
+import V04KBApi from './pages/v04/KBApi';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -102,6 +109,12 @@ const AuthenticatedApp = () => {
         <Route path="/kb-user/detail/actions" element={<KBDetailActions />} />
         <Route path="/kb-user/detail/constraints" element={<KBDetailConstraints />} />
         <Route path="/kb-user/workflow" element={<KBWorkflow />} />
+
+        {/* V0.4 */}
+        <Route path="/v0.4/dashboard" element={<V04Dashboard />} />
+        <Route path="/v0.4/settings" element={<V04Settings />} />
+        <Route path="/v0.4/kb-user/dashboard" element={<V04KBUserDashboard />} />
+        <Route path="/v0.4/kb-api" element={<V04KBApi />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
@@ -113,12 +126,14 @@ function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <ProjectProvider>
+          <VersionProvider>
           <RoleProvider>
             <Router>
               <AuthenticatedApp />
               <Toaster />
             </Router>
           </RoleProvider>
+          </VersionProvider>
         </ProjectProvider>
       </QueryClientProvider>
     </AuthProvider>
