@@ -7,85 +7,78 @@ import { generateSwaggerSpec } from '@/lib/swaggerSpec';
 import SwaggerUiContainer from '@/components/kbapi/SwaggerUiContainer';
 
 // Display-only server URL shown in the Swagger spec (requests are
-// actually routed through the SDK via the custom fetch plugin below).
+// actually routed through the SDK via the custom userFetch below).
 const DISPLAY_SERVER_URL = 'https://api.openrel.org/v0.4';
 
 /**
- * Swagger UI plugin that intercepts "Try it out" requests and routes them
- * through the Base44 SDK (base44.functions.invoke) instead of making direct
- * HTTP calls. This avoids CORS, auth-header, and URL-routing issues.
+ * Creates a requestInterceptor that injects a `userFetch` into every
+ * "Try it out" request.  Swagger UI's internal http client (http_http)
+ * calls `(req.userFetch || fetch)(url, req)` and then runs the result
+ * through `serializeResponse`, which expects a standard Response object
+ * (with `.ok`, `.status`, `.statusText`, `.headers`, and `.text()`).
  *
- * Swagger UI's fn.fetch receives a single request object { url, method, headers,
- * body, ... } and must return a plain object (NOT a Response) with:
- *   { ok, url, status, statusText, headers, text }
- * where `text` is a string property (not a method) and `headers` is a plain object.
+ * By returning a real Response from userFetch, the response flows through
+ * the normal serializeResponse → setResponse → fromJSOrdered pipeline,
+ * producing the Immutable Map that LiveResponse.render expects.
  */
-function createApiProxyPlugin(serverUrl) {
+function createRequestInterceptor(serverUrl) {
   const serverPathname = new URL(serverUrl, window.location.origin).pathname;
-  return {
-    fn: {
-      fetch: async (req) => {
-        // Swagger UI may pass a URL string instead of an object
-        if (typeof req === 'string') req = { url: req, method: 'GET' };
 
+  return (req) => {
+    req.userFetch = async (url, options) => {
+      const parsedUrl = new URL(url, window.location.origin);
+
+      // Extract the API path, stripping the display server's pathname prefix
+      let apiPath = parsedUrl.pathname;
+      if (serverPathname && apiPath.startsWith(serverPathname)) {
+        apiPath = apiPath.substring(serverPathname.length);
+      }
+      if (!apiPath.startsWith('/')) apiPath = '/' + apiPath;
+      apiPath = apiPath.replace(/\/$/, '') || '/';
+
+      // Collect query parameters
+      const params = {};
+      parsedUrl.searchParams.forEach((value, key) => {
+        params[key] = value;
+      });
+
+      // Parse body if present (POST/PUT/PATCH)
+      if (options?.body) {
         try {
-          const parsedUrl = new URL(req.url, window.location.origin);
-
-          // Extract the API path, stripping the display server's pathname prefix
-          let apiPath = parsedUrl.pathname;
-          if (serverPathname && apiPath.startsWith(serverPathname)) {
-            apiPath = apiPath.substring(serverPathname.length);
+          const bodyObj = typeof options.body === 'string'
+            ? JSON.parse(options.body)
+            : options.body;
+          if (bodyObj && typeof bodyObj === 'object') {
+            Object.assign(params, bodyObj);
           }
-          if (!apiPath.startsWith('/')) apiPath = '/' + apiPath;
-          apiPath = apiPath.replace(/\/$/, '') || '/';
+        } catch { /* not JSON, ignore */ }
+      }
 
-          // Collect query parameters
-          const params = {};
-          parsedUrl.searchParams.forEach((value, key) => {
-            params[key] = value;
-          });
+      try {
+        const result = await base44.functions.invoke('apiProxy', {
+          api_path: apiPath,
+          _method: (options?.method || 'GET').toUpperCase(),
+          ...params,
+        });
 
-          // Parse body if present (POST/PUT/PATCH)
-          if (req.body) {
-            try {
-              const bodyObj = typeof req.body === 'string'
-                ? JSON.parse(req.body)
-                : req.body;
-              if (bodyObj && typeof bodyObj === 'object') {
-                Object.assign(params, bodyObj);
-              }
-            } catch { /* not JSON, ignore */ }
-          }
+        const data = result?.data ?? result;
+        return new Response(JSON.stringify(data), {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } catch (err) {
+        const status = err?.response?.status || 500;
+        const errorData = err?.response?.data || { error: err.message };
+        return new Response(JSON.stringify(errorData), {
+          status,
+          statusText: err?.response?.statusText || 'Error',
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    };
 
-          const result = await base44.functions.invoke('apiProxy', {
-            api_path: apiPath,
-            _method: (req.method || 'GET').toUpperCase(),
-            ...params,
-          });
-
-          const data = result?.data ?? result;
-          return {
-            ok: true,
-            url: req.url,
-            status: 200,
-            statusText: 'OK',
-            headers: { 'content-type': 'application/json' },
-            text: JSON.stringify(data),
-          };
-        } catch (err) {
-          const status = err?.response?.status || 500;
-          const errorData = err?.response?.data || { error: err.message };
-          return {
-            ok: false,
-            url: req.url,
-            status,
-            statusText: err?.response?.statusText || 'Error',
-            headers: { 'content-type': 'application/json' },
-            text: JSON.stringify(errorData),
-          };
-        }
-      },
-    },
+    return req;
   };
 }
 
@@ -100,7 +93,10 @@ export default function KBApiPreview() {
     [endpoints]
   );
 
-  const plugins = useMemo(() => [createApiProxyPlugin(DISPLAY_SERVER_URL)], []);
+  const requestInterceptor = useMemo(
+    () => createRequestInterceptor(DISPLAY_SERVER_URL),
+    []
+  );
 
   return (
     <div className="space-y-4">
@@ -131,7 +127,7 @@ export default function KBApiPreview() {
       </Card>
 
       <div className="rounded-xl border border-border overflow-hidden bg-card">
-        <SwaggerUiContainer spec={spec} plugins={plugins} />
+        <SwaggerUiContainer spec={spec} requestInterceptor={requestInterceptor} />
       </div>
     </div>
   );
