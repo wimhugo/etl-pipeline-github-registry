@@ -22,14 +22,13 @@ export default function KBApiPreview() {
     [endpoints, serverUrl]
   );
 
-  const blobUrl = useMemo(() => {
-    const specJson = JSON.stringify(spec).replace(/</g, '\\u003c');
-    const html = `<!DOCTYPE html>
+  const iframeSrcDoc = useMemo(() => {
+    const specJson = JSON.stringify(spec).replace(/</g, '\\u003c').replace(/<\/script/g, '<\\/script');
+    return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui.css">
-  <script src="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-bundle.js"></script>
   <style>
     body { margin: 0; background: hsl(222 47% 11%); }
     .swagger-ui { background: hsl(222 47% 11%); }
@@ -56,8 +55,9 @@ export default function KBApiPreview() {
 </head>
 <body>
   <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5.18.2/swagger-ui-bundle.js" onload="initSwagger()"><\/script>
   <script>
-    window.onload = function() {
+    function initSwagger() {
       SwaggerUIBundle({
         dom_id: '#swagger-ui',
         spec: ${specJson},
@@ -65,17 +65,11 @@ export default function KBApiPreview() {
         layout: 'BaseLayout',
         deepLinking: true,
       });
-    };
-  </script>
+    }
+  <\/script>
 </body>
 </html>`;
-    const blob = new Blob([html], { type: 'text/html' });
-    return URL.createObjectURL(blob);
   }, [spec]);
-
-  useEffect(() => {
-    return () => URL.revokeObjectURL(blobUrl);
-  }, [blobUrl]);
 
   return (
     <div className="space-y-4">
@@ -111,7 +105,7 @@ export default function KBApiPreview() {
 
       <div className="rounded-xl border border-border overflow-hidden">
         <iframe
-          src={blobUrl}
+          srcDoc={iframeSrcDoc}
           className="w-full border-0"
           style={{ height: '70vh', minHeight: '500px' }}
           title="Swagger UI Preview"
