@@ -5,7 +5,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronDown, ChevronRight, Trash2, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, Plus, Copy } from 'lucide-react';
+import WiringConfig from './WiringConfig';
+import { LOGIC_TYPES } from '@/lib/apiLogicTypes';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 const PARAM_IN = ['query', 'path', 'header'];
@@ -18,12 +20,12 @@ const methodColor = {
   DELETE: 'bg-red-500/15 text-red-400 border-red-500/30',
 };
 
-export default function ApiEndpointCard({ endpoint, onSave, onDelete }) {
+export default function ApiEndpointCard({ endpoint, onSave, onDelete, onClone, sourceFiles = [] }) {
   const [expanded, setExpanded] = useState(false);
   const [form, setForm] = useState({});
 
   useEffect(() => {
-    setForm({ ...endpoint, parameters: endpoint.parameters || [] });
+    setForm({ ...endpoint, parameters: endpoint.parameters || [], target_logic_type: endpoint.target_logic_type || '', logic_config: endpoint.logic_config || {} });
   }, [endpoint]);
 
   const update = (field, val) => setForm(f => ({ ...f, [field]: val }));
@@ -61,9 +63,21 @@ export default function ApiEndpointCard({ endpoint, onSave, onDelete }) {
           placeholder="openrel/api/v0.4/actions"
         />
         <Badge variant="outline" className="text-xs shrink-0">{form.endpoint_type || 'list'}</Badge>
+        {form.target_logic_type ? (
+          <Badge variant="secondary" className="text-xs shrink-0 hidden md:inline-flex">
+            {LOGIC_TYPES.find(t => t.value === form.target_logic_type)?.label || form.target_logic_type}
+          </Badge>
+        ) : (
+          <Badge variant="secondary" className="text-xs shrink-0 hidden md:inline-flex text-muted-foreground/50">No wiring</Badge>
+        )}
         <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => onSave(form)} disabled={!form.path?.trim()}>
           Save
         </Button>
+        {onClone && (
+          <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" title="Clone" onClick={() => onClone(endpoint)}>
+            <Copy className="w-3.5 h-3.5" />
+          </Button>
+        )}
         <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => onDelete(endpoint)}>
           <Trash2 className="w-3.5 h-3.5 text-destructive" />
         </Button>
@@ -123,6 +137,13 @@ export default function ApiEndpointCard({ endpoint, onSave, onDelete }) {
               </div>
             )}
           </div>
+          <WiringConfig
+            logicType={form.target_logic_type}
+            logicConfig={form.logic_config}
+            onLogicTypeChange={(v) => setForm(f => ({ ...f, target_logic_type: v, logic_config: {} }))}
+            onConfigChange={(key, val) => setForm(f => ({ ...f, logic_config: { ...(f.logic_config || {}), [key]: val } }))}
+            sourceFiles={sourceFiles}
+          />
         </div>
       )}
     </div>
