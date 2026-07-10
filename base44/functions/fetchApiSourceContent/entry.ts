@@ -429,15 +429,43 @@ Deno.serve(async (req) => {
     // term (e.g. "odrl:move") or a full IRI.  We compare on the local name
     // (after the last ':', '/', or '#') as a fallback for prefix differences.
     if (id) {
+      const prefixes = parsed.prefixes || {};
+
+      // Resolve a CURIE (e.g. "odrl:use") to a full IRI using parsed prefixes
+      const resolveIri = (term) => {
+        term = String(term).trim();
+        if (term.startsWith('<') && term.endsWith('>')) return term.slice(1, -1);
+        if (term.startsWith('http')) return term;
+        const colonIdx = term.indexOf(':');
+        if (colonIdx > 0) {
+          const prefix = term.substring(0, colonIdx);
+          const local = term.substring(colonIdx + 1);
+          if (prefixes[prefix]) return prefixes[prefix] + local;
+        }
+        return term;
+      };
+
       const localName = (term) => {
         const t = String(term);
         const idx = Math.max(t.lastIndexOf(':'), t.lastIndexOf('/'), t.lastIndexOf('#'));
         return idx >= 0 ? t.substring(idx + 1) : t;
       };
+
+      const idResolved = resolveIri(id);
       const idLocal = localName(id);
-      members = members.filter(m =>
-        m.iri === id || localName(m.iri) === idLocal
+      const idHasPrefix = id.includes(':') && !id.startsWith('http');
+
+      // First pass: match on full IRI (exact or resolved CURIE)
+      let filtered = members.filter(m =>
+        m.iri === id || resolveIri(m.iri) === idResolved
       );
+
+      // Fall back to local-name matching only when id has no prefix
+      if (filtered.length === 0 && !idHasPrefix) {
+        filtered = members.filter(m => localName(m.iri) === idLocal);
+      }
+
+      members = filtered;
       appliedId = id;
     }
 
