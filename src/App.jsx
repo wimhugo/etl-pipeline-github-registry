@@ -51,6 +51,7 @@ import V04Dashboard from './pages/v04/Dashboard';
 import V04Settings from './pages/v04/Settings';
 import V04KBUserDashboard from './pages/v04/KBUserDashboard';
 import V04KBApi from './pages/v04/KBApi';
+import V04KBApiConfig from './pages/v04/KBApiConfig';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -115,6 +116,7 @@ const AuthenticatedApp = () => {
         <Route path="/v0.4/settings" element={<V04Settings />} />
         <Route path="/v0.4/kb-user/dashboard" element={<V04KBUserDashboard />} />
         <Route path="/v0.4/kb-api" element={<V04KBApi />} />
+        <Route path="/v0.4/kb-api/configuration" element={<V04KBApiConfig />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
