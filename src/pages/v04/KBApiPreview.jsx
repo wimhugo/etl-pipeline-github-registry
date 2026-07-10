@@ -69,14 +69,15 @@ function createRequestInterceptor(serverUrl) {
 
         const data = result?.data ?? result;
 
-        // When the Accept header requested text/turtle, apiProxy returns
-        // the raw TTL body as a string (not JSON). Pass it through with
-        // the correct Content-Type so Swagger UI renders it as text.
-        if (typeof data === 'string' && acceptHeader && acceptHeader.includes('text/turtle')) {
-          return new Response(data, {
+        // When the target function produced a non-JSON response (e.g.
+        // text/turtle), apiProxy wraps it as { _content_type, _raw_body }.
+        // Reconstruct the proper Response with the correct Content-Type so
+        // Swagger UI renders it as text rather than JSON.
+        if (data && data._content_type && data._raw_body) {
+          return new Response(data._raw_body, {
             status: 200,
             statusText: 'OK',
-            headers: { 'Content-Type': 'text/turtle' },
+            headers: { 'Content-Type': data._content_type },
           });
         }
 
