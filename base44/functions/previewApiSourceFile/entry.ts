@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
     // 4. Parse each statement to extract subject + predicate-object pairs
     const members = {};
 
-    function extractTerm(str) {
+    function extractTerm(str, keepRaw = false) {
       str = str.trim();
       if (str.startsWith('<') && str.endsWith('>')) return str.slice(1, -1);
       if (str.startsWith('"')) {
@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
         return str.substring(1, end);
       }
       // Prefixed name
-      return resolve(str);
+      return keepRaw ? str : resolve(str);
     }
 
     for (const stmt of statements) {
@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
       // Find the subject (first term before whitespace)
       const subjMatch = stmt.match(/^(\S+)\s+([\s\S]*)/);
       if (!subjMatch) continue;
-      const subject = extractTerm(subjMatch[1]);
+      const subject = extractTerm(subjMatch[1], true);
       const rest = subjMatch[2].trim();
 
       // Split predicate-object pairs by ';' (not in quotes)

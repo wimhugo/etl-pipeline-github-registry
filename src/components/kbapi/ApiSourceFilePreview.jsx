@@ -2,10 +2,28 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight, Loader2, AlertCircle, Eye } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, AlertCircle, Eye, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 
 export default function ApiSourceFilePreview({ item }) {
   const [expanded, setExpanded] = useState(false);
+  const [sortCol, setSortCol] = useState('iri');
+  const [sortDir, setSortDir] = useState('asc');
+
+  const toggleSort = (col) => {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ col }) => {
+    if (sortCol !== col) return <ArrowUpDown className="w-3 h-3 opacity-40" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="w-3 h-3" />
+      : <ArrowDown className="w-3 h-3" />;
+  };
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['previewApiSourceFile', item.id],
@@ -54,9 +72,21 @@ export default function ApiSourceFilePreview({ item }) {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border/40 bg-muted/30">
-                    <th className="text-left px-3 py-2 font-medium text-muted-foreground w-1/4">IRI</th>
-                    <th className="text-left px-3 py-2 font-medium text-muted-foreground w-1/4">Label</th>
-                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Definition</th>
+                    {[
+                      { key: 'iri', label: 'IRI', cls: 'w-1/4' },
+                      { key: 'label', label: 'Label', cls: 'w-1/4' },
+                      { key: 'definition', label: 'Definition', cls: '' },
+                    ].map(col => (
+                      <th key={col.key} className={`text-left px-3 py-2 font-medium text-muted-foreground ${col.cls}`}>
+                        <button
+                          onClick={() => toggleSort(col.key)}
+                          className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                        >
+                          {col.label}
+                          <SortIcon col={col.key} />
+                        </button>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -67,7 +97,14 @@ export default function ApiSourceFilePreview({ item }) {
                       </td>
                     </tr>
                   ) : (
-                    data.members.map((m, i) => (
+                    [...data.members]
+                      .sort((a, b) => {
+                        const av = (a[sortCol] || '').toLowerCase();
+                        const bv = (b[sortCol] || '').toLowerCase();
+                        const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+                        return sortDir === 'asc' ? cmp : -cmp;
+                      })
+                      .map((m, i) => (
                       <tr key={i} className={`border-b border-border/30 last:border-0 ${i % 2 === 0 ? '' : 'bg-muted/10'}`}>
                         <td className="px-3 py-2 font-mono text-primary break-all">{m.iri}</td>
                         <td className="px-3 py-2">{m.label || <span className="text-muted-foreground/50">—</span>}</td>
