@@ -168,3 +168,16 @@
 .swagger-ui-dark-wrapper .swagger-ui .loading-container {
   background: hsl(222 47% 11%);
 }
+
+/* Collapse server info bar (display-only — requests route through apiProxy) */
+.swagger-ui-dark-wrapper .swagger-ui .scheme-container {
+  display: none;
+}
+
+/* Reduce spacing between API title and first endpoint group */
+.swagger-ui-dark-wrapper .swagger-ui .info {
+  margin-bottom: 8px;
+}
+.swagger-ui-dark-wrapper .swagger-ui .wrapper {
+  padding: 16px 24px;
+}

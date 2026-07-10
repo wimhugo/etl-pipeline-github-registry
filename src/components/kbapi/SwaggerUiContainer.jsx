@@ -10,6 +10,7 @@ export default function SwaggerUiContainer({ spec, plugins, requestInterceptor }
         deepLinking={true}
         plugins={plugins}
         requestInterceptor={requestInterceptor}
+        docExpansion="list"
       />
     </div>
   );

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Eye } from 'lucide-react';
+import { Eye, ExternalLink } from 'lucide-react';
 import { generateSwaggerSpec } from '@/lib/swaggerSpec';
 import SwaggerUiContainer from '@/components/kbapi/SwaggerUiContainer';
 
@@ -114,10 +114,21 @@ export default function KBApiPreview() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-          <Eye className="w-6 h-6 text-primary" />
-          API Preview
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+            <Eye className="w-6 h-6 text-primary" />
+            API Preview
+          </h1>
+          <a
+            href="/v0.4/kb-api/preview"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Open in new window
+          </a>
+        </div>
         <p className="text-sm text-muted-foreground mt-1">
           Interactive Swagger UI preview of your API definition. Expand an endpoint and click "Try it out" to send a live request.
         </p>
