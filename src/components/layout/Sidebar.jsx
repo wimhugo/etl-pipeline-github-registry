@@ -29,6 +29,7 @@ const ICON_MAP = {
   'Compose':              BookMarked,
   'Preferences':          Sliders,
   'API Definition':      Code2,
+  'API Preview':          Eye,
   'Configuration':        SlidersHorizontal,
   'My Workflows':         Workflow,
 };
