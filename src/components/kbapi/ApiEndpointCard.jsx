@@ -20,12 +20,12 @@ const methodColor = {
   DELETE: 'bg-red-500/15 text-red-400 border-red-500/30',
 };
 
-export default function ApiEndpointCard({ endpoint, onSave, onDelete, onClone, sourceFiles = [] }) {
+export default function ApiEndpointCard({ endpoint, onSave, onDelete, onClone, sourceFiles = [], availableTags = [] }) {
   const [expanded, setExpanded] = useState(false);
   const [form, setForm] = useState({});
 
   useEffect(() => {
-    setForm({ ...endpoint, parameters: endpoint.parameters || [], target_logic_type: endpoint.target_logic_type || '', logic_config: endpoint.logic_config || {} });
+    setForm({ ...endpoint, tag: endpoint.tag || 'default', parameters: endpoint.parameters || [], target_logic_type: endpoint.target_logic_type || '', logic_config: endpoint.logic_config || {} });
   }, [endpoint]);
 
   const update = (field, val) => setForm(f => ({ ...f, [field]: val }));
@@ -62,6 +62,7 @@ export default function ApiEndpointCard({ endpoint, onSave, onDelete, onClone, s
           onChange={e => update('path', e.target.value)}
           placeholder="openrel/api/v0.4/actions"
         />
+        <Badge variant="outline" className="text-xs shrink-0 hidden lg:inline-flex">{form.tag || 'default'}</Badge>
         <Badge variant="outline" className="text-xs shrink-0">{form.endpoint_type || 'list'}</Badge>
         {form.target_logic_type ? (
           <Badge variant="secondary" className="text-xs shrink-0 hidden md:inline-flex">
@@ -84,10 +85,23 @@ export default function ApiEndpointCard({ endpoint, onSave, onDelete, onClone, s
       </div>
       {expanded && (
         <div className="px-4 pb-3 space-y-3 border-t border-border/30 pt-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Summary</Label>
               <Input className="h-8 bg-muted/50 text-xs" value={form.summary || ''} onChange={e => update('summary', e.target.value)} placeholder="List Actions" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Tag / Group</Label>
+              <Input
+                className="h-8 bg-muted/50 text-xs"
+                value={form.tag || 'default'}
+                onChange={e => update('tag', e.target.value)}
+                placeholder="default"
+                list="endpoint-tags-list"
+              />
+              <datalist id="endpoint-tags-list">
+                {availableTags.map(t => <option key={t} value={t} />)}
+              </datalist>
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Endpoint Type</Label>

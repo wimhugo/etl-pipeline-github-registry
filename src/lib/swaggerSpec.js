@@ -7,10 +7,14 @@ export function generateSwaggerSpec(endpoints, meta = {}) {
   const active = (endpoints || []).filter(e => e.is_active !== false);
 
   const pathMap = {};
+  const tagOrder = [];
+  const tagSet = new Set();
   for (const ep of active) {
     const cleanPath = '/' + (ep.path || '').replace(/^\/+/, '');
     if (!pathMap[cleanPath]) pathMap[cleanPath] = [];
     pathMap[cleanPath].push(ep);
+    const tag = ep.tag || 'default';
+    if (!tagSet.has(tag)) { tagSet.add(tag); tagOrder.push(tag); }
   }
 
   const paths = {};
@@ -31,6 +35,7 @@ export function generateSwaggerSpec(endpoints, meta = {}) {
         : { type: 'array', items: memberSchema };
 
       paths[path][m] = {
+        tags: [ep.tag || 'default'],
         summary: ep.summary || '',
         description: ep.description || '',
         parameters: [
@@ -77,6 +82,8 @@ export function generateSwaggerSpec(endpoints, meta = {}) {
     info: { title, version, description: desc },
     paths,
   };
+
+  spec.tags = tagOrder.map(name => ({ name, description: '' }));
 
   if (serverUrl) {
     spec.servers = [{ url: serverUrl }];

@@ -25,6 +25,7 @@ export default function ApiEndpointPanel({ sourceFiles = [] }) {
         const base = `openrel/api/v0.4/${sf.section.toLowerCase()}`;
         toCreate.push({
           section: sf.section,
+          tag: 'default',
           method: 'GET',
           path: base,
           endpoint_type: 'list',
@@ -38,6 +39,7 @@ export default function ApiEndpointPanel({ sourceFiles = [] }) {
         });
         toCreate.push({
           section: sf.section,
+          tag: 'default',
           method: 'GET',
           path: `${base}/{id}`,
           endpoint_type: 'detail',
@@ -101,6 +103,7 @@ export default function ApiEndpointPanel({ sourceFiles = [] }) {
   const handleAdd = () => {
     setDraft({
       section: '',
+      tag: 'default',
       method: 'GET',
       path: '',
       endpoint_type: 'list',
@@ -124,6 +127,7 @@ export default function ApiEndpointPanel({ sourceFiles = [] }) {
   };
 
   const sorted = [...endpoints].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const availableTags = [...new Set(endpoints.map(e => e.tag || 'default').filter(Boolean))].sort();
 
   return (
     <Card className="bg-card border-border/50">
@@ -169,6 +173,7 @@ export default function ApiEndpointPanel({ sourceFiles = [] }) {
                 key="draft"
                 endpoint={draft}
                 sourceFiles={sourceFiles}
+                availableTags={availableTags}
                 onSave={(data) => createEndpoint.mutate(data)}
                 onDelete={() => setDraft(null)}
                 onClone={handleClone}
@@ -179,6 +184,7 @@ export default function ApiEndpointPanel({ sourceFiles = [] }) {
                 key={ep.id}
                 endpoint={ep}
                 sourceFiles={sourceFiles}
+                availableTags={availableTags}
                 onSave={(data) => saveEndpoint.mutate({ id: ep.id, data })}
                 onDelete={() => { if (window.confirm('Delete this endpoint?')) deleteEndpoint.mutate(ep.id); }}
                 onClone={handleClone}

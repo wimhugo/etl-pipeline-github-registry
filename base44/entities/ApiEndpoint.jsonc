@@ -6,6 +6,11 @@
       "type": "string",
       "description": "API section name this endpoint belongs to (matches ApiSourceFile.section)"
     },
+    "tag": {
+      "type": "string",
+      "default": "default",
+      "description": "Swagger UI group/tag name this endpoint belongs to (e.g. 'Vocabulary', 'Policies', 'Mappings')"
+    },
     "method": {
       "type": "string",
       "enum": [

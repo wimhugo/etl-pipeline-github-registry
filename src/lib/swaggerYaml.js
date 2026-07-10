@@ -15,10 +15,14 @@ export function generateSwaggerYaml(endpoints, meta = {}) {
   const active = (endpoints || []).filter(e => e.is_active !== false);
 
   const pathMap = {};
+  const tagOrder = [];
+  const tagSet = new Set();
   for (const ep of active) {
     const cleanPath = '/' + (ep.path || '').replace(/^\/+/, '');
     if (!pathMap[cleanPath]) pathMap[cleanPath] = [];
     pathMap[cleanPath].push(ep);
+    const tag = ep.tag || 'default';
+    if (!tagSet.has(tag)) { tagSet.add(tag); tagOrder.push(tag); }
   }
 
   const L = [];
@@ -27,6 +31,13 @@ export function generateSwaggerYaml(endpoints, meta = {}) {
   L.push(`  title: ${yamlStr(title)}`);
   L.push(`  version: ${yamlStr(version)}`);
   L.push(`  description: ${yamlStr(desc)}`);
+  if (tagOrder.length > 0) {
+    L.push('tags:');
+    for (const tag of tagOrder) {
+      L.push(`  - name: ${yamlStr(tag)}`);
+      L.push(`    description: ""`);
+    }
+  }
   L.push('paths:');
 
   if (Object.keys(pathMap).length === 0) {
@@ -39,6 +50,8 @@ export function generateSwaggerYaml(endpoints, meta = {}) {
     for (const ep of eps) {
       const method = (ep.method || 'GET').toLowerCase();
       L.push(`    ${method}:`);
+      L.push(`      tags:`);
+      L.push(`        - ${yamlStr(ep.tag || 'default')}`);
       L.push(`      summary: ${yamlStr(ep.summary || `${ep.endpoint_type === 'detail' ? 'Get' : 'List'} ${ep.section || ''}`)}`);
       if (ep.description) {
         L.push(`      description: ${yamlStr(ep.description)}`);
