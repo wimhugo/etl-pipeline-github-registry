@@ -28,7 +28,15 @@ export default function ApiEndpointCard({ endpoint, onSave, onDelete, onClone, s
     setForm({ ...endpoint, tag: endpoint.tag || 'default', parameters: endpoint.parameters || [], target_logic_type: endpoint.target_logic_type || '', logic_config: endpoint.logic_config || {} });
   }, [endpoint]);
 
-  const update = (field, val) => setForm(f => ({ ...f, [field]: val }));
+  const update = (field, val) => setForm(f => {
+    const next = { ...f, [field]: val };
+    // Auto-sync logic_config.section when the endpoint section changes
+    // and the wiring uses fetchApiSourceContent (which reads section from logic_config)
+    if (field === 'section' && (f.target_logic_type === 'fetchApiSourceContent' || !f.target_logic_type)) {
+      next.logic_config = { ...(f.logic_config || {}), section: val };
+    }
+    return next;
+  });
   const updateParam = (idx, field, val) => setForm(f => ({
     ...f,
     parameters: f.parameters.map((p, i) => i === idx ? { ...p, [field]: val } : p),
@@ -86,6 +94,15 @@ export default function ApiEndpointCard({ endpoint, onSave, onDelete, onClone, s
       {expanded && (
         <div className="px-4 pb-3 space-y-3 border-t border-border/30 pt-3">
           <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Section</Label>
+              <Select value={form.section || ''} onValueChange={v => update('section', v)}>
+                <SelectTrigger className="h-8 bg-muted/50 text-xs"><SelectValue placeholder="Select section…" /></SelectTrigger>
+                <SelectContent>
+                  {sourceFiles.map(sf => <SelectItem key={sf.id} value={sf.section}>{sf.section}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Summary</Label>
               <Input className="h-8 bg-muted/50 text-xs" value={form.summary || ''} onChange={e => update('summary', e.target.value)} placeholder="List Actions" />
@@ -155,7 +172,11 @@ export default function ApiEndpointCard({ endpoint, onSave, onDelete, onClone, s
             logicType={form.target_logic_type}
             logicConfig={form.logic_config}
             onLogicTypeChange={(v) => setForm(f => ({ ...f, target_logic_type: v, logic_config: {} }))}
-            onConfigChange={(key, val) => setForm(f => ({ ...f, logic_config: { ...(f.logic_config || {}), [key]: val } }))}
+            onConfigChange={(key, val) => setForm(f => ({
+              ...f,
+              section: key === 'section' ? val : f.section,
+              logic_config: { ...(f.logic_config || {}), [key]: val },
+            }))}
             sourceFiles={sourceFiles}
           />
         </div>
