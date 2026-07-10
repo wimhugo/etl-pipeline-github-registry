@@ -89,3 +89,82 @@
     @apply bg-background text-foreground;
   }
 }
+
+.swagger-ui-dark-wrapper .swagger-ui {
+  background: hsl(222 47% 11%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .opblock-tag,
+.swagger-ui-dark-wrapper .swagger-ui .opblock-tag-small {
+  color: hsl(210 40% 98%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .info .title,
+.swagger-ui-dark-wrapper .swagger-ui .info .baseurl {
+  color: hsl(210 40% 98%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .info .description p {
+  color: hsl(215 20% 65%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .scheme-container {
+  background: hsl(222 47% 13%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .opblock {
+  border: 1px solid hsl(217 33% 25%);
+  background: hsl(217 33% 17%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .opblock .opblock-summary-method {
+  color: hsl(0 0% 100%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .opblock .opblock-summary-path,
+.swagger-ui-dark-wrapper .swagger-ui .opblock .opblock-summary-description {
+  color: hsl(210 40% 98%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .parameters-col_description,
+.swagger-ui-dark-wrapper .swagger-ui .parameter__name,
+.swagger-ui-dark-wrapper .swagger-ui table thead tr td,
+.swagger-ui-dark-wrapper .swagger-ui table thead tr th {
+  color: hsl(210 40% 98%);
+}
+.swagger-ui-dark-wrapper .swagger-ui table .parameters-col_name {
+  color: hsl(210 40% 98%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .responses-inner,
+.swagger-ui-dark-wrapper .swagger-ui .responses-wrapper,
+.swagger-ui-dark-wrapper .swagger-ui .opblock-body {
+  color: hsl(210 40% 98%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .opblock-body pre,
+.swagger-ui-dark-wrapper .swagger-ui .opblock-body .microlight {
+  background: hsl(222 47% 9%);
+  color: hsl(160 84% 70%);
+}
+.swagger-ui-dark-wrapper .swagger-ui section.models {
+  background: hsl(217 33% 17%);
+}
+.swagger-ui-dark-wrapper .swagger-ui section.models h4,
+.swagger-ui-dark-wrapper .swagger-ui section.models .model-title {
+  color: hsl(210 40% 98%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .model-box {
+  background: hsl(222 47% 9%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .btn {
+  border-color: hsl(217 33% 25%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .btn.authorize,
+.swagger-ui-dark-wrapper .swagger-ui .btn.try-out {
+  background: hsl(217 91% 60%);
+  color: hsl(222 47% 11%);
+}
+.swagger-ui-dark-wrapper .swagger-ui input[type=text],
+.swagger-ui-dark-wrapper .swagger-ui textarea {
+  background: hsl(222 47% 9%);
+  color: hsl(210 40% 98%);
+  border-color: hsl(217 33% 25%);
+}
+.swagger-ui-dark-wrapper .swagger-ui select {
+  background: hsl(222 47% 9%);
+  color: hsl(210 40% 98%);
+}
+.swagger-ui-dark-wrapper .swagger-ui .loading-container {
+  background: hsl(222 47% 11%);
+}
