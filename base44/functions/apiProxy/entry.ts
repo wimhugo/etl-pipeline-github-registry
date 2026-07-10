@@ -89,6 +89,18 @@ Deno.serve(async (req) => {
     const result = await base44.asServiceRole.functions.invoke(matched.target_logic_type, payload);
     const data = result?.data ?? result;
 
+    // If the target function returned a raw body with a custom content type
+    // (e.g. text/turtle), pass it through as a non-JSON response.
+    if (data && data._content_type) {
+      return new Response(data._raw_body, {
+        status: 200,
+        headers: {
+          'Content-Type': data._content_type,
+          ...corsHeaders,
+        },
+      });
+    }
+
     return Response.json(data, { headers: corsHeaders });
   } catch (error) {
     return Response.json({ error: error.message }, {

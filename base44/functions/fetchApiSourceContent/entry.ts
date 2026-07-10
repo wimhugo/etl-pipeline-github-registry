@@ -148,7 +148,7 @@ function parseTtl(text, memberIdentifier) {
     }
   }
 
-  return { members: Object.values(members), memberIdentifierResolved: memberIri };
+  return { members: Object.values(members), memberIdentifierResolved: memberIri, prefixes };
 }
 
 // --- JSON / JSON-LD parser ---
@@ -225,6 +225,65 @@ function parseYamlContent(text, memberIdentifier) {
   return { members, memberIdentifierResolved: memberIdentifier };
 }
 
+// --- TTL serializer (from parsed members) ---
+function escapeTtlLiteral(str) {
+  return String(str)
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+}
+
+function membersToTtl(members, memberIdentifierResolved, prefixes) {
+  prefixes = prefixes || {};
+
+  // Collect prefixes actually used by member IRIs (CURIEs like "openrel:use")
+  const usedPrefixes = new Set();
+  for (const m of members) {
+    const iri = m.iri || '';
+    const colonIdx = iri.indexOf(':');
+    if (colonIdx > 0) {
+      const prefix = iri.substring(0, colonIdx);
+      if (prefixes[prefix]) usedPrefixes.add(prefix);
+    }
+  }
+
+  // Resolve the member type IRI to a CURIE if possible
+  let typeCurie = memberIdentifierResolved || 'skos:Concept';
+  if (memberIdentifierResolved) {
+    for (const [prefix, ns] of Object.entries(prefixes)) {
+      if (memberIdentifierResolved.startsWith(ns)) {
+        typeCurie = `${prefix}:${memberIdentifierResolved.substring(ns.length)}`;
+        usedPrefixes.add(prefix);
+        break;
+      }
+    }
+  }
+
+  const lines = [
+    '@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .',
+    '@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .',
+    '@prefix skos: <http://www.w3.org/2004/02/skos/core#> .',
+  ];
+  for (const prefix of usedPrefixes) {
+    lines.push(`@prefix ${prefix}: <${prefixes[prefix]}> .`);
+  }
+  lines.push('');
+
+  for (const m of members) {
+    const iri = m.iri || '';
+    if (!iri) continue;
+    const parts = [`${iri} a ${typeCurie}`];
+    if (m.label) parts.push(`    skos:prefLabel "${escapeTtlLiteral(m.label)}"`);
+    if (m.definition) parts.push(`    skos:definition "${escapeTtlLiteral(m.definition)}"`);
+    lines.push(parts.join(' ;\n') + ' .');
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -232,7 +291,7 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { section, source_file_id, include_raw = false, repo, branch = 'main', id, prefix } = body;
+    const { section, source_file_id, include_raw = false, repo, branch = 'main', id, prefix, format = 'json' } = body;
 
     if (!section && !source_file_id) {
       return Response.json({ error: 'section or source_file_id is required' }, { status: 400 });
@@ -350,6 +409,27 @@ Deno.serve(async (req) => {
       );
       result.member_count = result.members.length;
       result.applied_prefix = prefix;
+    }
+
+    // If format=ttl was requested, return Turtle content instead of JSON.
+    // When no filtering is applied, return the raw TTL for full fidelity.
+    // When filtered (by id or prefix), re-serialize the filtered members.
+    if (format === 'ttl') {
+      let ttlContent;
+      if (!id && !prefix) {
+        ttlContent = rawContent;
+      } else {
+        ttlContent = membersToTtl(result.members, parsed.memberIdentifierResolved, parsed.prefixes);
+      }
+      return Response.json({
+        _content_type: 'text/turtle',
+        _raw_body: ttlContent,
+        _meta: {
+          section: result.section,
+          file_path: result.file_path,
+          member_count: result.member_count,
+        },
+      });
     }
 
     return Response.json(result);
