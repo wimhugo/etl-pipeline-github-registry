@@ -62,8 +62,8 @@ function parseMappingsTtl(text) {
 
   const cleaned = text
     .replace(/#[^\n]*/g, '')
-    .replace(/@prefix[^.]+\./g, '')
-    .replace(/@base[^.]+\./g, '');
+    .replace(/@prefix\s+[^:]+:\s+<[^>]+>\s*\./g, '')
+    .replace(/@base\s+<[^>]+>\s*\./g, '');
 
   // Split into statements (terminated by '.')
   const statements = [];
@@ -80,6 +80,12 @@ function parseMappingsTtl(text) {
   }
   if (current.trim()) statements.push(current.trim());
 
+  function isValidCurie(term) {
+    if (!term || term === 'a') return false;
+    if (/[/<>"'{}|^`]/.test(term)) return false;
+    return term.includes(':');
+  }
+
   for (const stmt of statements) {
     if (!stmt || stmt === '.') continue;
     const subjMatch = stmt.match(/^(\S+)\s+([\s\S]*)/);
@@ -87,6 +93,7 @@ function parseMappingsTtl(text) {
     const subject = subjMatch[1].trim();
     if (subject === '.') continue;
     const subjectCurie = subject.startsWith('<') ? subject.slice(1, -1) : subject;
+    if (!isValidCurie(subjectCurie)) continue;
     const rest = subjMatch[2].trim();
 
     // Split predicate-object pairs by ';'
@@ -129,6 +136,7 @@ function parseMappingsTtl(text) {
       for (const o of objs) {
         if (!o) continue;
         const objCurie = o.startsWith('<') ? o.slice(1, -1) : o;
+        if (!isValidCurie(objCurie)) continue;
         const key = `${subjectCurie}|${predCurie}|${objCurie}`;
         if (!tripleSet.has(key)) {
           tripleSet.add(key);
@@ -198,11 +206,14 @@ function serializeMappingsTtl(triples, prefixes) {
   const sortedSubjects = Object.keys(bySubject).sort();
   for (const subject of sortedSubjects) {
     const preds = bySubject[subject];
-    const parts = ['    a skos:Concept', `    rdfs:label "${escapeLiteral(localName(subject))}"`];
+    const parts = ['a skos:Concept', `rdfs:label "${escapeLiteral(localName(subject))}"`];
     for (const p of preds) {
-      parts.push(`    ${p.predicate} ${p.object}`);
+      parts.push(`${p.predicate} ${p.object}`);
     }
-    lines.push(`${subject} ${parts.join(' ;')} .`);
+    lines.push(subject);
+    for (let i = 0; i < parts.length; i++) {
+      lines.push(`    ${parts[i]}${i < parts.length - 1 ? ' ;' : ' .'}`);
+    }
     lines.push('');
   }
 
