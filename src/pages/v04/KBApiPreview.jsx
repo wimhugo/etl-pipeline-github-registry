@@ -15,15 +15,19 @@ const DISPLAY_SERVER_URL = 'https://api.openrel.org/v0.4';
  * through the Base44 SDK (base44.functions.invoke) instead of making direct
  * HTTP calls. This avoids CORS, auth-header, and URL-routing issues.
  *
- * Swagger UI's fn.fetch receives a single request object (built by
- * fn.buildRequest) with { url, method, headers, body, credentials } — NOT
- * the standard fetch(url, options) signature.
+ * Swagger UI's fn.fetch receives a single request object { url, method, headers,
+ * body, ... } and must return a plain object (NOT a Response) with:
+ *   { ok, url, status, statusText, headers, text }
+ * where `text` is a string property (not a method) and `headers` is a plain object.
  */
 function createApiProxyPlugin(serverUrl) {
   const serverPathname = new URL(serverUrl, window.location.origin).pathname;
   return {
     fn: {
       fetch: async (req) => {
+        // Swagger UI may pass a URL string instead of an object
+        if (typeof req === 'string') req = { url: req, method: 'GET' };
+
         try {
           const parsedUrl = new URL(req.url, window.location.origin);
 
@@ -60,17 +64,25 @@ function createApiProxyPlugin(serverUrl) {
           });
 
           const data = result?.data ?? result;
-          return new Response(JSON.stringify(data), {
+          return {
+            ok: true,
+            url: req.url,
             status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          });
+            statusText: 'OK',
+            headers: { 'content-type': 'application/json' },
+            text: JSON.stringify(data),
+          };
         } catch (err) {
           const status = err?.response?.status || 500;
           const errorData = err?.response?.data || { error: err.message };
-          return new Response(JSON.stringify(errorData), {
+          return {
+            ok: false,
+            url: req.url,
             status,
-            headers: { 'Content-Type': 'application/json' },
-          });
+            statusText: err?.response?.statusText || 'Error',
+            headers: { 'content-type': 'application/json' },
+            text: JSON.stringify(errorData),
+          };
         }
       },
     },
