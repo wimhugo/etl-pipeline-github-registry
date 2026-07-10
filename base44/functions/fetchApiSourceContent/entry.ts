@@ -232,7 +232,7 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { section, source_file_id, include_raw = false, repo, branch = 'main', id } = body;
+    const { section, source_file_id, include_raw = false, repo, branch = 'main', id, prefix } = body;
 
     if (!section && !source_file_id) {
       return Response.json({ error: 'section or source_file_id is required' }, { status: 400 });
@@ -334,13 +334,22 @@ Deno.serve(async (req) => {
         return idx >= 0 ? t.substring(idx + 1) : t;
       };
       const idLocal = localName(id);
-      const matched = result.members.filter(m =>
+      result.members = result.members.filter(m =>
         m.iri === id ||
         localName(m.iri) === idLocal
       );
-      result.members = matched;
-      result.member_count = matched.length;
+      result.member_count = result.members.length;
       result.requested_id = id;
+    }
+
+    // If a prefix query parameter was provided (list endpoint), filter to
+    // members whose IRI starts with the given prefix (e.g. "openrel:").
+    if (prefix) {
+      result.members = result.members.filter(m =>
+        String(m.iri).startsWith(prefix)
+      );
+      result.member_count = result.members.length;
+      result.applied_prefix = prefix;
     }
 
     return Response.json(result);
