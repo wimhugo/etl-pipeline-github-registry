@@ -12,7 +12,9 @@ export default function ApiSourceFileEditor({ open, onClose, onSave, sourceFile 
   const [form, setForm] = useState({});
 
   useEffect(() => {
-    setForm(sourceFile ? { ...sourceFile } : { data_format: 'ttl', is_active: true, sort_order: 0 });
+    setForm(sourceFile
+      ? { ...sourceFile }
+      : { data_format: 'ttl', is_active: true, sort_order: 0, member_identifier: 'skos:Concept' });
   }, [sourceFile, open]);
 
   const handleSave = () => {
@@ -55,6 +57,18 @@ export default function ApiSourceFileEditor({ open, onClose, onSave, sourceFile 
               value={form.file_path || ''}
               onChange={e => setForm(f => ({ ...f, file_path: e.target.value }))}
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Member Instance Identifier</Label>
+            <Input
+              className="bg-muted/50 text-sm font-mono"
+              placeholder="skos:Concept"
+              value={form.member_identifier || ''}
+              onChange={e => setForm(f => ({ ...f, member_identifier: e.target.value }))}
+            />
+            <p className="text-xs text-muted-foreground">
+              How members are recognized in the file — 'skos:Concept' for concept schemes, or a class IRI for instance lists.
+            </p>
           </div>
           <div className="flex gap-4">
             <div className="space-y-1.5 flex-1">
