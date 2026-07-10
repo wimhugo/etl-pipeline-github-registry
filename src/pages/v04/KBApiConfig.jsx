@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Pencil, Trash2, FileCode2, Settings } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import ApiSourceFileEditor from '@/components/kbapi/ApiSourceFileEditor';
+import ApiSourceFilePreview from '@/components/kbapi/ApiSourceFilePreview';
 
 export default function KBApiConfig() {
   const queryClient = useQueryClient();
@@ -107,29 +108,32 @@ export default function KBApiConfig() {
               {sortedFiles.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-4 rounded-lg border border-border/40 bg-muted/20 px-4 py-3 hover:bg-muted/30 transition-colors"
+                  className="rounded-lg border border-border/40 bg-muted/20 overflow-hidden"
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-semibold text-sm">{item.section}</span>
-                      <Badge variant="outline" className="text-xs font-mono">{item.data_format || 'ttl'}</Badge>
-                      {!item.is_active && (
-                        <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                  <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="font-semibold text-sm">{item.section}</span>
+                        <Badge variant="outline" className="text-xs font-mono">{item.data_format || 'ttl'}</Badge>
+                        {!item.is_active && (
+                          <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono truncate">{item.file_path}</p>
+                      {item.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground font-mono truncate">{item.file_path}</p>
-                    {item.description && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(item)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(item)}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
+                  <ApiSourceFilePreview item={item} />
                 </div>
               ))}
             </div>
