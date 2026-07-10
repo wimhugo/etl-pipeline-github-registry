@@ -42,15 +42,15 @@ export function generateSwaggerSpec(endpoints, meta = {}) {
             description: p.description || '',
           })),
           {
-            name: 'Accept',
-            in: 'header',
+            name: 'format',
+            in: 'query',
             required: false,
             schema: {
               type: 'string',
-              default: 'application/json',
-              enum: ['application/json', 'text/turtle'],
+              default: 'json',
+              enum: ['json', 'ttl'],
             },
-            description: 'Response media type. Select `text/turtle` for RDF Turtle output.',
+            description: 'Output format. Select `ttl` for RDF Turtle output.',
           },
         ],
         responses: {
