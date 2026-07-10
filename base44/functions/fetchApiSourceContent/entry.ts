@@ -69,7 +69,7 @@ function parseTtl(text, memberIdentifier) {
     if (!inQuotes && ch === '>') inAngles = false;
     current += ch;
     if (ch === '.' && !inQuotes && !inAngles) {
-      statements.push(current.trim());
+      statements.push(current.trim().replace(/\.$/, '').trim());
       current = '';
     }
   }
@@ -339,7 +339,7 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { section, source_file_id, include_raw = false, repo, branch = 'main', id, prefix, format = 'json' } = body;
+    const { section, source_file_id, include_raw = false, repo, branch = 'main', id, prefix, format = 'json', keep_properties = false } = body;
 
     if (!section && !source_file_id) {
       return Response.json({ error: 'section or source_file_id is required' }, { status: 400 });
@@ -447,7 +447,7 @@ Deno.serve(async (req) => {
 
     // For list views (no id), strip properties to keep payload small.
     // Detail views (with id) retain all properties.
-    if (!id) {
+    if (!id && !keep_properties) {
       members = members.map(({ iri, label, definition }) => ({ iri, label, definition }));
     }
 
@@ -482,6 +482,7 @@ Deno.serve(async (req) => {
 
     if (parseError) result.parse_error = parseError;
     if (include_raw) result.raw_content = rawContent;
+    if (keep_properties) result.prefixes = parsed.prefixes || {};
 
     return Response.json(result);
   } catch (error) {

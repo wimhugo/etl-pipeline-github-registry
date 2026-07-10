@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, FileCode2, Settings } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileCode2, Settings, Lock } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import ApiSourceFileEditor from '@/components/kbapi/ApiSourceFileEditor';
 import ApiSourceFilePreview from '@/components/kbapi/ApiSourceFilePreview';
@@ -114,6 +114,11 @@ export default function KBApiConfig() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="font-semibold text-sm">{item.section}</span>
+                        {item.is_system && (
+                          <Badge variant="secondary" className="text-xs gap-0.5">
+                            <Lock className="w-2.5 h-2.5" /> System
+                          </Badge>
+                        )}
                         <Badge variant="outline" className="text-xs font-mono">{item.data_format || 'ttl'}</Badge>
                         {!item.is_active && (
                           <Badge variant="secondary" className="text-xs">Inactive</Badge>
@@ -125,12 +130,18 @@ export default function KBApiConfig() {
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(item)}>
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
+                      {item.is_system ? (
+                        <span className="text-xs text-muted-foreground/50 px-2">Auto-managed</span>
+                      ) : (
+                        <>
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(item)}>
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                   <ApiSourceFilePreview item={item} />
