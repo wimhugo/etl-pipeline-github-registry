@@ -15,15 +15,20 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const url = new URL(req.url);
 
-    // Extract API path after the function endpoint
-    const funcSegment = 'apiProxy';
-    const idx = url.pathname.lastIndexOf(funcSegment);
-    let apiPath = idx >= 0 ? url.pathname.substring(idx + funcSegment.length) : url.pathname;
+    // API path is passed as an `api_path` query parameter by the Swagger UI
+    // request interceptor (Base44 function URLs don't support extra path segments).
+    let apiPath = url.searchParams.get('api_path');
+    if (!apiPath) {
+      const funcSegment = 'apiProxy';
+      const idx = url.pathname.lastIndexOf(funcSegment);
+      apiPath = idx >= 0 ? url.pathname.substring(idx + funcSegment.length) : url.pathname;
+    }
     if (!apiPath.startsWith('/')) apiPath = '/' + apiPath;
     apiPath = apiPath.replace(/\/$/, '') || '/';
 
     const method = req.method;
     const queryParams = Object.fromEntries(url.searchParams.entries());
+    delete queryParams.api_path;
 
     // Find matching endpoint
     const endpoints = await base44.asServiceRole.entities.ApiEndpoint.list();

@@ -23,6 +23,28 @@ export default function KBApiPreview() {
     [endpoints, serverUrl]
   );
 
+  // Swagger UI concatenates serverUrl + path (e.g. .../apiProxy/openrel/api/v0.4/actions).
+  // Base44 function URLs don't support extra path segments, so we rewrite each
+  // request to pass the API path as an `api_path` query parameter instead.
+  const requestInterceptor = useMemo(() => (req) => {
+    try {
+      const url = new URL(req.url);
+      const proxySegment = '/functions/apiProxy';
+      const idx = url.pathname.indexOf(proxySegment);
+      if (idx >= 0) {
+        const afterProxy = url.pathname.substring(idx + proxySegment.length);
+        if (afterProxy && afterProxy !== '/') {
+          url.searchParams.set('api_path', afterProxy);
+          url.pathname = url.pathname.substring(0, idx + proxySegment.length);
+          req.url = url.toString();
+        }
+      }
+    } catch {
+      // leave request unchanged
+    }
+    return req;
+  }, []);
+
   return (
     <div className="space-y-4">
       <div>
@@ -56,7 +78,7 @@ export default function KBApiPreview() {
       </Card>
 
       <div className="rounded-xl border border-border overflow-hidden bg-card">
-        <SwaggerUiContainer spec={spec} />
+        <SwaggerUiContainer spec={spec} requestInterceptor={requestInterceptor} />
       </div>
     </div>
   );
