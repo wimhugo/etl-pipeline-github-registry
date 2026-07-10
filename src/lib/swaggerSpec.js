@@ -45,8 +45,12 @@ export function generateSwaggerSpec(endpoints, meta = {}) {
             name: 'Accept',
             in: 'header',
             required: false,
-            schema: { type: 'string', default: 'application/json' },
-            description: 'Response media type. Use `text/turtle` for RDF Turtle output.',
+            schema: {
+              type: 'string',
+              default: 'application/json',
+              enum: ['application/json', 'text/turtle'],
+            },
+            description: 'Response media type. Select `text/turtle` for RDF Turtle output.',
           },
         ],
         responses: {
