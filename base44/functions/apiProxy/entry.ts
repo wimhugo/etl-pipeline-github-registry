@@ -82,6 +82,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Translate Accept header into a format parameter for content negotiation
+    const accept = body._accept || queryParams._accept;
+    delete body._accept;
+    delete queryParams._accept;
+    if (accept && accept.includes('text/turtle')) {
+      body.format = 'ttl';
+    }
+
     // Merge logic_config with query params and path params
     const payload = { ...(matched.logic_config || {}), ...queryParams, ...pathParams, ...body };
 

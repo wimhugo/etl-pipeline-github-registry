@@ -42,6 +42,12 @@ function createRequestInterceptor(serverUrl) {
         params[key] = value;
       });
 
+      // Pass the Accept header through for content negotiation
+      const acceptHeader = options?.headers?.Accept || options?.headers?.accept;
+      if (acceptHeader) {
+        params._accept = acceptHeader;
+      }
+
       // Parse body if present (POST/PUT/PATCH)
       if (options?.body) {
         try {

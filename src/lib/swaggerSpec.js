@@ -26,24 +26,38 @@ export function generateSwaggerSpec(endpoints, meta = {}) {
           definition: { type: 'string' },
         },
       };
+      const responseSchema = ep.endpoint_type === 'detail'
+        ? memberSchema
+        : { type: 'array', items: memberSchema };
+
       paths[path][m] = {
         summary: ep.summary || '',
         description: ep.description || '',
-        parameters: (ep.parameters || []).map(p => ({
-          name: p.name,
-          in: p.in || 'query',
-          required: p.required || false,
-          schema: { type: p.schema_type || 'string' },
-          description: p.description || '',
-        })),
+        parameters: [
+          ...(ep.parameters || []).map(p => ({
+            name: p.name,
+            in: p.in || 'query',
+            required: p.required || false,
+            schema: { type: p.schema_type || 'string' },
+            description: p.description || '',
+          })),
+          {
+            name: 'Accept',
+            in: 'header',
+            required: false,
+            schema: { type: 'string', default: 'application/json' },
+            description: 'Response media type. Use `text/turtle` for RDF Turtle output.',
+          },
+        ],
         responses: {
           '200': {
             description: 'Successful response',
             content: {
               'application/json': {
-                schema: ep.endpoint_type === 'detail'
-                  ? memberSchema
-                  : { type: 'array', items: memberSchema },
+                schema: responseSchema,
+              },
+              'text/turtle': {
+                schema: { type: 'string' },
               },
             },
           },
