@@ -15,9 +15,17 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const url = new URL(req.url);
 
-    // API path is passed as an `api_path` query parameter by the Swagger UI
-    // request interceptor (Base44 function URLs don't support extra path segments).
-    let apiPath = url.searchParams.get('api_path');
+    // Parse request body first (SDK invoke sends params as POST body)
+    let body = {};
+    try {
+      if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+        const text = await req.text();
+        body = text ? JSON.parse(text) : {};
+      }
+    } catch { /* leave body empty */ }
+
+    // API path: check body first (SDK invoke), then query param, then URL path
+    let apiPath = body.api_path || url.searchParams.get('api_path');
     if (!apiPath) {
       const funcSegment = 'apiProxy';
       const idx = url.pathname.lastIndexOf(funcSegment);
@@ -26,9 +34,13 @@ Deno.serve(async (req) => {
     if (!apiPath.startsWith('/')) apiPath = '/' + apiPath;
     apiPath = apiPath.replace(/\/$/, '') || '/';
 
-    const method = req.method;
+    // Method: prefer _method from payload (set by custom fetch plugin),
+    // fall back to the actual HTTP method.
+    const method = body._method || req.method;
     const queryParams = Object.fromEntries(url.searchParams.entries());
     delete queryParams.api_path;
+    delete body._method;
+    delete body.api_path;
 
     // Find matching endpoint
     const endpoints = await base44.asServiceRole.entities.ApiEndpoint.list();
@@ -71,7 +83,7 @@ Deno.serve(async (req) => {
     }
 
     // Merge logic_config with query params and path params
-    const payload = { ...(matched.logic_config || {}), ...queryParams, ...pathParams };
+    const payload = { ...(matched.logic_config || {}), ...queryParams, ...pathParams, ...body };
 
     // Invoke the target function
     const result = await base44.asServiceRole.functions.invoke(matched.target_logic_type, payload);
