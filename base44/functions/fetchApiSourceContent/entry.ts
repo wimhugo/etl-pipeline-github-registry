@@ -278,6 +278,12 @@ function membersToTtl(members, memberIdentifierResolved, prefixes) {
         if (!p.is_literal) collectFromIri(p.object);
       }
     }
+    if (m.mappings) {
+      for (const mp of m.mappings) {
+        collectFromIri(mp.predicate);
+        collectFromIri(mp.object);
+      }
+    }
   }
 
   // Resolve the member type IRI to a CURIE if possible
@@ -320,10 +326,15 @@ function membersToTtl(members, memberIdentifierResolved, prefixes) {
       });
       lines.push(`${iri} ${parts.join(' ;\n')} .`);
     } else {
-      // List view: only type, label, definition
+      // List view: type, label, definition, and mappings (if present)
       const parts = [`${iri} a ${typeCurie}`];
       if (m.label) parts.push(`    skos:prefLabel "${escapeTtlLiteral(m.label)}"`);
       if (m.definition) parts.push(`    skos:definition "${escapeTtlLiteral(m.definition)}"`);
+      if (m.mappings) {
+        for (const mp of m.mappings) {
+          parts.push(`    ${mp.predicate} ${iriToCurie(mp.object)}`);
+        }
+      }
       lines.push(parts.join(' ;\n') + ' .');
     }
     lines.push('');
@@ -447,8 +458,32 @@ Deno.serve(async (req) => {
 
     // For list views (no id), strip properties to keep payload small.
     // Detail views (with id) retain all properties.
+    // Exception: the Mappings section includes match-related properties
+    // (skos:exactMatch, closeMatch, broadMatch, narrowMatch) in the list
+    // view, since that is the primary purpose of the mappings file.
     if (!id && !keep_properties) {
-      members = members.map(({ iri, label, definition }) => ({ iri, label, definition }));
+      const MAPPING_PREDICATES = new Set([
+        'http://www.w3.org/2004/02/skos/core#exactMatch',
+        'http://www.w3.org/2004/02/skos/core#closeMatch',
+        'http://www.w3.org/2004/02/skos/core#broadMatch',
+        'http://www.w3.org/2004/02/skos/core#narrowMatch',
+      ]);
+      const SKOS_NS = 'http://www.w3.org/2004/02/skos/core#';
+
+      if (sourceFile.section === 'Mappings') {
+        members = members.map(({ iri, label, properties }) => ({
+          iri,
+          label,
+          mappings: (properties || [])
+            .filter(p => MAPPING_PREDICATES.has(p.predicate))
+            .map(p => ({
+              predicate: 'skos:' + p.predicate.substring(SKOS_NS.length),
+              object: p.object,
+            })),
+        }));
+      } else {
+        members = members.map(({ iri, label, definition }) => ({ iri, label, definition }));
+      }
     }
 
     const meta = {
