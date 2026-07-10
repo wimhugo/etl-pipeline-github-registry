@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { appParams } from '@/lib/app-params';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,7 +8,9 @@ import { Eye, ExternalLink } from 'lucide-react';
 import { generateSwaggerSpec } from '@/lib/swaggerSpec';
 
 export default function KBApiPreview() {
-  const [serverUrl, setServerUrl] = useState('');
+  const [serverUrl, setServerUrl] = useState(
+    `${appParams.appBaseUrl || ''}/functions/apiProxy`
+  );
 
   const { data: endpoints = [] } = useQuery({
     queryKey: ['apiEndpoints'],
