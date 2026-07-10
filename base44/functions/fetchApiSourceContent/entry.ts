@@ -366,26 +366,21 @@ Deno.serve(async (req) => {
       parseError = e.message;
     }
 
-    // 5. Return structured result
-    const result = {
-      status: 'success',
-      section: sourceFile.section,
-      file_path,
-      data_format,
-      member_identifier,
-      member_identifier_resolved: parsed.memberIdentifierResolved,
-      member_count: parsed.members.length,
-      members: parsed.members,
-    };
+    // Pipeline:
+    //   1. Parse source → members only (non-members already stripped above)
+    //   2. Apply parameter-based filters (id, prefix)
+    //   3. Convert to requested format (ttl or json)
+    //   4. Add wrappers / metadata
 
-    if (parseError) result.parse_error = parseError;
-    if (include_raw) result.raw_content = rawContent;
+    let members = parsed.members;
+    let appliedId = null;
+    let appliedPrefix = null;
 
-    // If an id path parameter was provided (detail endpoint), filter to the
-    // single matching member.  The id may be a prefixed term (e.g. "odrl:move")
-    // or a full IRI (e.g. "http://www.w3.org/ns/odrl/2/move").  We compare on
-    // the local name (the fragment after the last ':', '/', or '#') as a
-    // fallback so that prefix differences don't prevent a match.
+    // --- Step 2: Apply parameter-based filters ---
+
+    // Detail filter: match a single member by id.  The id may be a prefixed
+    // term (e.g. "odrl:move") or a full IRI.  We compare on the local name
+    // (after the last ':', '/', or '#') as a fallback for prefix differences.
     if (id) {
       const localName = (term) => {
         const t = String(term);
@@ -393,44 +388,49 @@ Deno.serve(async (req) => {
         return idx >= 0 ? t.substring(idx + 1) : t;
       };
       const idLocal = localName(id);
-      result.members = result.members.filter(m =>
-        m.iri === id ||
-        localName(m.iri) === idLocal
+      members = members.filter(m =>
+        m.iri === id || localName(m.iri) === idLocal
       );
-      result.member_count = result.members.length;
-      result.requested_id = id;
+      appliedId = id;
     }
 
-    // If a prefix query parameter was provided (list endpoint), filter to
-    // members whose IRI starts with the given prefix (e.g. "openrel:").
+    // List filter: narrow to members whose IRI starts with the prefix.
     if (prefix) {
-      result.members = result.members.filter(m =>
-        String(m.iri).startsWith(prefix)
-      );
-      result.member_count = result.members.length;
-      result.applied_prefix = prefix;
+      members = members.filter(m => String(m.iri).startsWith(prefix));
+      appliedPrefix = prefix;
     }
 
-    // If format=ttl was requested, return Turtle content instead of JSON.
-    // When no filtering is applied, return the raw TTL for full fidelity.
-    // When filtered (by id or prefix), re-serialize the filtered members.
+    const meta = {
+      section: sourceFile.section,
+      file_path,
+      data_format,
+      member_identifier,
+      member_identifier_resolved: parsed.memberIdentifierResolved,
+      member_count: members.length,
+      requested_id: appliedId,
+      applied_prefix: appliedPrefix,
+    };
+
+    // --- Step 3-4: Format conversion + wrappers ---
+
     if (format === 'ttl') {
-      let ttlContent;
-      if (!id && !prefix) {
-        ttlContent = rawContent;
-      } else {
-        ttlContent = membersToTtl(result.members, parsed.memberIdentifierResolved, parsed.prefixes);
-      }
+      const ttlContent = membersToTtl(members, parsed.memberIdentifierResolved, parsed.prefixes);
       return Response.json({
         _content_type: 'text/turtle',
         _raw_body: ttlContent,
-        _meta: {
-          section: result.section,
-          file_path: result.file_path,
-          member_count: result.member_count,
-        },
+        _meta: meta,
       });
     }
+
+    // Default: JSON
+    const result = {
+      status: 'success',
+      ...meta,
+      members,
+    };
+
+    if (parseError) result.parse_error = parseError;
+    if (include_raw) result.raw_content = rawContent;
 
     return Response.json(result);
   } catch (error) {
