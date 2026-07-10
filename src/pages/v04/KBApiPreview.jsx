@@ -14,47 +14,61 @@ const DISPLAY_SERVER_URL = 'https://api.openrel.org/v0.4';
  * Swagger UI plugin that intercepts "Try it out" requests and routes them
  * through the Base44 SDK (base44.functions.invoke) instead of making direct
  * HTTP calls. This avoids CORS, auth-header, and URL-routing issues.
+ *
+ * Swagger UI's fn.fetch receives a single request object (built by
+ * fn.buildRequest) with { url, method, headers, body, credentials } — NOT
+ * the standard fetch(url, options) signature.
  */
-function createApiProxyPlugin() {
+function createApiProxyPlugin(serverUrl) {
+  const serverPathname = new URL(serverUrl, window.location.origin).pathname;
   return {
     fn: {
-      fetch: async (url, options = {}) => {
+      fetch: async (req) => {
         try {
-          const parsedUrl = new URL(url, window.location.origin);
-          // The API path is everything after the display server URL's pathname
+          const parsedUrl = new URL(req.url, window.location.origin);
+
+          // Extract the API path, stripping the display server's pathname prefix
           let apiPath = parsedUrl.pathname;
+          if (serverPathname && apiPath.startsWith(serverPathname)) {
+            apiPath = apiPath.substring(serverPathname.length);
+          }
           if (!apiPath.startsWith('/')) apiPath = '/' + apiPath;
           apiPath = apiPath.replace(/\/$/, '') || '/';
 
-          // Collect query parameters (excluding internal ones)
+          // Collect query parameters
           const params = {};
           parsedUrl.searchParams.forEach((value, key) => {
             params[key] = value;
           });
 
-          // Route through the SDK — the platform handles auth and routing
-          try {
-            const result = await base44.functions.invoke('apiProxy', {
-              api_path: apiPath,
-              _method: (options.method || 'GET').toUpperCase(),
-              ...params,
-            });
-            const data = result?.data ?? result;
-            return new Response(JSON.stringify(data), {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' },
-            });
-          } catch (err) {
-            const status = err?.response?.status || 500;
-            const errorData = err?.response?.data || { error: err.message };
-            return new Response(JSON.stringify(errorData), {
-              status,
-              headers: { 'Content-Type': 'application/json' },
-            });
+          // Parse body if present (POST/PUT/PATCH)
+          if (req.body) {
+            try {
+              const bodyObj = typeof req.body === 'string'
+                ? JSON.parse(req.body)
+                : req.body;
+              if (bodyObj && typeof bodyObj === 'object') {
+                Object.assign(params, bodyObj);
+              }
+            } catch { /* not JSON, ignore */ }
           }
-        } catch (e) {
-          return new Response(JSON.stringify({ error: e.message }), {
-            status: 500,
+
+          const result = await base44.functions.invoke('apiProxy', {
+            api_path: apiPath,
+            _method: (req.method || 'GET').toUpperCase(),
+            ...params,
+          });
+
+          const data = result?.data ?? result;
+          return new Response(JSON.stringify(data), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch (err) {
+          const status = err?.response?.status || 500;
+          const errorData = err?.response?.data || { error: err.message };
+          return new Response(JSON.stringify(errorData), {
+            status,
             headers: { 'Content-Type': 'application/json' },
           });
         }
@@ -74,7 +88,7 @@ export default function KBApiPreview() {
     [endpoints]
   );
 
-  const plugins = useMemo(() => [createApiProxyPlugin()], []);
+  const plugins = useMemo(() => [createApiProxyPlugin(DISPLAY_SERVER_URL)], []);
 
   return (
     <div className="space-y-4">
