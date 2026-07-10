@@ -232,7 +232,7 @@ Deno.serve(async (req) => {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const { section, source_file_id, include_raw = false, repo, branch = 'main' } = body;
+    const { section, source_file_id, include_raw = false, repo, branch = 'main', id } = body;
 
     if (!section && !source_file_id) {
       return Response.json({ error: 'section or source_file_id is required' }, { status: 400 });
@@ -321,6 +321,27 @@ Deno.serve(async (req) => {
 
     if (parseError) result.parse_error = parseError;
     if (include_raw) result.raw_content = rawContent;
+
+    // If an id path parameter was provided (detail endpoint), filter to the
+    // single matching member.  The id may be a prefixed term (e.g. "odrl:move")
+    // or a full IRI (e.g. "http://www.w3.org/ns/odrl/2/move").  We compare on
+    // the local name (the fragment after the last ':', '/', or '#') as a
+    // fallback so that prefix differences don't prevent a match.
+    if (id) {
+      const localName = (term) => {
+        const t = String(term);
+        const idx = Math.max(t.lastIndexOf(':'), t.lastIndexOf('/'), t.lastIndexOf('#'));
+        return idx >= 0 ? t.substring(idx + 1) : t;
+      };
+      const idLocal = localName(id);
+      const matched = result.members.filter(m =>
+        m.iri === id ||
+        localName(m.iri) === idLocal
+      );
+      result.members = matched;
+      result.member_count = matched.length;
+      result.requested_id = id;
+    }
 
     return Response.json(result);
   } catch (error) {
