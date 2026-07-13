@@ -284,7 +284,7 @@ Deno.serve(async (req) => {
       'User-Agent': 'OpenREL-App',
     };
 
-    // Check if file exists (to get SHA for update)
+    // Check if file exists on the base branch (to get SHA for update)
     const getUrl = `https://api.github.com/repos/${githubRepo}/contents/${targetPath}?ref=${ghBranch}`;
     const getResp = await fetch(getUrl, { headers: ghHeaders });
 
@@ -297,11 +297,35 @@ Deno.serve(async (req) => {
       return Response.json({ error: `GitHub GET ${getResp.status}: ${errText.substring(0, 200)}` }, { status: 502 });
     }
 
-    // Write the TTL file
+    // 1. Get the base branch ref SHA (for creating a new branch)
+    const refResp = await fetch(`https://api.github.com/repos/${githubRepo}/git/ref/heads/${ghBranch}`, { headers: ghHeaders });
+    if (!refResp.ok) {
+      const errText = await refResp.text();
+      return Response.json({ error: `Failed to get base branch ref: ${errText.substring(0, 200)}` }, { status: 502 });
+    }
+    const refJson = await refResp.json();
+    const baseSha = refJson.object.sha;
+
+    // 2. Create a new branch for the PR
+    const timestamp = Date.now();
+    const safeName = config.name.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase().substring(0, 40);
+    const prBranch = `json-ttl-${safeName}-${timestamp}`;
+
+    const branchResp = await fetch(`https://api.github.com/repos/${githubRepo}/git/refs`, {
+      method: 'POST',
+      headers: ghHeaders,
+      body: JSON.stringify({ ref: `refs/heads/${prBranch}`, sha: baseSha }),
+    });
+    if (!branchResp.ok) {
+      const errText = await branchResp.text();
+      return Response.json({ error: `Failed to create branch: ${errText.substring(0, 200)}` }, { status: 502 });
+    }
+
+    // 3. Commit the TTL file to the new branch
     const putBody: any = {
       message: `chore: JSON-to-TTL pipeline — ${config.name}`,
       content: btoa(unescape(encodeURIComponent(ttlContent))),
-      branch: ghBranch,
+      branch: prBranch,
     };
     if (existingSha) putBody.sha = existingSha;
 
@@ -310,7 +334,6 @@ Deno.serve(async (req) => {
     const putData = await putResp.json();
 
     if (!putResp.ok) {
-      // Update config with failure
       if (config_id) {
         await base44.asServiceRole.entities.JsonPolicyParser.update(config_id, {
           last_run_at: new Date().toISOString(),
@@ -321,12 +344,39 @@ Deno.serve(async (req) => {
       return Response.json({ error: `GitHub PUT ${putResp.status}: ${putData.message || ''}` }, { status: 502 });
     }
 
+    // 4. Open the pull request
+    const prResp = await fetch(`https://api.github.com/repos/${githubRepo}/pulls`, {
+      method: 'POST',
+      headers: ghHeaders,
+      body: JSON.stringify({
+        title: `[JSON-to-TTL] ${config.name}`,
+        body: `Converted JSON input to RDF Turtle and wrote to \`${targetPath}\`.\n\n**Pipeline:** ${config.name}\n**Target:** \`${githubRepo}:${targetPath}\`\n**TTL size:** ${ttlContent.length} bytes\n\nReview and merge to update the vocabulary.`,
+        head: prBranch,
+        base: ghBranch,
+      }),
+    });
+    const prData = await prResp.json();
+
+    if (!prResp.ok) {
+      if (config_id) {
+        await base44.asServiceRole.entities.JsonPolicyParser.update(config_id, {
+          last_run_at: new Date().toISOString(),
+          last_run_status: 'failed',
+          last_run_message: `PR creation failed ${prResp.status}: ${prData.message || ''}`.substring(0, 500),
+        });
+      }
+      return Response.json({ error: `Failed to create PR: ${prData.message || ''}` }, { status: 502 });
+    }
+
+    const prUrl = prData.html_url;
+
     // Update config with success
     if (config_id) {
       await base44.asServiceRole.entities.JsonPolicyParser.update(config_id, {
         last_run_at: new Date().toISOString(),
         last_run_status: 'success',
-        last_run_message: `Wrote ${ttlContent.length} bytes to ${targetPath}`,
+        last_run_message: `PR #${prData.number} created — ${ttlContent.length} bytes to ${targetPath}`,
+        last_pr_url: prUrl,
       });
     }
 
@@ -336,6 +386,9 @@ Deno.serve(async (req) => {
       target_path: targetPath,
       target_repo: githubRepo,
       target_branch: ghBranch,
+      pr_branch: prBranch,
+      pr_url: prUrl,
+      pr_number: prData.number,
       file_sha: putData.content?.sha,
       ttl_length: ttlContent.length,
       ttl_preview: ttlContent.substring(0, 1000),

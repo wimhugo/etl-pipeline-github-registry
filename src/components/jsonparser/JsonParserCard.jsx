@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, Copy, Play, FileJson, Globe, FileText, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Edit, Trash2, Copy, Play, FileJson, Globe, FileText, Loader2, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
 
 export default function JsonParserCard({ config, onEdit, onDelete, onClone, onExecute, isExecuting }) {
   const inputIcon = config.input_type === 'file' ? <Globe className="w-3.5 h-3.5" /> : <FileJson className="w-3.5 h-3.5" />;
@@ -104,6 +104,17 @@ export default function JsonParserCard({ config, onEdit, onDelete, onClone, onEx
           <div className="mt-3 p-2 rounded bg-muted/50 text-[11px] text-muted-foreground font-mono break-all">
             {config.last_run_message}
           </div>
+        )}
+        {config.last_pr_url && (
+          <a
+            href={config.last_pr_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            View Pull Request
+          </a>
         )}
         {config.input_type === 'text' && config.json_text && (
           <div className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">

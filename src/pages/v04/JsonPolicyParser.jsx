@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Plus, Loader2, FileJson } from 'lucide-react';
+import { Plus, Loader2, FileJson, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
@@ -80,7 +80,15 @@ export default function JsonPolicyParser() {
       const res = await base44.functions.invoke('jsonToTtl', { config_id: config.id });
       const data = res.data || res;
       if (data.status === 'success') {
-        toast({ title: 'Pipeline complete', description: `Wrote ${data.ttl_length} bytes to ${data.target_path}` });
+        toast({
+          title: `PR #${data.pr_number} created`,
+          description: (
+            <a href={data.pr_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+              View Pull Request <ExternalLink className="w-3 h-3" />
+            </a>
+          ),
+          duration: 30000,
+        });
       } else {
         toast({ title: 'Pipeline failed', description: data.error || 'Unknown error', variant: 'destructive' });
       }
