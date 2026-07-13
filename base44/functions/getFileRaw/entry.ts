@@ -13,11 +13,12 @@ Deno.serve(async (req) => {
     const config = configs[0] || {};
     const token = config.github_token || Deno.env.get('GITHUB_TOKEN');
 
-    const apiUrl = `https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`;
+    const apiUrl = `https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}&_=${Date.now()}`;
     const resp = await fetch(apiUrl, {
       headers: {
         Authorization: `token ${token}`,
         Accept: 'application/vnd.github.v3.raw',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
       }
     });
 

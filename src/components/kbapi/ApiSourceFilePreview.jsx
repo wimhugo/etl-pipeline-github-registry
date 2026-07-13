@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight, Loader2, AlertCircle, Eye, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, AlertCircle, Eye, ArrowUp, ArrowDown, ArrowUpDown, RefreshCw } from 'lucide-react';
 
 export default function ApiSourceFilePreview({ item }) {
   const [expanded, setExpanded] = useState(false);
@@ -25,7 +25,7 @@ export default function ApiSourceFilePreview({ item }) {
       : <ArrowDown className="w-3 h-3" />;
   };
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['previewApiSourceFile', item.id],
     queryFn: async () => {
       const res = await base44.functions.invoke('fetchApiSourceContent', {
@@ -34,6 +34,9 @@ export default function ApiSourceFilePreview({ item }) {
       return res.data;
     },
     enabled: expanded,
+    // Always fetch fresh — never serve stale cached data when re-expanding
+    staleTime: 0,
+    gcTime: 0,
   });
 
   return (
@@ -49,6 +52,18 @@ export default function ApiSourceFilePreview({ item }) {
         Preview
         {data && (
           <span className="ml-1 text-muted-foreground/70">({data.member_count} members)</span>
+        )}
+        {expanded && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); refetch(); }}
+            className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            title="Refresh from GitHub"
+          >
+            <RefreshCw className={`w-3 h-3 ${isFetching ? 'animate-spin' : ''}`} />
+            Refresh
+          </span>
         )}
       </button>
 

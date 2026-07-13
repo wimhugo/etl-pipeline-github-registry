@@ -385,13 +385,15 @@ Deno.serve(async (req) => {
     const token = config.github_token || Deno.env.get('GITHUB_TOKEN');
     const githubRepo = repo || config.github_repo || 'wimhugo/openrel';
 
-    // 3. Fetch the raw file
-    const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${file_path}?ref=${branch}`;
+    // 3. Fetch the raw file — cache-busting timestamp ensures GitHub's
+    //    CDN never serves a stale copy when the source file has been updated.
+    const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${file_path}?ref=${branch}&_=${Date.now()}`;
     const resp = await fetch(apiUrl, {
       headers: {
         Authorization: `token ${token}`,
         Accept: 'application/vnd.github.v3.raw',
         'User-Agent': 'OpenREL-App',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
       }
     });
     if (!resp.ok) {
