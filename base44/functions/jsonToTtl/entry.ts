@@ -89,52 +89,91 @@ function jsonToTtl(jsonText: string, defaultNamespace: string): string {
     prefixes[defaultNamespace] = STANDARD_PREFIXES[defaultNamespace] || `https://openrel.org/ns#`;
   }
 
-  // Auto-detect prefixes used in CURIEs
+  // Auto-detect prefixes used in CURIEs (recursively traverses nested objects)
   function collectPrefix(term: any) {
-    if (typeof term !== 'string') return;
-    const colonIdx = term.indexOf(':');
-    if (colonIdx > 0) {
-      const prefix = term.substring(0, colonIdx);
-      if (!prefixes[prefix] && STANDARD_PREFIXES[prefix]) {
-        prefixes[prefix] = STANDARD_PREFIXES[prefix];
+    if (typeof term === 'string') {
+      const colonIdx = term.indexOf(':');
+      if (colonIdx > 0) {
+        const prefix = term.substring(0, colonIdx);
+        if (!prefixes[prefix] && STANDARD_PREFIXES[prefix]) {
+          prefixes[prefix] = STANDARD_PREFIXES[prefix];
+        }
+      }
+    } else if (Array.isArray(term)) {
+      term.forEach(collectPrefix);
+    } else if (typeof term === 'object' && term !== null) {
+      for (const [k, v] of Object.entries(term)) {
+        collectPrefix(k);
+        collectPrefix(v);
       }
     }
   }
 
   for (const item of items) {
-    if (typeof item !== 'object' || item === null) continue;
-    for (const key of Object.keys(item)) {
-      collectPrefix(key);
-      const val = item[key];
-      if (Array.isArray(val)) {
-        val.forEach(collectPrefix);
-      } else {
-        collectPrefix(val);
-      }
-    }
+    collectPrefix(item);
   }
 
-  function toObjDisplay(val: any): string {
+  function formatPredicate(pred: string): string {
+    if (isIri(pred)) {
+      for (const [prefix, ns] of Object.entries(prefixes)) {
+        if (pred.startsWith(ns)) return `${prefix}:${pred.substring(ns.length)}`;
+      }
+      return `<${pred}>`;
+    }
+    return pred;
+  }
+
+  function serializeValue(val: any, indent: string): string {
     if (val === null || val === undefined) return '""';
     if (typeof val === 'number' || typeof val === 'boolean') {
-      return isCurie(String(val)) ? String(val) : `"${escapeLiteral(String(val))}"`;
+      const s = String(val);
+      return isCurie(s) ? s : `"${escapeLiteral(s)}"`;
+    }
+    if (typeof val === 'string') {
+      if (isIri(val)) {
+        for (const [prefix, ns] of Object.entries(prefixes)) {
+          if (val.startsWith(ns)) return `${prefix}:${val.substring(ns.length)}`;
+        }
+        return `<${val}>`;
+      }
+      if (isCurie(val)) return val;
+      return `"${escapeLiteral(val)}"`;
+    }
+    if (Array.isArray(val)) {
+      const parts = val
+        .filter((v) => v !== null && v !== undefined)
+        .map((v) => serializeValue(v, indent));
+      return parts.join(', ');
     }
     if (typeof val === 'object') {
-      return `"${escapeLiteral(JSON.stringify(val))}"`;
-    }
-    // string
-    if (isIri(val)) {
-      for (const [prefix, ns] of Object.entries(prefixes)) {
-        if (val.startsWith(ns)) {
-          return `${prefix}:${val.substring(ns.length)}`;
-        }
+      // If the nested object has an @id, reference it by IRI (it should be defined elsewhere as a top-level subject)
+      const iri = val['@id'] || val['id'] || val['iri'];
+      if (iri) {
+        return isIri(iri) ? `<${iri}>` : iri;
       }
-      return `<${val}>`;
+      // Otherwise, create a recursive blank node
+      return serializeBlankNode(val, indent);
     }
-    if (isCurie(val)) {
-      return val;
+    return `"${escapeLiteral(String(val))}"`;
+  }
+
+  function serializeBlankNode(obj: Record<string, any>, indent: string): string {
+    const innerIndent = indent + '    ';
+    const parts: string[] = [];
+
+    for (const [key, val] of Object.entries(obj)) {
+      if (['@id', 'id', 'iri'].includes(key)) continue;
+      const pred = key === '@type' ? 'rdf:type' : key;
+      const predDisplay = formatPredicate(pred);
+      const values = Array.isArray(val) ? val : [val];
+      for (const v of values) {
+        if (v === null || v === undefined) continue;
+        parts.push(`${innerIndent}${predDisplay} ${serializeValue(v, innerIndent)}`);
+      }
     }
-    return `"${escapeLiteral(val)}"`;
+
+    if (parts.length === 0) return '[]';
+    return `[\n${parts.join(' ;\n')}\n${indent}]`;
   }
 
   const lines: string[] = [];
@@ -157,19 +196,12 @@ function jsonToTtl(jsonText: string, defaultNamespace: string): string {
       if (['@id', 'id', 'iri'].includes(key)) continue;
 
       const pred = key === '@type' ? 'rdf:type' : key;
-      const predDisplay = isIri(pred)
-        ? (() => {
-            for (const [prefix, ns] of Object.entries(prefixes)) {
-              if (pred.startsWith(ns)) return `${prefix}:${pred.substring(ns.length)}`;
-            }
-            return `<${pred}>`;
-          })()
-        : pred;
+      const predDisplay = formatPredicate(pred);
 
       const values = Array.isArray(val) ? val : [val];
       for (const v of values) {
         if (v === null || v === undefined) continue;
-        parts.push(`    ${predDisplay} ${toObjDisplay(v)}`);
+        parts.push(`    ${predDisplay} ${serializeValue(v, '    ')}`);
       }
     }
 
