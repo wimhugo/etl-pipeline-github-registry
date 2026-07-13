@@ -343,6 +343,95 @@ function membersToTtl(members, memberIdentifierResolved, prefixes) {
   return lines.join('\n');
 }
 
+// --- Dynamic Mappings composer ---
+// When the Mappings section is requested, content is composed dynamically
+// from all active, non-system source files — not read from mappings.ttl.
+// This ensures the Mappings API always reflects the current state of all
+// source files without relying on the syncMappings automation having run.
+
+const MAPPING_INVERSE = {
+  'http://www.w3.org/2004/02/skos/core#exactMatch': 'http://www.w3.org/2004/02/skos/core#exactMatch',
+  'http://www.w3.org/2004/02/skos/core#closeMatch': 'http://www.w3.org/2004/02/skos/core#closeMatch',
+  'http://www.w3.org/2004/02/skos/core#broadMatch': 'http://www.w3.org/2004/02/skos/core#narrowMatch',
+  'http://www.w3.org/2004/02/skos/core#narrowMatch': 'http://www.w3.org/2004/02/skos/core#broadMatch',
+};
+
+const SKOS_NS = 'http://www.w3.org/2004/02/skos/core#';
+
+async function composeMappingsFromAllSources(base44, config) {
+  const token = config.github_token || Deno.env.get('GITHUB_TOKEN');
+  const githubRepo = config.github_repo || 'wimhugo/openrel';
+  const branch = config.github_branch || 'main';
+
+  const allSources = await base44.asServiceRole.entities.ApiSourceFile.filter({ is_active: true });
+  const sources = allSources.filter(s => !s.is_system);
+
+  const members = {};
+  const allPrefixes = {};
+
+  for (const sf of sources) {
+    if (!sf.file_path) continue;
+    const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${sf.file_path}?ref=${branch}&_=${Date.now()}`;
+    const resp = await fetch(apiUrl, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3.raw',
+        'User-Agent': 'OpenREL-App',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      }
+    });
+    if (!resp.ok) continue;
+    const rawContent = await resp.text();
+
+    let parsed;
+    try {
+      switch (sf.data_format || 'ttl') {
+        case 'ttl':
+          parsed = parseTtl(rawContent, sf.member_identifier || 'skos:Concept');
+          break;
+        case 'json':
+        case 'json-ld':
+          parsed = parseJsonContent(rawContent, sf.member_identifier);
+          break;
+        case 'yaml':
+          parsed = parseYamlContent(rawContent, sf.member_identifier);
+          break;
+        default:
+          continue;
+      }
+    } catch { continue; }
+    if (!parsed || !parsed.members) continue;
+
+    if (parsed.prefixes) Object.assign(allPrefixes, parsed.prefixes);
+
+    // Extract mapping properties and invert them (external term → openrel term)
+    for (const member of parsed.members) {
+      if (!member.properties) continue;
+      const openrelIri = member.iri;
+      for (const prop of member.properties) {
+        const inversePred = MAPPING_INVERSE[prop.predicate];
+        if (!inversePred || prop.is_literal) continue;
+        const externalTerm = prop.object;
+        if (!members[externalTerm]) {
+          members[externalTerm] = { iri: externalTerm, label: '', definition: '', properties: [] };
+        }
+        const exists = members[externalTerm].properties.some(
+          p => p.predicate === inversePred && p.object === openrelIri
+        );
+        if (!exists) {
+          members[externalTerm].properties.push({ predicate: inversePred, object: openrelIri, is_literal: false });
+        }
+      }
+    }
+  }
+
+  return {
+    members: Object.values(members),
+    memberIdentifierResolved: SKOS_NS + 'Concept',
+    prefixes: allPrefixes,
+  };
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -375,56 +464,65 @@ Deno.serve(async (req) => {
 
     const { file_path, data_format = 'ttl', member_identifier = 'skos:Concept' } = sourceFile;
 
-    if (!file_path) {
-      return Response.json({ error: 'Source file has no file_path configured' }, { status: 400 });
-    }
-
     // 2. Resolve GitHub credentials
     const configs = await base44.asServiceRole.entities.GlobalConfig.list();
     const config = configs[0] || {};
     const token = config.github_token || Deno.env.get('GITHUB_TOKEN');
     const githubRepo = repo || config.github_repo || 'wimhugo/openrel';
 
-    // 3. Fetch the raw file — cache-busting timestamp ensures GitHub's
-    //    CDN never serves a stale copy when the source file has been updated.
-    const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${file_path}?ref=${branch}&_=${Date.now()}`;
-    const resp = await fetch(apiUrl, {
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: 'application/vnd.github.v3.raw',
-        'User-Agent': 'OpenREL-App',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-      }
-    });
-    if (!resp.ok) {
-      const errText = await resp.text();
-      return Response.json({ error: `GitHub ${resp.status}: ${errText.substring(0, 200)}` }, { status: resp.status });
-    }
-
-    const rawContent = await resp.text();
-
-    // 4. Parse according to data_format
     let parsed;
     let parseError = null;
-    try {
-      switch (data_format) {
-        case 'ttl':
-          parsed = parseTtl(rawContent, member_identifier);
-          break;
-        case 'json':
-        case 'json-ld':
-          parsed = parseJsonContent(rawContent, member_identifier);
-          break;
-        case 'yaml':
-          parsed = parseYamlContent(rawContent, member_identifier);
-          break;
-        default:
-          parsed = { members: [], memberIdentifierResolved: member_identifier };
-          parseError = `Unsupported data_format: ${data_format}`;
+    let rawContent = null;
+
+    // Dynamic composition: the Mappings section aggregates mapping
+    // properties from ALL active non-system source files at query time,
+    // rather than reading from the pre-generated mappings.ttl file.
+    if (sourceFile.is_system && sourceFile.section === 'Mappings') {
+      parsed = await composeMappingsFromAllSources(base44, config);
+    } else {
+      if (!file_path) {
+        return Response.json({ error: 'Source file has no file_path configured' }, { status: 400 });
       }
-    } catch (e) {
-      parsed = { members: [], memberIdentifierResolved: member_identifier };
-      parseError = e.message;
+
+      // 3. Fetch the raw file — cache-busting timestamp ensures GitHub's
+      //    CDN never serves a stale copy when the source file has been updated.
+      const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${file_path}?ref=${branch}&_=${Date.now()}`;
+      const resp = await fetch(apiUrl, {
+        headers: {
+          Authorization: `token ${token}`,
+          Accept: 'application/vnd.github.v3.raw',
+          'User-Agent': 'OpenREL-App',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        }
+      });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        return Response.json({ error: `GitHub ${resp.status}: ${errText.substring(0, 200)}` }, { status: resp.status });
+      }
+
+      rawContent = await resp.text();
+
+      // 4. Parse according to data_format
+      try {
+        switch (data_format) {
+          case 'ttl':
+            parsed = parseTtl(rawContent, member_identifier);
+            break;
+          case 'json':
+          case 'json-ld':
+            parsed = parseJsonContent(rawContent, member_identifier);
+            break;
+          case 'yaml':
+            parsed = parseYamlContent(rawContent, member_identifier);
+            break;
+          default:
+            parsed = { members: [], memberIdentifierResolved: member_identifier };
+            parseError = `Unsupported data_format: ${data_format}`;
+        }
+      } catch (e) {
+        parsed = { members: [], memberIdentifierResolved: member_identifier };
+        parseError = e.message;
+      }
     }
 
     // Pipeline:
@@ -470,7 +568,6 @@ Deno.serve(async (req) => {
         'http://www.w3.org/2004/02/skos/core#broadMatch',
         'http://www.w3.org/2004/02/skos/core#narrowMatch',
       ]);
-      const SKOS_NS = 'http://www.w3.org/2004/02/skos/core#';
 
       if (sourceFile.section === 'Mappings') {
         members = members.map(({ iri, label, properties }) => ({
