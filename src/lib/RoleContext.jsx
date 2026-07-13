@@ -45,6 +45,7 @@ export const KB_USER_FEATURES_DEFAULT = [
 
 export const KB_MANAGER_V04_FEATURES = [
   { label: 'Dashboard', path: '/v0.4/dashboard', access: { Administrator: true, Curator: true, Contributor: true, 'End User': true } },
+  { label: 'JSON Policy Parser', path: '/v0.4/json-policy-parser', access: { Administrator: true, Curator: true, Contributor: false, 'End User': false } },
   { label: 'Settings',  path: '/v0.4/settings',  access: { Administrator: true, Curator: false, Contributor: false, 'End User': false } },
 ];
 

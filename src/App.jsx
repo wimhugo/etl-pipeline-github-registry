@@ -55,6 +55,7 @@ import V04KBApiConfig from './pages/v04/KBApiConfig';
 import V04KBApiDefinition from './pages/v04/KBApiDefinition';
 import V04KBApiPreview from './pages/v04/KBApiPreview';
 import V04KBApiPreviewStandalone from './pages/v04/KBApiPreviewStandalone';
+import V04JsonPolicyParser from './pages/v04/JsonPolicyParser';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -123,6 +124,7 @@ const AuthenticatedApp = () => {
         <Route path="/v0.4/kb-api/definition" element={<V04KBApiDefinition />} />
         <Route path="/v0.4/kb-api/preview" element={<V04KBApiPreview />} />
         <Route path="/v0.4/kb-api/preview-standalone" element={<V04KBApiPreviewStandalone />} />
+        <Route path="/v0.4/json-policy-parser" element={<V04JsonPolicyParser />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
