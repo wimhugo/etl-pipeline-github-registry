@@ -109,8 +109,17 @@ function parseTtl(text, memberIdentifier) {
     }
     if (pair.trim()) poPairs.push(pair.trim());
 
+    // Flatten blank node subjects: when a statement uses [ ... ] syntax
+    // (e.g. "subject [ a Type ; prop val ; ... ]"), strip the brackets
+    // so the blank node's properties merge into the parent subject.
+    if (poPairs.length > 0) {
+      poPairs[0] = poPairs[0].replace(/^\s*\[\s*/, '');
+      const lastIdx = poPairs.length - 1;
+      poPairs[lastIdx] = poPairs[lastIdx].replace(/\s*\]\s*$/, '');
+    }
+
     for (const po of poPairs) {
-      if (!po) continue;
+      if (!po || po.trim() === ']' || po.trim() === '[') continue;
       const poMatch = po.match(/^(\S+)\s+([\s\S]*)/);
       if (!poMatch) continue;
       const predicate = resolve(poMatch[1]);
