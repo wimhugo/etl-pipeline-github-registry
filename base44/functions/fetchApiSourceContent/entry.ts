@@ -537,16 +537,9 @@ Deno.serve(async (req) => {
 
     // --- Step 2: Apply parameter-based filters ---
 
-    // Detail filter: match by exact CURIE string.  Searches both member IRIs
-    // and property object values (e.g. skos:exactMatch, odrl:includedIn).
+    // Detail filter: match by exact member IRI (CURIE or full IRI).
     if (id) {
-      members = members.filter(m => {
-        if (m.iri === id) return true;
-        if (m.properties && Array.isArray(m.properties)) {
-          return m.properties.some(p => p.object === id);
-        }
-        return false;
-      });
+      members = members.filter(m => m.iri === id);
       appliedId = id;
     }
 
