@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { resolveGithubCredentials } from '../../shared/resolveGithubCredentials.ts';
 
 /**
  * FetchApiSourceContent
@@ -368,9 +369,13 @@ const MAPPING_INVERSE = {
 const SKOS_NS = 'http://www.w3.org/2004/02/skos/core#';
 
 async function composeMappingsFromAllSources(base44, config) {
-  const token = config.github_token || Deno.env.get('GITHUB_TOKEN');
-  const githubRepo = config.github_repo || 'wimhugo/openrel';
-  const branch = config.github_branch || 'main';
+  const creds = await resolveGithubCredentials(base44, {
+    repo: config?.github_repo,
+    branch: config?.github_branch,
+  });
+  const token = creds.token;
+  const githubRepo = creds.githubRepo;
+  const branch = creds.branch;
 
   const allSources = await base44.asServiceRole.entities.ApiSourceFile.filter({ is_active: true });
   const sources = allSources.filter(s => !s.is_system);
@@ -473,11 +478,10 @@ Deno.serve(async (req) => {
 
     const { file_path, data_format = 'ttl', member_identifier = 'skos:Concept' } = sourceFile;
 
-    // 2. Resolve GitHub credentials
-    const configs = await base44.asServiceRole.entities.GlobalConfig.list();
-    const config = configs[0] || {};
-    const token = config.github_token || Deno.env.get('GITHUB_TOKEN');
-    const githubRepo = repo || config.github_repo || 'wimhugo/openrel';
+    // 2. Resolve GitHub credentials — checks GlobalConfig AND Project entities,
+    //    using the most recently updated token (fixes stale-token issue when
+    //    credentials were saved to a Project instead of GlobalConfig).
+    const { token, githubRepo } = await resolveGithubCredentials(base44, { repo, branch });
 
     let parsed;
     let parseError = null;

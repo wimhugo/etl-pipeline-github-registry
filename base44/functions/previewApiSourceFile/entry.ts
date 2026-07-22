@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { resolveGithubCredentials } from '../../shared/resolveGithubCredentials.ts';
 
 Deno.serve(async (req) => {
   try {
@@ -11,11 +12,8 @@ Deno.serve(async (req) => {
 
     if (!file_path) return Response.json({ error: 'file_path is required' }, { status: 400 });
 
-    // Get GitHub config
-    const configs = await base44.asServiceRole.entities.GlobalConfig.list();
-    const config = configs[0] || {};
-    const token = config.github_token || Deno.env.get('GITHUB_TOKEN');
-    const githubRepo = repo || config.github_repo || 'wimhugo/openrel';
+    // Resolve GitHub credentials — checks GlobalConfig AND Project entities
+    const { token, githubRepo } = await resolveGithubCredentials(base44, { repo, branch });
 
     // Fetch the raw file — cache-busting timestamp ensures freshness
     const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${file_path}?ref=${branch}&_=${Date.now()}`;

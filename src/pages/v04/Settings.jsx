@@ -35,10 +35,33 @@ export default function Settings() {
   }, [activeProject?.id, globalConfig?.id]);
 
   const updateProjectMutation = useMutation({
-    mutationFn: (data) => base44.entities.Project.update(activeProject.id, data),
+    mutationFn: async (data) => {
+      await base44.entities.Project.update(activeProject.id, data);
+      // Sync GitHub credentials to GlobalConfig so backend functions that
+      // read from GlobalConfig (e.g. fetchApiSourceContent) always have the
+      // latest token, even when it was saved to a Project.
+      if (data.github_token || data.github_repo || data.github_branch) {
+        const configs = await base44.entities.GlobalConfig.list();
+        const gc = configs[0];
+        if (gc) {
+          const patch = {};
+          if (data.github_token) patch.github_token = data.github_token;
+          if (data.github_repo) patch.github_repo = data.github_repo;
+          if (data.github_branch) patch.github_branch = data.github_branch;
+          await base44.entities.GlobalConfig.update(gc.id, patch);
+        } else {
+          await base44.entities.GlobalConfig.create({
+            github_token: data.github_token,
+            github_repo: data.github_repo,
+            github_branch: data.github_branch,
+          });
+        }
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast({ title: 'Saved', description: 'Project settings updated.' });
+      queryClient.invalidateQueries({ queryKey: ['globalConfig'] });
+      toast({ title: 'Saved', description: 'Project settings updated. GitHub credentials synced to global config.' });
     },
   });
 
