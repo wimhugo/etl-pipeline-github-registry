@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OpenREL Policy Wizard — Standalone</title>
+<!--
+  OpenREL Policy Wizard — standalone, self-contained distribution.
+
+  Runtime dependencies:
+    1. The OpenREL KB public API (apiProxy: no auth, CORS *).
+    2. N3.js (Turtle parser) loaded from a CDN as an ES module.
+
+  No React build, no npm install, no Base44 SDK is required to run this file.
+  Open it from anywhere (file://, any host, or the app domain). The ODRL parser,
+  adapter and API client are inlined below and are framework-agnostic vanilla JS;
+  canonical copies live in /public/odrel-wizard/lib/ for reuse.
+-->
+<style>
+  :root {
+    --bg: #0b1120; --card: #131c31; --card-2: #0f1830; --border: #243049;
+    --fg: #e8eefc; --muted: #8aa0c4; --primary: #3b82f6; --accent: #2dd4bf;
+    --danger: #ef4444; --warn: #f59e0b; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.5; }
+  header { padding: 18px 28px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: linear-gradient(180deg, #0e1729, var(--bg)); position: sticky; top: 0; z-index: 20; }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  header .grow { flex: 1; }
+  header input[type=text] { background: var(--card); border: 1px solid var(--border); color: var(--fg); border-radius: 8px; padding: 7px 10px; font-size: 12px; width: 360px; font-family: inherit; }
+  header button { cursor: pointer; }
+  .btn { background: var(--primary); color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 500; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--fg); }
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 28px 60px; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 12px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; cursor: pointer; transition: border-color .15s, transform .1s; display: flex; flex-direction: column; gap: 8px; min-height: 168px; }
+  .card:hover { border-color: var(--primary); transform: translateY(-1px); }
+  .card .title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .card .desc { font-size: 12px; color: var(--muted); flex: 1; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .card .sum { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; }
+  .tag { padding: 2px 8px; border-radius: 6px; background: var(--card-2); border: 1px solid var(--border); color: var(--muted); }
+  .tag.perm { color: var(--accent); border-color: rgba(45,212,191,.3); }
+  .tag.proh { color: var(--danger); border-color: rgba(239,68,68,.3); }
+  .tag.req { color: var(--warn); border-color: rgba(245,158,11,.3); }
+  .badge-comp { font-size: 10px; background: rgba(59,130,246,.18); color: var(--primary); border: 1px solid rgba(59,130,246,.4); padding: 2px 7px; border-radius: 999px; font-weight: 600; }
+  .skeleton { color: var(--muted); font-size: 11px; font-style: italic; }
+  .overlay { position: fixed; inset: 0; background: rgba(3,7,18,.72); backdrop-filter: blur(3px); display: none; align-items: flex-start; justify-content: center; z-index: 50; padding: 32px 16px; overflow: auto; }
+  .overlay.open { display: flex; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px; max-width: 880px; width: 100%; padding: 24px; margin-bottom: 32px; }
+  .modal h2 { margin: 0 0 4px; font-size: 19px; }
+  .modal .iri { color: var(--muted); font-size: 12px; font-family: 'JetBrains Mono', ui-monospace, monospace; margin-bottom: 12px; word-break: break-all; }
+  .modal .desc { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  section.block { margin-top: 18px; }
+  section.block > h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+  .rule { background: var(--card-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .rule .rhead { display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; }
+  .rule .rhead .kind { font-size: 11px; padding: 2px 8px; border-radius: 6px; }
+  .rule .rhead .kind.Permission { background: rgba(45,212,191,.16); color: var(--accent); }
+  .rule .rhead .kind.Prohibition { background: rgba(239,68,68,.16); color: var(--danger); }
+  .rule .rhead .kind.Obligation, .rule .rhead .kind.Duty { background: rgba(245,158,11,.16); color: var(--warn); }
+  .rule .row { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .rule .row b { color: var(--fg); font-weight: 500; }
+  .child { background: var(--card-2); border: 1px solid var(--border); border-left: 3px solid var(--primary); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .child .ch-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .child .ch-head button { background: var(--primary); color:#fff; border:none; border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer; }
+  .child .ch-head a.btn.ghost { padding:4px 10px; border-radius:6px; text-decoration:none; font-size:12px; }
+  .child .ch-body { margin-top: 8px; }
+  .child .ch-body .nested { padding-left: 12px; border-left: 2px solid var(--border); margin-left: 4px; }
+  pre.json { background: #060b18; border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-size: 12px; overflow: auto; max-height: 360px; margin: 0; font-family: 'JetBrains Mono', ui-monospace, monospace; color: #c7d2fe; }
+  .empty, .err { text-align: center; padding: 48px; color: var(--muted); }
+  .err { color: var(--danger); }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: sp .7s linear infinite; display: inline-block; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .pill-row { display:flex; gap:6px; flex-wrap:wrap; }
+  a { color: var(--primary); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>OpenREL Policy Wizard</h1>
+    <div class="sub">Standalone · client-side N3.js · ODRL reference tree</div>
+  </div>
+  <div class="grow"></div>
+  <input id="baseUrl" type="text" value="https://openrel-platform-poc.base44.app/functions/apiProxy" />
+  <button class="btn ghost" id="reloadBtn">Reload</button>
+</header>
+
+<main>
+  <div class="toolbar" id="filters"></div>
+  <div id="status" class="empty"><span class="spinner"></span> Loading policies…</div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+
+<script type="module">
+  import * as N3 from 'https://cdn.jsdelivr.net/npm/n3@2.6.4/+esm';
+
+  /* ===================================================================
+   * odrlApi — framework-agnostic KB API client (public apiProxy gateway)
+   * =================================================================== */
+  const DEFAULT_BASE = 'https://openrel-platform-poc.base44.app/functions/apiProxy';
+  function createApiClient(baseUrl = DEFAULT_BASE) {
+    async function get(apiPath, params = {}) {
+      const body = { api_path: apiPath, _method: 'GET', ...params };
+      const res = await fetch(baseUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok) { let msg = `API ${res.status}`; try { const j = await res.json(); if (j && j.error) msg += ': ' + j.error; } catch (_) {} throw new Error(msg); }
+      const json = await res.json();
+      if (json && json.error) throw new Error(json.error);
+      return json;
+    }
+    return {
+      baseUrl,
+      listPolicies: () => get('/openrel/api/v0.4/policies'),
+      getPolicyRaw: async (id) => {
+        const j = await get('/openrel/api/v0.4/policies/' + encodeURIComponent(id), { format: 'ttl' });
+        if (j && j._content_type === 'text/turtle' && j._raw_body != null) return j._raw_body;
+        throw new Error('Expected raw TTL for ' + id);
+      },
+      getPolicyJson: (id) => get('/openrel/api/v0.4/policies/' + encodeURIComponent(id), { keep_properties: true }),
+      listActions: () => get('/openrel/api/v0.4/actions'),
+      listConstraints: () => get('/openrel/api/v0.4/constraints'),
+      listCountries: () => get('/openrel/api/v0.4/countries'),
+      listParameters: () => get('/openrel/api/v0.4/parameters'),
+      listScenarios: () => get('/openrel/api/v0.4/scenarios'),
+    };
+  }
+
+  /* ===================================================================
+   * odrlParser — lossless ODRL Turtle parser (N3.js, injected)
+   * =================================================================== */
+  const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+  const RDF_TYPE = RDF + 'type';
+  const ODRL = 'http://www.w3.org/ns/odrl/2/';
+  const OPENREL_NS = 'http://www.w3.org/ns/openrel/0/';
+  const DCT = 'http://purl.org/dc/terms/';
+  const SKOS = 'http://www.w3.org/2004/02/skos/core#';
+  const POLICY_TYPES = new Set([ODRL+'Policy', ODRL+'Set', ODRL+'Offer', ODRL+'Agreement', OPENREL_NS+'Policy', OPENREL_NS+'PolicyCollection', OPENREL_NS+'Licence', OPENREL_NS+'Access', OPENREL_NS+'Process']);
+
+  function compactOpenrel(iri) {
+    if (typeof iri !== 'string') return iri;
+    if (iri.startsWith(OPENREL_NS)) return 'openrel:' + iri.substring(OPENREL_NS.length);
+    if (iri.startsWith(ODRL)) return 'odrl:' + iri.substring(ODRL.length);
+    if (iri.startsWith(DCT)) return 'dct:' + iri.substring(DCT.length);
+    if (iri.startsWith(SKOS)) return 'skos:' + iri.substring(SKOS.length);
+    if (iri.startsWith(RDF)) return 'rdf:' + iri.substring(RDF.length);
+    return iri;
+  }
+  function localName(iri) {
+    if (typeof iri !== 'string') return String(iri);
+    const i = Math.max(iri.lastIndexOf('/'), iri.lastIndexOf('#'));
+    return i >= 0 ? iri.substring(i + 1) : iri;
+  }
+  function isLocalPolicy(iri) { return typeof iri === 'string' && iri.startsWith('openrel:'); }
+  const iri = (t) => (t ? t.value : '');
+  const lit = (t) => (t ? t.value : '');
+
+  function parsePolicyTtl(ttlText) {
+    return new Promise((resolve, reject) => {
+      const quads = [];
+      const parser = new N3.Parser();
+      parser.parse(ttlText, (err, quad) => {
+        if (err) return reject(err);
+        if (quad) { quads.push(quad); return; }
+        try { resolve(buildPolicy(quads)); } catch (e) { reject(e); }
+      });
+    });
+  }
+  function buildPolicy(quads) {
+    const spo = new Map();
+    for (const q of quads) {
+      const s = q.subject.value;
+      if (!spo.has(s)) spo.set(s, new Map());
+      const preds = spo.get(s);
+      const p = q.predicate.value;
+      if (!preds.has(p)) preds.set(p, []);
+      preds.get(p).push(q.object);
+    }
+    const get = (s, p) => (spo.get(s)?.get(p) || []);
+    let policySubj = null;
+    for (const [s] of spo) {
+      const types = get(s, RDF_TYPE).map(iri);
+      if (types.some((t) => POLICY_TYPES.has(t))) { policySubj = s; break; }
+    }
+    if (!policySubj) {
+      for (const [s, preds] of spo) {
+        if (preds.has(ODRL+'permission') || preds.has(ODRL+'prohibition') || preds.has(ODRL+'obligation') || preds.has(OPENREL_NS+'hasPolicy')) { policySubj = s; break; }
+      }
+    }
+    if (!policySubj) return null;
+    const types = get(policySubj, RDF_TYPE).map(iri).map(compactOpenrel);
+    const titleTerm = get(policySubj, DCT+'title')[0] || get(policySubj, OPENREL_NS+'title')[0] || get(policySubj, SKOS+'prefLabel')[0];
+    const descTerm = get(policySubj, DCT+'description')[0] || get(policySubj, OPENREL_NS+'description')[0] || get(policySubj, SKOS+'definition')[0];
+    const hasPolicy = get(policySubj, OPENREL_NS+'hasPolicy').map(iri).map(compactOpenrel);
+    return {
+      iri: compactOpenrel(policySubj), fullIri: policySubj, type: types,
+      label: titleTerm ? lit(titleTerm) : '', definition: descTerm ? lit(descTerm) : '',
+      hasPolicy,
+      permissions: get(policySubj, ODRL+'permission').map((t) => buildRule(t, spo, 'Permission')),
+      prohibitions: get(policySubj, ODRL+'prohibition').map((t) => buildRule(t, spo, 'Prohibition')),
+      obligations: get(policySubj, ODRL+'obligation').map((t) => buildRule(t, spo, 'Obligation')),
+      metadata: {
+        status: get(policySubj, OPENREL_NS+'policyStatus').map((t) => t.value),
+        subjects: get(policySubj, DCT+'subject').map((t) => compactOpenrel(iri(t))),
+      },
+    };
+  }
+  function buildRule(term, spo, ruleType) {
+    const s = term.value;
+    const get = (p) => (spo.get(s)?.get(p) || []);
+    const duties = get(ODRL+'duty').map((d) => buildRule(d, spo, 'Duty'));
+    const consequences = get(ODRL+'consequence').map((d) => buildRule(d, spo, 'Duty'));
+    return {
+      iri: compactOpenrel(s), type: ruleType,
+      actions: get(ODRL+'action').map((t) => compactOpenrel(iri(t))),
+      target: get(ODRL+'target').map((t) => compactOpenrel(iri(t))),
+      assigner: get(ODRL+'assigner').map((t) => compactOpenrel(iri(t))),
+      assignee: get(ODRL+'assignee').map((t) => compactOpenrel(iri(t))),
+      constraints: get(ODRL+'constraint').map((c) => buildConstraint(c, spo)),
+      duties, consequences,
+    };
+  }
+  function buildConstraint(term, spo) {
+    const s = term.value;
+    const get = (p) => (spo.get(s)?.get(p) || []);
+    return {
+      iri: compactOpenrel(s),
+      leftOperand: get(ODRL+'leftOperand').map((t) => compactOpenrel(iri(t)))[0] || '',
+      operator: get(ODRL+'operator').map((t) => compactOpenrel(iri(t)))[0] || '',
+      rightOperand: get(ODRL+'rightOperand').map((t) => t.value)[0] || '',
+      rightOperandReference: get(ODRL+'rightOperandReference').map((t) => compactOpenrel(iri(t)))[0] || '',
+      dataType: get(ODRL+'dataType').map((t) => compactOpenrel(iri(t)))[0] || '',
+    };
+  }
+
+  /* ===================================================================
+   * odrlAdapter — parsed ODRL -> wizard card summary + preload
+   * =================================================================== */
+  const unique = (arr) => [...new Set(arr.filter(Boolean))];
+  const allActions = (rules) => (rules || []).flatMap((r) => r.actions || []);
+  function resolveLabels(iris, actions) {
+    if (!actions) return iris;
+    const byIri = new Map(actions.map((a) => [a.iri, a.label || a.iri]));
+    return iris.map((i) => byIri.get(i) || i);
+  }
+  function buildTemplateCard(parsed, vocab = {}) {
+    const typeChip = (parsed.type || []).map((t) => t.replace('openrel:','').replace('odrl:','')).find(Boolean) || 'Policy';
+    const isComposite = (parsed.hasPolicy && parsed.hasPolicy.length > 0) || parsed.type.includes('openrel:PolicyCollection');
+    const permits = unique(allActions(parsed.permissions));
+    const prohibits = unique(allActions(parsed.prohibitions));
+    const dutyActions = (parsed.permissions || []).flatMap((p) => (p.duties || []).flatMap((d) => d.actions || []));
+    const requires = unique(allActions(parsed.obligations).concat(dutyActions));
+    return {
+      id: parsed.iri, label: parsed.label || localName(parsed.iri), desc: parsed.definition || '',
+      type: typeChip, status: (parsed.metadata.status || [])[0] || '',
+      permits: resolveLabels(permits, vocab.actions), prohibits: resolveLabels(prohibits, vocab.actions),
+      requires: resolveLabels(requires, vocab.actions), tags: parsed.metadata.subjects || [],
+      isComposite, children: (parsed.hasPolicy || []).map((h) => ({ iri: h, isLocal: isLocalPolicy(h) })),
+    };
+  }
+  function buildPreload(parsed) {
+    const collectCons = (rules) => (rules || []).flatMap((r) => (r.constraints || []).map((c) => ({
+      on: (r.actions || []).join(','), left: c.leftOperand, op: c.operator,
+      right: c.rightOperand, rightRef: c.rightOperandReference, dt: c.dataType,
+    })));
+    return {
+      iri: parsed.iri,
+      ptype: (parsed.type.map((t) => t.replace('openrel:', '')).find(Boolean)) || 'Policy',
+      label: parsed.label, desc: parsed.definition,
+      perms: (parsed.permissions || []).map((p) => ({ actions: p.actions, target: p.target, assigner: p.assigner, assignee: p.assignee, constraints: p.constraints, duties: (p.duties || []).map((d) => d.actions) })),
+      prohs: (parsed.prohibitions || []).map((p) => ({ actions: p.actions, target: p.target, assigner: p.assigner, assignee: p.assignee, constraints: p.constraints })),
+      oblis: (parsed.obligations || []).map((o) => ({ actions: o.actions, target: o.target, constraints: o.constraints })),
+      cons: [...collectCons(parsed.permissions), ...collectCons(parsed.prohibitions), ...collectCons(parsed.obligations)],
+      hasPolicy: parsed.hasPolicy || [],
+      simple: { q1: null, q2: null, q3: null, q4: null, geoInc: null, geoExc: null },
+    };
+  }
+  function resolveCompositeChildren(parsed) {
+    return (parsed.hasPolicy || []).map((h) => ({ iri: h, apiId: compactOpenrel(h), isLocal: isLocalPolicy(h) }));
+  }
+
+  /* ===================================================================
+   * Standalone wizard UI
+   * =================================================================== */
+  const state = {
+    api: createApiClient(document.getElementById('baseUrl').value),
+    policies: [], parsed: new Map(), vocab: {},
+  };
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const cssEsc = (s) => String(s).replace(/:/g, '\\:');
+
+  function setApi() { state.api = createApiClient($('baseUrl').value); state.parsed.clear(); load(); }
+
+  async function load() {
+    const status = $('status'), grid = $('grid'), filters = $('filters');
+    status.className = 'empty'; status.innerHTML = '<span class="spinner"></span> Loading policies…';
+    grid.innerHTML = ''; filters.innerHTML = '';
+    try {
+      const [policies, actions, constraints, countries, parameters, scenarios] = await Promise.all([
+        state.api.listPolicies(),
+        state.api.listActions().catch(() => ({ members: [] })),
+        state.api.listConstraints().catch(() => ({ members: [] })),
+        state.api.listCountries().catch(() => ({ members: [] })),
+        state.api.listParameters().catch(() => ({ members: [] })),
+        state.api.listScenarios().catch(() => ({ members: [] })),
+      ]);
+      state.policies = policies.members || [];
+      state.vocab = { actions: actions.members || [], constraints: constraints.members || [], countries: countries.members || [], parameters: parameters.members || [], scenarios: scenarios.members || [] };
+      if (!state.policies.length) { status.className = 'empty'; status.textContent = 'No policies returned by the API.'; return; }
+      status.textContent = '';
+      filters.innerHTML = `<span class="chip">${state.policies.length} policies</span><span class="chip">vocab: ${state.vocab.actions.length} actions · ${state.vocab.constraints.length} constraints</span>`;
+      renderGrid();
+      state.policies.forEach((m) => lazyCard(m));
+    } catch (e) { status.className = 'err'; status.textContent = 'Error: ' + e.message; }
+  }
+
+  function renderGrid() {
+    const grid = $('grid');
+    grid.innerHTML = state.policies.map((m) => {
+      const label = m.label || localName(m.iri);
+      return `<div class="card" data-id="${esc(m.iri)}">
+        <div class="title">${esc(label)} <span class="skeleton" data-pending="${esc(m.iri)}"></span></div>
+        <div class="desc">${esc(m.definition || '')}</div>
+        <div class="sum" data-sum="${esc(m.iri)}"><span class="skeleton">parsing ODRL…</span></div>
+      </div>`;
+    }).join('');
+    [...grid.querySelectorAll('.card')].forEach((el) => el.addEventListener('click', () => openModal(el.dataset.id)));
+  }
+
+  async function lazyCard(m) {
+    try {
+      const parsed = await getParsed(m.iri);
+      const card = buildTemplateCard(parsed, state.vocab);
+      const pend = document.querySelector(`[data-pending="${cssEsc(m.iri)}"]`);
+      const sum = document.querySelector(`[data-sum="${cssEsc(m.iri)}"]`);
+      const title = pend?.closest('.title');
+      if (title && card.isComposite) title.insertAdjacentHTML('beforeend', `<span class="badge-comp">COMPOSITE · ${card.children.length}</span>`);
+      if (pend) pend.textContent = card.status ? '· ' + card.status : '';
+      if (sum) {
+        const tags = [
+          ...card.permits.map((l) => `<span class="tag perm">+ ${esc(l)}</span>`),
+          ...card.prohibits.map((l) => `<span class="tag proh">− ${esc(l)}</span>`),
+          ...card.requires.map((l) => `<span class="tag req">↳ ${esc(l)}</span>`),
+        ].join('');
+        sum.innerHTML = tags || '<span class="skeleton">no rules</span>';
+      }
+    } catch (e) {
+      const sum = document.querySelector(`[data-sum="${cssEsc(m.iri)}"]`);
+      if (sum) sum.innerHTML = `<span class="skeleton" style="color:var(--danger)">parse failed</span>`;
+    }
+  }
+
+  async function getParsed(id) {
+    if (state.parsed.has(id)) return state.parsed.get(id);
+    const raw = await state.api.getPolicyRaw(id);
+    const parsed = await parsePolicyTtl(raw);
+    if (parsed) state.parsed.set(id, parsed);
+    return parsed;
+  }
+
+  async function openModal(id) {
+    const overlay = $('overlay'), modal = $('modal');
+    overlay.classList.add('open');
+    modal.innerHTML = '<h2>Loading…</h2>';
+    try {
+      const parsed = await getParsed(id);
+      if (!parsed) { modal.innerHTML = `<div class="err">Could not parse policy ${esc(id)}</div>`; return; }
+      const preload = buildPreload(parsed);
+      const children = resolveCompositeChildren(parsed);
+      modal.innerHTML = `
+        <h2>${esc(parsed.label || localName(parsed.iri))}</h2>
+        <div class="iri">${esc(parsed.iri)} · ${esc(parsed.type.join(', ') || 'no type')}</div>
+        ${parsed.definition ? `<div class="desc">${esc(parsed.definition)}</div>` : ''}
+        <div class="pill-row">
+          ${parsed.metadata.status.map((s) => `<span class="tag">status: ${esc(s)}</span>`).join('')}
+          ${parsed.metadata.subjects.map((s) => `<span class="tag">${esc(s)}</span>`).join('')}
+        </div>
+        ${rulesHtml('Permissions', parsed.permissions)}
+        ${rulesHtml('Prohibitions', parsed.prohibitions)}
+        ${rulesHtml('Obligations', parsed.obligations)}
+        ${children.length ? compositeHtml(children) : ''}
+        <section class="block"><h3>Preload JSON (wizard input)</h3><pre class="json">${esc(JSON.stringify(preload, null, 2))}</pre></section>
+      `;
+      bindChildren(children);
+    } catch (e) { modal.innerHTML = `<div class="err">Error: ${esc(e.message)}</div>`; }
+  }
+
+  function rulesHtml(title, rules) {
+    if (!rules || !rules.length) return '';
+    return `<section class="block"><h3>${title} (${rules.length})</h3>${rules.map(ruleHtml).join('')}</section>`;
+  }
+  function ruleHtml(r) {
+    const duties = (r.duties || []).map(ruleHtml).join('');
+    const cons = (r.constraints || []).map(conHtml).join('');
+    const meta = [
+      r.target.length ? `<div class="row">target: <b>${esc(r.target.join(', '))}</b></div>` : '',
+      r.assigner.length ? `<div class="row">assigner: <b>${esc(r.assigner.join(', '))}</b></div>` : '',
+      r.assignee.length ? `<div class="row">assignee: <b>${esc(r.assignee.join(', '))}</b></div>` : '',
+      cons ? `<div class="row">constraints:<br>${cons}</div>` : '',
+      duties ? `<div class="row">duties:<div style="margin-top:6px">${duties}</div></div>` : '',
+    ].join('');
+    return `<div class="rule"><div class="rhead"><span class="kind ${r.type}">${r.type}</span> ${esc(r.actions.join(', ') || '—')}</div>${meta}</div>`;
+  }
+  function conHtml(c) {
+    const right = c.rightOperand || c.rightOperandReference;
+    return `<div style="margin:2px 0">· ${esc(c.leftOperand)} ${esc(c.operator)} <b>${esc(right)}</b>${c.dataType ? ' (' + esc(c.dataType) + ')' : ''}</div>`;
+  }
+  function compositeHtml(children) {
+    const rows = children.map((c, i) => `
+      <div class="child" data-child="${i}">
+        <div class="ch-head">
+          <div><b>${esc(c.iri)}</b> ${c.isLocal ? '<span class="tag perm">local · fetchable</span>' : '<span class="tag">external</span>'}</div>
+          <div>${c.isLocal ? `<button data-fetch="${i}">Load rules</button>` : ''}<a class="btn ghost" href="#" data-ext="${i}">open ↗</a></div>
+        </div>
+        <div class="ch-body" data-body="${i}"></div>
+      </div>`).join('');
+    return `<section class="block"><h3>Includes (composite · reference tree) — ${children.length}</h3>${rows}</section>`;
+  }
+  function bindChildren(children) {
+    children.forEach((c, i) => {
+      const fetchBtn = document.querySelector(`[data-fetch="${i}"]`);
+      const extLink = document.querySelector(`[data-ext="${i}"]`);
+      if (fetchBtn) fetchBtn.addEventListener('click', () => loadChild(children, i));
+      if (extLink) extLink.addEventListener('click', (e) => { e.preventDefault(); window.open(c.iri.startsWith('http') ? c.iri : '#', '_blank'); });
+    });
+  }
+  async function loadChild(children, i) {
+    const c = children[i];
+    const body = document.querySelector(`[data-body="${i}"]`);
+    const btn = document.querySelector(`[data-fetch="${i}"]`);
+    body.innerHTML = '<span class="skeleton"><span class="spinner"></span> fetching…</span>';
+    try {
+      const childParsed = await getParsed(c.apiId);
+      if (!childParsed) { body.innerHTML = '<div class="err">Not found in the policy folder.</div>'; return; }
+      body.innerHTML = `<div class="nested">${rulesHtml('Permissions', childParsed.permissions)}${rulesHtml('Prohibitions', childParsed.prohibitions)}${rulesHtml('Obligations', childParsed.obligations)}</div>`;
+      if (btn) btn.textContent = 'Reload';
+      const nested = resolveCompositeChildren(childParsed);
+      if (nested.length) bindChildren(nested);
+    } catch (e) { body.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  }
+
+  $('overlay').addEventListener('click', (e) => { if (e.target === $('overlay')) $('overlay').classList.remove('open'); });
+  $('reloadBtn').addEventListener('click', setApi);
+  $('baseUrl').addEventListener('change', setApi);
+  load();
+</script>
+</body>
+</html>
