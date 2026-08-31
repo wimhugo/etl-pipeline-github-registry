@@ -32,6 +32,10 @@ function parseTtl(text, memberIdentifier) {
     prefixes[pmatch[1].trim()] = pmatch[2];
   }
 
+  // Capture @base for folder-mode ID prefix substitution.
+  const baseMatch = text.match(/@base\s+<([^>]+)>\s*\./);
+  const baseIri = baseMatch ? baseMatch[1] : null;
+
   function resolve(term) {
     term = term.trim();
     if (term.startsWith('<') && term.endsWith('>')) return term.slice(1, -1);
@@ -45,6 +49,7 @@ function parseTtl(text, memberIdentifier) {
   }
 
   let memberIri = memberIdentifier;
+  const allSubjectsMode = !memberIdentifier;
   if (memberIdentifier && memberIdentifier.includes(':') && !memberIdentifier.startsWith('<')) {
     memberIri = resolve(memberIdentifier);
   }
@@ -56,8 +61,8 @@ function parseTtl(text, memberIdentifier) {
 
   const cleaned = text
     .replace(/#[^\n]*/g, '')
-    .replace(/@prefix[^.]+\./g, '')
-    .replace(/@base[^.]+\./g, '');
+    .replace(/@prefix[^\n]*/g, '')
+    .replace(/@base[^\n]*/g, '');
 
   const statements = [];
   let current = '';
@@ -69,7 +74,10 @@ function parseTtl(text, memberIdentifier) {
     if (!inQuotes && ch === '<') inAngles = true;
     if (!inQuotes && ch === '>') inAngles = false;
     current += ch;
-    if (ch === '.' && !inQuotes && !inAngles) {
+    // A '.' is a statement terminator only when followed by whitespace or EOF,
+    // so decimals/version strings inside CURIEs (e.g. spdx:CC0-1.0) don't split.
+    const nextCh = cleaned[i + 1];
+    if (ch === '.' && !inQuotes && !inAngles && (nextCh === undefined || /\s/.test(nextCh))) {
       statements.push(current.trim().replace(/\.$/, '').trim());
       current = '';
     }
@@ -147,6 +155,10 @@ function parseTtl(text, memberIdentifier) {
         if (predResolved === RDF_TYPE && objValue === memberIri) {
           if (!members[subject]) members[subject] = { iri: subject, label: '', definition: '', properties: [] };
         }
+        // Folder mode: every subject is a member.
+        if (allSubjectsMode && !members[subject]) {
+          members[subject] = { iri: subject, label: '', definition: '', properties: [] };
+        }
         if (members[subject]) {
           members[subject].properties.push({ predicate: predResolved, object: objRaw, is_literal: isLiteral });
           if (predResolved === SKOS_PREF_LABEL && !members[subject].label) {
@@ -161,7 +173,7 @@ function parseTtl(text, memberIdentifier) {
     }
   }
 
-  return { members: Object.values(members), memberIdentifierResolved: memberIri, prefixes };
+  return { members: Object.values(members), memberIdentifierResolved: memberIri, prefixes, baseIri };
 }
 
 // --- JSON / JSON-LD parser ---
@@ -353,6 +365,157 @@ function membersToTtl(members, memberIdentifierResolved, prefixes) {
   return lines.join('\n');
 }
 
+// --- Folder mode: list TTL files in a folder, each file is a member ---
+//
+// In folder mode, file_path points to a GitHub folder. Each .ttl file inside
+// is one member. The list view returns { iri, label, definition } where:
+//   - iri  = the file's primary subject IRI, with @base substituted by id_prefix
+//            (e.g. openrel:01-public-domain) when id_prefix is set, else the
+//            full resolved subject IRI.
+//   - label/definition = the title_field / description_field values from that
+//            subject (configurable CURIEs, defaults dct:title / dct:description).
+// The detail view (id param) returns the entire raw TTL file (format=ttl) or
+// the parsed single-subject properties (format=json, keep_properties).
+
+function resolveCurie(curie, prefixes) {
+  if (!curie) return null;
+  curie = curie.trim();
+  if (curie.startsWith('<') && curie.endsWith('>')) return curie.slice(1, -1);
+  const colonIdx = curie.indexOf(':');
+  if (colonIdx > 0) {
+    const prefix = curie.substring(0, colonIdx);
+    const local = curie.substring(colonIdx + 1);
+    if (prefixes[prefix]) return prefixes[prefix] + local;
+  }
+  return curie; // already an IRI or unknown prefix — return as-is
+}
+
+function findPrimarySubject(parsed, titleFieldIri, descriptionFieldIri) {
+  // Prefer a subject that carries the title or description field; otherwise
+  // fall back to the first subject in document order.
+  const members = parsed.members || [];
+  if (members.length === 0) return null;
+  const withField = members.find(m =>
+    (m.properties || []).some(p =>
+      p.predicate === titleFieldIri || p.predicate === descriptionFieldIri
+    )
+  );
+  return withField || members[0];
+}
+
+function applyIdPrefix(subjectIri, idPrefix, prefixes, baseIri) {
+  if (!idPrefix) return subjectIri;
+  // Replace the resolved @base portion with the configured prefix.
+  // idPrefix is a CURIE-style string like 'openrel:'.
+  if (baseIri && subjectIri.startsWith(baseIri)) {
+    return idPrefix + subjectIri.substring(baseIri.length);
+  }
+  return subjectIri;
+}
+
+async function listFolderFiles(base44, config, folderPath) {
+  const creds = await resolveGithubCredentials(base44, {
+    repo: config?.github_repo,
+    branch: config?.github_branch,
+  });
+  const token = creds.token;
+  const githubRepo = creds.githubRepo;
+  const branch = creds.branch;
+
+  const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${folderPath}?ref=${branch}&_=${Date.now()}`;
+  const resp = await fetch(apiUrl, {
+    headers: {
+      Authorization: `token ${token}`,
+      Accept: 'application/vnd.github.v3+json',
+      'User-Agent': 'OpenREL-App',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    }
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`GitHub ${resp.status}: ${errText.substring(0, 200)}`);
+  }
+  const listing = await resp.json();
+  if (!Array.isArray(listing)) return { files: [], token, githubRepo, branch };
+  // Only top-level .ttl files (folder mode does not recurse).
+  const files = listing
+    .filter(item => item.type === 'file' && item.name.endsWith('.ttl'))
+    .map(item => item.path);
+  return { files, token, githubRepo, branch };
+}
+
+async function fetchFolderMembers(base44, config, sourceFile) {
+  const folderPath = sourceFile.file_path;
+  const { files, token, githubRepo, branch } = await listFolderFiles(base44, config, folderPath);
+
+  const titleField = sourceFile.title_field || 'dct:title';
+  const descriptionField = sourceFile.description_field || 'dct:description';
+  const idPrefix = sourceFile.id_prefix || '';
+
+  const members = [];
+  const fileById = {}; // id -> { rawContent, parsed, subject }
+
+  for (const filePath of files) {
+    const rawUrl = `https://api.github.com/repos/${githubRepo}/contents/${filePath}?ref=${branch}&_=${Date.now()}`;
+    const resp = await fetch(rawUrl, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3.raw',
+        'User-Agent': 'OpenREL-App',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      }
+    });
+    if (!resp.ok) continue;
+    const rawContent = await resp.text();
+
+    // null memberIdentifier → all-subjects mode (every subject becomes a member)
+    const parsed = parseTtl(rawContent, null);
+    const prefixes = parsed.prefixes || {};
+
+    // Resolve title/description field CURIEs to full IRIs using this file's prefixes.
+    const titleFieldIri = resolveCurie(titleField, prefixes) || titleField;
+    const descriptionFieldIri = resolveCurie(descriptionField, prefixes) || descriptionField;
+
+    const subject = findPrimarySubject(parsed, titleFieldIri, descriptionFieldIri);
+    if (!subject) continue;
+
+    const subjectIri = subject.iri;
+    const baseIri = parsed.baseIri || null;
+
+    let id;
+    if (idPrefix) {
+      // If subject is relative (no scheme), prefix directly.
+      if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(subjectIri) && !subjectIri.startsWith(idPrefix)) {
+        id = applyIdPrefix(subjectIri, idPrefix, prefixes, baseIri);
+      } else {
+        // Relative subject — just prepend the prefix.
+        id = idPrefix + subjectIri;
+      }
+    } else {
+      // No prefix configured — return the full subject IRI (resolved against @base if relative).
+      id = baseIri && !subjectIri.startsWith('http') && !subjectIri.startsWith('urn')
+        ? baseIri + subjectIri
+        : subjectIri;
+    }
+
+    const label = (subject.properties || []).find(p => p.predicate === titleFieldIri)?.object || subject.label || '';
+    // Labels come back as quoted literals — strip surrounding quotes if present.
+    const cleanLabel = String(label).replace(/^"|"$/g, '').replace(/^"|"$/g, '');
+    const desc = (subject.properties || []).find(p => p.predicate === descriptionFieldIri)?.object || subject.definition || '';
+    const cleanDesc = String(desc).replace(/^"|"$/g, '').replace(/^"|"$/g, '');
+
+    members.push({
+      iri: id,
+      label: cleanLabel,
+      definition: cleanDesc,
+    });
+
+    fileById[id] = { rawContent, parsed, subject, filePath };
+  }
+
+  return { members, fileById, prefixes: {} };
+}
+
 // --- Dynamic Mappings composer ---
 // When the Mappings section is requested, content is composed dynamically
 // from all active, non-system source files — not read from mappings.ttl.
@@ -474,6 +637,76 @@ Deno.serve(async (req) => {
 
     if (!sourceFile.is_active) {
       return Response.json({ error: `Source file for section "${section}" is inactive` }, { status: 410 });
+    }
+
+    // ---- Folder mode: each TTL file in the folder is a member ----
+    if (sourceFile.source_mode === 'folder') {
+      const { members, fileById } = await fetchFolderMembers(base44, { github_repo: repo, github_branch: branch }, sourceFile);
+
+      let appliedId = null;
+      let appliedPrefix = null;
+      let detailMembers = members;
+
+      if (id) {
+        detailMembers = members.filter(m => m.iri === id);
+        appliedId = id;
+      }
+      if (prefix) {
+        detailMembers = detailMembers.filter(m => String(m.iri).startsWith(prefix));
+        appliedPrefix = prefix;
+      }
+
+      const meta = {
+        section: sourceFile.section,
+        file_path: sourceFile.file_path,
+        source_mode: 'folder',
+        member_count: detailMembers.length,
+        requested_id: appliedId,
+        applied_prefix: appliedPrefix,
+      };
+
+      // Detail view: return the entire raw file.
+      if (id) {
+        const matched = detailMembers[0];
+        const fileEntry = matched ? fileById[matched.iri] : null;
+
+        if (!fileEntry) {
+          return Response.json({ ...meta, status: 'not_found', members: [] }, { status: 404 });
+        }
+
+        if (format === 'ttl') {
+          return Response.json({
+            _content_type: 'text/turtle',
+            _raw_body: fileEntry.rawContent,
+            _meta: meta,
+          });
+        }
+        // format=json: return parsed single-subject properties (keep_properties path)
+        const subj = fileEntry.subject;
+        return Response.json({
+          status: 'success',
+          ...meta,
+          members: [{
+            iri: matched.iri,
+            label: matched.label,
+            definition: matched.definition,
+            properties: subj.properties || [],
+          }],
+          prefixes: fileEntry.parsed.prefixes || {},
+          raw_content: include_raw ? fileEntry.rawContent : undefined,
+        });
+      }
+
+      // List view
+      if (format === 'ttl') {
+        const ttlContent = membersToTtl(detailMembers, null, {});
+        return Response.json({
+          _content_type: 'text/turtle',
+          _raw_body: ttlContent,
+          _meta: meta,
+        });
+      }
+      return Response.json({ status: 'success', ...meta, members: detailMembers });
     }
 
     const { file_path, data_format = 'ttl', member_identifier = 'skos:Concept' } = sourceFile;

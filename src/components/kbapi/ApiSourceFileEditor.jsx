@@ -14,7 +14,7 @@ export default function ApiSourceFileEditor({ open, onClose, onSave, sourceFile 
   useEffect(() => {
     setForm(sourceFile
       ? { ...sourceFile }
-      : { data_format: 'ttl', is_active: true, sort_order: 0, member_identifier: 'skos:Concept' });
+      : { source_mode: 'file', data_format: 'ttl', is_active: true, sort_order: 0, member_identifier: 'skos:Concept', title_field: 'dct:title', description_field: 'dct:description' });
   }, [sourceFile, open]);
 
   const handleSave = () => {
@@ -50,26 +50,85 @@ export default function ApiSourceFileEditor({ open, onClose, onSave, sourceFile 
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">GitHub File Path</Label>
+            <Label className="text-xs text-muted-foreground">Source Mode</Label>
+            <Select
+              value={form.source_mode || 'file'}
+              onValueChange={(val) => setForm(f => ({ ...f, source_mode: val }))}
+            >
+              <SelectTrigger className="bg-muted/50 text-sm font-mono">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="file">file — parse members in a single file</SelectItem>
+                <SelectItem value="folder">folder — each TTL file is a member</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {form.source_mode === 'folder'
+                ? 'Lists all .ttl files in the folder; each file becomes one member listed by ID, title, and description.'
+                : 'Parses a single source file and extracts all members matching the identifier below.'}
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">
+              {form.source_mode === 'folder' ? 'GitHub Folder Path' : 'GitHub File Path'}
+            </Label>
             <Input
               className="bg-muted/50 text-sm font-mono"
-              placeholder=".openrel/vocabs/openrel/actions.ttl"
+              placeholder={form.source_mode === 'folder' ? 'data/policy' : '.openrel/vocabs/openrel/actions.ttl'}
               value={form.file_path || ''}
               onChange={e => setForm(f => ({ ...f, file_path: e.target.value }))}
             />
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Member Instance Identifier</Label>
-            <Input
-              className="bg-muted/50 text-sm font-mono"
-              placeholder="skos:Concept"
-              value={form.member_identifier || ''}
-              onChange={e => setForm(f => ({ ...f, member_identifier: e.target.value }))}
-            />
-            <p className="text-xs text-muted-foreground">
-              How members are recognized in the file — 'skos:Concept' for concept schemes, or a class IRI for instance lists.
-            </p>
-          </div>
+          {form.source_mode === 'folder' ? (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">ID Prefix (optional)</Label>
+                <Input
+                  className="bg-muted/50 text-sm font-mono"
+                  placeholder="openrel:"
+                  value={form.id_prefix || ''}
+                  onChange={e => setForm(f => ({ ...f, id_prefix: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  When set, the list/detail ID replaces the resolved @base with this prefix (e.g. openrel:01-public-domain). Leave empty to use the full subject IRI.
+                </p>
+              </div>
+              <div className="flex gap-4">
+                <div className="space-y-1.5 flex-1">
+                  <Label className="text-xs text-muted-foreground">Title Field</Label>
+                  <Input
+                    className="bg-muted/50 text-sm font-mono"
+                    placeholder="dct:title"
+                    value={form.title_field || 'dct:title'}
+                    onChange={e => setForm(f => ({ ...f, title_field: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5 flex-1">
+                  <Label className="text-xs text-muted-foreground">Description Field</Label>
+                  <Input
+                    className="bg-muted/50 text-sm font-mono"
+                    placeholder="dct:description"
+                    value={form.description_field || 'dct:description'}
+                    onChange={e => setForm(f => ({ ...f, description_field: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Member Instance Identifier</Label>
+              <Input
+                className="bg-muted/50 text-sm font-mono"
+                placeholder="skos:Concept"
+                value={form.member_identifier || ''}
+                onChange={e => setForm(f => ({ ...f, member_identifier: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                How members are recognized in the file — 'skos:Concept' for concept schemes, or a class IRI for instance lists.
+              </p>
+            </div>
+          )}
           <div className="flex gap-4">
             <div className="space-y-1.5 flex-1">
               <Label className="text-xs text-muted-foreground">Data Format</Label>

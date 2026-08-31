@@ -10,9 +10,18 @@
       "type": "string",
       "description": "Optional description of this API section"
     },
+    "source_mode": {
+      "type": "string",
+      "enum": [
+        "file",
+        "folder"
+      ],
+      "default": "file",
+      "description": "file = parse members from a single source file; folder = each TTL file in the folder is a member"
+    },
     "file_path": {
       "type": "string",
-      "description": "GitHub file path to the source file (e.g. .openrel/vocabs/openrel/actions.ttl)"
+      "description": "GitHub path to the source file (file mode) OR the folder containing per-member TTL files (folder mode)"
     },
     "data_format": {
       "type": "string",
@@ -23,12 +32,26 @@
         "yaml"
       ],
       "default": "ttl",
-      "description": "Format of the source file"
+      "description": "Format of the source file (file mode)"
     },
     "member_identifier": {
       "type": "string",
       "default": "skos:Concept",
-      "description": "Identifier used to recognize members/instances in the source file (e.g. 'skos:Concept' for concept schemes, or a class IRI for instance lists)"
+      "description": "Identifier used to recognize members/instances in the source file (file mode only)"
+    },
+    "id_prefix": {
+      "type": "string",
+      "description": "Folder mode: when set, the list/detail ID replaces the resolved @base with this prefix (e.g. 'openrel:'). When empty, the full resolved subject IRI is used."
+    },
+    "title_field": {
+      "type": "string",
+      "default": "dct:title",
+      "description": "Folder mode: property used as the list label (CURIE or full IRI). Defaults to dct:title."
+    },
+    "description_field": {
+      "type": "string",
+      "default": "dct:description",
+      "description": "Folder mode: property used as the list definition (CURIE or full IRI). Defaults to dct:description."
     },
     "is_system": {
       "type": "boolean",
