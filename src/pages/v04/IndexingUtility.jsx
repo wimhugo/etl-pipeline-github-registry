@@ -93,9 +93,10 @@ export default function IndexingUtility() {
         </h1>
         <p className="text-sm text-muted-foreground mt-1.5 max-w-2xl">
           Re-index the curated Policy Index with auto-derived metadata — legal-code links, citation metadata,
-          publication info, and the parameters (by prefLabel) that apply to each policy — extracted from the
-          canonical policy TTL files. Human-curated fields are preserved; only the auto-derived objects are
-          written back via a pull request.
+          publication info, the parameters (by prefLabel) that apply to each policy, and the named constraints
+          (by human-readable label, resolved locally or via constraints.ttl) — extracted from the canonical
+          policy TTL files. Human-curated fields are preserved; only the auto-derived objects are written back
+          via a pull request.
         </p>
       </div>
 

@@ -163,6 +163,22 @@ export default async function indexPolicies(req: Request): Promise<Response> {
       console.warn('indexPolicies: could not load parameters scheme:', e?.message || e);
     }
 
+    // 4.6. Constraints concept scheme (constraints.ttl) via the API — map each
+    // shared named constraint IRI to its human-readable label.
+    const sharedConstraintLabel = new Map<string, string>();
+    try {
+      const cRes = await base44.asServiceRole.functions.invoke('fetchApiSourceContent', { section: 'Constraints' });
+      const cData = (cRes as any)?.data ?? cRes;
+      for (const m of cData?.members || []) {
+        if (!m.iri || !m.label) continue;
+        sharedConstraintLabel.set(m.iri, m.label);
+        const c = compactForIndex(m.iri);
+        if (c !== m.iri) sharedConstraintLabel.set(c, m.label);
+      }
+    } catch (e: any) {
+      console.warn('indexPolicies: could not load constraints scheme:', e?.message || e);
+    }
+
     // 5. Determine target index entries.
     const targets = requestedIris.length
       ? policies.filter((p) => requestedIris.includes(p.iri))
@@ -200,17 +216,27 @@ export default async function indexPolicies(req: Request): Promise<Response> {
           .map((pi: string) => paramPrefLabel.get(pi) || paramPrefLabel.get(compactForIndex(pi)))
           .filter(Boolean) as string[]
       )].sort();
+      const constraintLabels = [...new Set(
+        (md.constraint_iris || [])
+          .map((ci: string) => {
+            const c = compactForIndex(ci);
+            return md.local_constraint_labels?.[c] || sharedConstraintLabel.get(c);
+          })
+          .filter(Boolean) as string[]
+      )].sort();
       const newDerived = {
         legal_code: md.legal_code,
         citation: md.citation,
         publication: md.publication,
         parameters: paramLabels,
+        constraints: constraintLabels,
       };
       const oldDerived = {
         legal_code: entry.legal_code,
         citation: entry.citation,
         publication: entry.publication,
         parameters: entry.parameters,
+        constraints: entry.constraints,
       };
       const added: LeafDiff[] = [];
       const changed: LeafDiff[] = [];
@@ -228,6 +254,20 @@ export default async function indexPolicies(req: Request): Promise<Response> {
             field: 'parameters',
             before: wasEmpty ? null : oldP,
             after: newP,
+            status: wasEmpty ? 'added' : 'changed',
+          });
+        }
+      }
+      // constraints is a flat named-constraint label array: diff whole-array.
+      {
+        const oldC = oldDerived.constraints || [];
+        const newC = newDerived.constraints;
+        if (JSON.stringify(oldC) !== JSON.stringify(newC)) {
+          const wasEmpty = !oldC || (Array.isArray(oldC) && oldC.length === 0);
+          (wasEmpty ? added : changed).push({
+            field: 'constraints',
+            before: wasEmpty ? null : oldC,
+            after: newC,
             status: wasEmpty ? 'added' : 'changed',
           });
         }

@@ -43,6 +43,12 @@ export interface PolicyMetadata {
   // (full scan of the TTL, including the rules block the flat extractor skips).
   // Resolved to prefLabels by the indexer via the parameters concept scheme.
   parameter_iris: string[];
+  // Named constraint IRIs referenced in the policy's rules (odrl:constraint
+  // <iri>, and @id <iri> inside NamedConstraint-typed duty blocks). Resolved
+  // to human-readable labels by the indexer.
+  constraint_iris: string[];
+  // Locally-defined NamedConstraints in this file: compacted-IRI → label.
+  local_constraint_labels: Record<string, string>;
   legal_code: {
     legal_code: string | null;
     policy_text_html: string | null;
@@ -269,6 +275,42 @@ export function extractPolicyMetadata(ttl: string): PolicyMetadata | null {
   }
   const parameter_iris = [...paramSet];
 
+  // Named constraints referenced in the policy's rules. Constraints live
+  // inside the rules block the flat extractor skips, so we full-scan the
+  // normalized TTL for IRI/CURIE references after `odrl:constraint` (skip
+  // inline blank-node `[ ... ]` constraints) and after `@id` (the
+  // NamedConstraint-as-duty pattern). Literal/blank tokens are skipped.
+  const conSet = new Set<string>();
+  const refRe = (pred: string) => new RegExp(pred + '\\s+("[^"]*"|\\[|<[^>]+>|\\S+)', 'g');
+  for (const pred of ['odrl:constraint', '@id']) {
+    const re = refRe(pred);
+    let rm: RegExpExecArray | null;
+    while ((rm = re.exec(normalized)) !== null) {
+      let tok = rm[1];
+      if (tok === '[' || tok.startsWith('"')) continue;
+      tok = tok.replace(/[;,\]\s]+$/, '').trim();
+      if (tok.startsWith('<') && tok.endsWith('>')) tok = tok.slice(1, -1);
+      conSet.add(resolveTerm(tok));
+    }
+  }
+  const constraint_iris = [...conSet];
+
+  // Locally-defined NamedConstraints in this file: <subject> a openrel:NamedConstraint ;
+  // rdfs:label "..." . Keyed by compacted IRI so the indexer matches references.
+  const local_constraint_labels: Record<string, string> = {};
+  const ncRe = /(<[^>]+>|\S+:\S+)\s+a\s+openrel:NamedConstraint\b/g;
+  let nm: RegExpExecArray | null;
+  while ((nm = ncRe.exec(normalized)) !== null) {
+    const subjTok = nm[1];
+    const full = resolveTerm(
+      subjTok.startsWith('<') && subjTok.endsWith('>') ? subjTok.slice(1, -1) : subjTok
+    );
+    const c = compactForIndex(full);
+    const after = normalized.slice(nm.index + nm[0].length, nm.index + nm[0].length + 600);
+    const lbl = after.match(/(?:rdfs:label|skos:prefLabel|dct:title)\s+"((?:[^"\\]|\\.)*)"/);
+    if (lbl) local_constraint_labels[c] = lbl[1].replace(/\\"/g, '"');
+  }
+
   const legal_code = {
     legal_code: getLiteral(OPENREL + 'legalCode') || getLiteral(OPENREL + 'legalcode'),
     policy_text_html: getLiteral(OPENREL + 'policyTextHtml'),
@@ -300,6 +342,8 @@ export function extractPolicyMetadata(ttl: string): PolicyMetadata | null {
     subject_iri: subjectIri,
     subject_curie: compactForIndex(subjectIri),
     parameter_iris,
+    constraint_iris,
+    local_constraint_labels,
     legal_code, citation, publication,
   };
 }
