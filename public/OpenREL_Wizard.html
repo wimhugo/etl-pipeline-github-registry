@@ -87,7 +87,7 @@
 
   /* Facet sidebar */
   .layout { display:flex; gap:18px; align-items:flex-start; }
-  .facets { width:230px; flex:0 0 230px; position:sticky; top:84px; display:flex; flex-direction:column; gap:12px; }
+  .facets { width:230px; flex:0 0 230px; position:sticky; top:84px; max-height:calc(100vh - 96px); overflow-y:auto; display:flex; flex-direction:column; gap:12px; }
   .facet { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
   .facet > summary { list-style:none; cursor:pointer; padding:10px 12px; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); display:flex; justify-content:space-between; align-items:center; }
   .facet > summary::-webkit-details-marker { display:none; }

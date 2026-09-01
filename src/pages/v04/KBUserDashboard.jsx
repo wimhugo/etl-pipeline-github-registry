@@ -8,7 +8,7 @@ import React from 'react';
 
 export default function KBUserDashboard() {
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col h-[calc(100vh-7rem)] gap-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Sample Application</h1>
