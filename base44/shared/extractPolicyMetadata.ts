@@ -194,14 +194,19 @@ export function extractPolicyMetadata(ttl: string): PolicyMetadata | null {
       depth = Math.max(0, depth - 1);
     }
     if (depth === 0) {
-      if (ch === ';') {
-        flushSegment(buf.replace(/;$/, '').trim());
-        buf = '';
-      } else if (ch === '.') {
+    if (ch === ';') {
+      flushSegment(buf.replace(/;$/, '').trim());
+      buf = '';
+    } else if (ch === '.') {
+      // A '.' is a statement terminator only when followed by whitespace or
+      // EOF, so decimals inside CURIEs (spdx:CC0-1.0) don't end the segment.
+      const nextCh = rest[i + 1];
+      if (nextCh === undefined || /\s/.test(nextCh)) {
         flushSegment(buf.replace(/\.$/, '').trim());
         stopped = true;
         break;
       }
+    }
     }
   }
   if (!stopped && buf.trim()) flushSegment(buf.trim());

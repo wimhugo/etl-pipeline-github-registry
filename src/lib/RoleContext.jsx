@@ -23,6 +23,7 @@ export const KB_MANAGER_FEATURES_DEFAULT = [
   { label: 'Populate Sub-Objects', path: '/populate-subobjects',access: { Administrator: true, Curator: true,  Contributor: false, 'End User': false } },
   { label: 'Provenance Viewer',    path: '/provenance',         access: { Administrator: true, Curator: true,  Contributor: true,  'End User': true  } },
   { label: 'Checklist Manager',    path: '/checklist-manager',  access: { Administrator: true, Curator: true,  Contributor: false, 'End User': false } },
+  { label: 'Indexing Utility',     path: '/indexing-utility',   access: { Administrator: true, Curator: true,  Contributor: false, 'End User': false } },
   { label: 'Settings',             path: '/config',             access: { Administrator: true, Curator: false, Contributor: false, 'End User': false } },
 ];
 

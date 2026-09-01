@@ -57,16 +57,19 @@ function diffDerived(oldObj: unknown, newObj: unknown): LeafDiff[] {
   const newFlat: Record<string, unknown> = {};
   flatten(oldObj ?? {}, '', oldFlat);
   flatten(newObj, '', newFlat);
+  const isEmpty = (v: unknown) =>
+    v === null || v === undefined || v === '' ||
+    (Array.isArray(v) && v.length === 0);
   const diffs: LeafDiff[] = [];
   const keys = new Set([...Object.keys(oldFlat), ...Object.keys(newFlat)]);
   for (const k of [...keys].sort()) {
     const ov = oldFlat[k];
     const nv = newFlat[k];
-    const same = JSON.stringify(ov) === JSON.stringify(nv);
-    if (same) continue;
-    if (ov === undefined || ov === null || ov === '' ||
-        (Array.isArray(ov) && ov.length === 0)) {
-      diffs.push({ field: k, before: ov ?? null, after: nv, status: 'added' });
+    if (JSON.stringify(ov) === JSON.stringify(nv)) continue;
+    // Skip noise: a null/empty leaf becoming null/empty is not a real change.
+    if (isEmpty(ov) && isEmpty(nv)) continue;
+    if (isEmpty(ov)) {
+      diffs.push({ field: k, before: null, after: nv, status: 'added' });
     } else {
       diffs.push({ field: k, before: ov, after: nv, status: 'changed' });
     }

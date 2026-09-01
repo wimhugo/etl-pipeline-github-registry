@@ -32,6 +32,7 @@ import ProvenanceViewer from './pages/ProvenanceViewer';
 import VocabularyManager from './pages/VocabularyManager';
 import ChecklistManager from './pages/ChecklistManager';
 import FacetConfigEditor from './pages/FacetConfigEditor';
+import IndexingUtility from './pages/IndexingUtility';
 
 // KB User pages
 import KBUserDashboard from './pages/kbuser/KBUserDashboard';
@@ -101,6 +102,7 @@ const AuthenticatedApp = () => {
         <Route path="/vocabulary-manager" element={<VocabularyManager />} />
         <Route path="/checklist-manager" element={<ChecklistManager />} />
         <Route path="/facet-config" element={<FacetConfigEditor />} />
+        <Route path="/indexing-utility" element={<IndexingUtility />} />
 
         {/* KB User */}
         <Route path="/kb-user/dashboard" element={<KBUserDashboard />} />

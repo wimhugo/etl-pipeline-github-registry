@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useRole } from '@/lib/RoleContext';
 import { useProject } from '@/lib/ProjectContext';
-import { Menu, X, ChevronRight, ChevronLeft, LayoutDashboard, FolderOpen, Database, GitBranch, CheckSquare, FileText, Layers, RefreshCw, BookOpen, PenTool, Link2, FileEdit, Box, Eye, Settings2, Search, Pencil, Shuffle, BookMarked, Sliders, SlidersHorizontal, Workflow, BookKey, KeyRound, Code2, FileJson } from 'lucide-react';
+import { Menu, X, ChevronRight, ChevronLeft, LayoutDashboard, FolderOpen, Database, GitBranch, CheckSquare, FileText, Layers, RefreshCw, BookOpen, PenTool, Link2, FileEdit, Box, Eye, Settings2, Search, Pencil, Shuffle, BookMarked, Sliders, SlidersHorizontal, Workflow, BookKey, KeyRound, Code2, FileJson, DatabaseZap } from 'lucide-react';
 
 const ICON_MAP = {
   'Dashboard':            LayoutDashboard,
@@ -22,6 +22,7 @@ const ICON_MAP = {
   'Populate Sub-Objects': Box,
   'Provenance Viewer':    Eye,
   'Checklist Manager':    CheckSquare,
+  'Indexing Utility':     DatabaseZap,
   'Settings':             Settings2,
   'Search':               Search,
   'Annotate':             Pencil,
