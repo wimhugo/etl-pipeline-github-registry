@@ -161,10 +161,21 @@
   const lit = (t) => (t ? t.value : '');
 
   function parsePolicyTtl(ttlText) {
+    // Normalize: several canonical policy TTLs ship an @prefix line without
+    // its terminating '.' (the dalicclib line). N3 is strict and aborts on the
+    // next line, so append '.' to any @prefix/@base declaration that ends with
+    // an IRI but no terminator.
+    const normalized = ttlText.split('\n').map((line) => {
+      const t = line.trim();
+      if (/^@(prefix|base)\s+\S+\s+<[^>]*>\s*$/.test(t) && !t.endsWith('.')) {
+        return line.replace(/\s*$/, '') + ' .';
+      }
+      return line;
+    }).join('\n');
     return new Promise((resolve, reject) => {
       const quads = [];
       const parser = new N3.Parser();
-      parser.parse(ttlText, (err, quad) => {
+      parser.parse(normalized, (err, quad) => {
         if (err) return reject(err);
         if (quad) { quads.push(quad); return; }
         try { resolve(buildPolicy(quads)); } catch (e) { reject(e); }
