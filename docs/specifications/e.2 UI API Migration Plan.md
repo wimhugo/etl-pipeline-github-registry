@@ -93,6 +93,32 @@ The Advanced Wizard routes each action to the permission / prohibition / obligat
 
 ~14 actions × 1–3 category literals + 1 default-duty literal.
 
+#### 5.1.1 Extracted mock-up values (`OpenREL_Wizard_mock.html`)
+
+The table below is the exact source-of-truth to be written into `actions.ttl` as `openrel:actionCategory` (one literal per category) and `openrel:defaultDuty` (single literal where present). A `—` means no default duty is defined for that action.
+
+| Action | Category | Default Duty |
+|---|---|---|
+| Use (`odrl:use`) | perm, proh, obli | — |
+| Read (`odrl:read`) | perm, proh | — |
+| Distribute (`odrl:distribute`) | perm, proh, obli | — |
+| Modify (`odrl:modify`) | perm, proh | — |
+| Reproduce (`odrl:reproduce`) | perm, proh | — |
+| Archive (`odrl:archive`) | perm, proh, obli | — |
+| Delete (`odrl:delete`) | perm, proh, obli | — |
+| Notify (`openrel:notify`) | perm, obli | — |
+| Log (`openrel:log`) | perm, obli | — |
+| Attribute (`odrl:attribute`) | perm, obli | postDuty |
+| Obtain Consent (`openrel:obtainConsent`) | obli | preDuty |
+| Anonymize (`openrel:anonymize`) | perm, obli | — |
+| Encrypt (`openrel:encrypt`) | perm, obli | preDuty |
+| Apply License (`openrel:applyLicense`) | perm, obli | — |
+
+Notes:
+- Category literals map to the Advanced Wizard grid placement: `perm` → Permissions, `proh` → Prohibitions, `obli` → Obligations.
+- Only 3 of 14 actions carry a `defaultDuty` (`postDuty` / `preDuty`); the adapter falls back to `"postDuty"` when absent (§6.2).
+- IRIs use the mock's `odrl:`/`openrel:` prefixes as written; align with the canonical `actions.ttl` subject IRIs before generating the TTL literals.
+
 ### 5.2 Policies (`data/policy/*.ttl`) — browser card + simple-mode preload
 
 #### 5.2.1 Browser card fields
