@@ -170,6 +170,15 @@
       if (/^@(prefix|base)\s+\S+\s+<[^>]*>\s*$/.test(t) && !t.endsWith('.')) {
         return line.replace(/\s*$/, '') + ' .';
       }
+      // Escape unescaped double-quotes inside a single-line string literal.
+      // Canonical legal-text literals ship (the "Waiver") unescaped; N3 would
+      // terminate the string early. Only touch single-literal lines with no
+      // ';' in the captured value (avoids mis-handling multi-statement lines).
+      const m = line.match(/^(\s*\S+\s+)"(.*)"(@\w+|\^\^[^ ]+)?\s*([;.]?)\s*$/);
+      if (m && !m[2].includes(';') && /(?<!\\)"/.test(m[2])) {
+        const escapedInner = m[2].replace(/(?<!\\)"/g, '\\"');
+        return `${m[1]}"${escapedInner}"${m[3] || ''}${m[4] || ''}`;
+      }
       return line;
     }).join('\n');
     return new Promise((resolve, reject) => {
