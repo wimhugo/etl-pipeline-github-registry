@@ -6,6 +6,7 @@ import {
   CURATED_FIELDS,
   DERIVED_FIELDS,
 } from '../../shared/extractPolicyMetadata.ts';
+import { submitGithubPR } from '../../shared/submitGithubPR.ts';
 
 /**
  * IndexPolicies
@@ -301,21 +302,31 @@ export default async function indexPolicies(req: Request): Promise<Response> {
       });
     }
 
-    // 7. Apply: write updated index back via submitPolicyPR (branch + PR).
+    // 7. Apply: write updated index back directly via the shared GitHub PR
+    //    helper (branch + commit + PR). We use the creds already resolved
+    //    above rather than a function-to-function service-role invoke, which
+    //    is unreliable for the write path.
     const updatedIndex = {
       ...index,
       generated_at: new Date().toISOString(),
       policies: mergedPolicies,
     };
     const serialized = JSON.stringify(updatedIndex, null, 2);
-    const prRes = await base44.asServiceRole.functions.invoke('submitPolicyPR', {
-      file_path: INDEX_FILE,
-      file_content: serialized,
-      message,
-    });
-    const prData = (prRes as any)?.data ?? prRes;
-    if (prData?.error) {
-      return Response.json({ error: `submitPolicyPR failed: ${prData.error}` }, { status: 500 });
+
+    let prResult: { pr_url: string; pr_number: number; branch: string };
+    try {
+      prResult = await submitGithubPR({
+        token,
+        repo,
+        branch,
+        filePath: INDEX_FILE,
+        content: serialized,
+        message,
+        prTitle: 'Re-index policy index metadata',
+        branchPrefix: 'reindex-policy-index',
+      });
+    } catch (e: any) {
+      return Response.json({ error: `submitGithubPR failed: ${e?.message || String(e)}` }, { status: 500 });
     }
 
     return Response.json({
@@ -326,8 +337,9 @@ export default async function indexPolicies(req: Request): Promise<Response> {
       not_found_count: notFoundCount,
       parse_errors: parseErrors,
       changes,
-      pr_url: prData?.pr_url || null,
-      pr_number: prData?.pr_number || null,
+      pr_url: prResult.pr_url,
+      pr_number: prResult.pr_number,
+      branch: prResult.branch,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
