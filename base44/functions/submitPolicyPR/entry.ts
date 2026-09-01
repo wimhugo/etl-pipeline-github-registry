@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { resolveGithubCredentials } from '../../shared/resolveGithubCredentials.ts';
 
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -6,14 +7,11 @@ Deno.serve(async (req) => {
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { file_path, file_content, message, repo, branch } = await req.json();
-  const token = Deno.env.get('GITHUB_TOKEN');
-  if (!token) return Response.json({ error: 'GITHUB_TOKEN not set' }, { status: 500 });
-
-  // Use global config for repo/branch if not provided
-  const globalConfigs = await base44.entities.GlobalConfig.list();
-  const globalConfig = globalConfigs[0];
-  let targetRepo = repo || globalConfig?.github_repo;
-  const targetBranch = branch || globalConfig?.github_branch || 'main';
+  const creds = await resolveGithubCredentials(base44, { repo, branch });
+  const token = creds.token;
+  if (!token) return Response.json({ error: 'No GitHub token configured' }, { status: 500 });
+  let targetRepo = creds.githubRepo;
+  const targetBranch = creds.branch;
 
   // Clean repo value if it's a full URL
   if (targetRepo?.includes('github.com')) {
@@ -57,7 +55,7 @@ Deno.serve(async (req) => {
   const apiBase = `https://api.github.com/repos/${targetRepo}/contents/${encodedFilePath}`;
   console.log('Fetching file from:', apiBase);
   const fileRes = await fetch(`${apiBase}?ref=${targetBranch}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'OpenREL-App' },
   });
   
   console.log('File fetch status:', fileRes.status);
@@ -84,7 +82,7 @@ Deno.serve(async (req) => {
   // 3. Create a new branch for the PR
   console.log('Getting branch ref for:', targetBranch);
   const refRes = await fetch(`https://api.github.com/repos/${targetRepo}/git/ref/heads/${targetBranch}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'OpenREL-App' },
   });
   console.log('Branch ref status:', refRes.status);
   if (!refRes.ok) {
@@ -103,7 +101,7 @@ Deno.serve(async (req) => {
   console.log('Creating branch:', prBranch);
   const branchRes = await fetch(`https://api.github.com/repos/${targetRepo}/git/refs`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'User-Agent': 'OpenREL-App' },
     body: JSON.stringify({ ref: `refs/heads/${prBranch}`, sha: baseSha }),
   });
   console.log('Branch creation status:', branchRes.status);
@@ -117,7 +115,7 @@ Deno.serve(async (req) => {
   console.log('Committing file to branch:', prBranch);
   const commitRes = await fetch(`https://api.github.com/repos/${targetRepo}/contents/${cleanFilePath}`, {
     method: 'PUT',
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'User-Agent': 'OpenREL-App' },
     body: JSON.stringify({
       message: message || `Update ${cleanFilePath}`,
       content: updatedContent,
@@ -136,7 +134,7 @@ Deno.serve(async (req) => {
   console.log('Creating PR from', prBranch, 'to', targetBranch);
   const prRes = await fetch(`https://api.github.com/repos/${targetRepo}/pulls`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'User-Agent': 'OpenREL-App' },
     body: JSON.stringify({
       title: `[Update] ${cleanFilePath}`,
       body: `Submitting update to "${cleanFilePath}" for review.\n\nChanges: ${message || 'Content update'}`,
