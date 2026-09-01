@@ -39,6 +39,11 @@
   .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; cursor: pointer; transition: border-color .15s, transform .1s; display: flex; flex-direction: column; gap: 8px; min-height: 168px; }
   .card:hover { border-color: var(--primary); transform: translateY(-1px); }
   .card .title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .card-head { display:flex; gap:12px; align-items:flex-start; }
+  .icon-box { width:40px; height:40px; flex:0 0 40px; border-radius:10px; background:rgba(240,253,244,.10); border:1px solid rgba(45,212,191,.25); display:flex; align-items:center; justify-content:center; font-size:22px; line-height:1; }
+  .title-stack { flex:1; min-width:0; }
+  .title-stack .pid { font-family:'JetBrains Mono',ui-monospace,monospace; font-size:11px; color:var(--muted); margin-bottom:2px; }
+  .title-stack .title { display:block; font-size:15px; line-height:1.3; }
   .card .desc { font-size: 12px; color: var(--muted); flex: 1; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .card .sum { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; }
   .tag { padding: 2px 8px; border-radius: 6px; background: var(--card-2); border: 1px solid var(--border); color: var(--muted); }
@@ -372,6 +377,30 @@
   /* ===================================================================
    * Standalone wizard UI
    * =================================================================== */
+  // Per-policy emoji icons (mock-up visual nicety — not scalable, but matches
+  // the mock-up author's reference card). Keyed by policy IRI; falls back to 📄.
+  const POLICY_ICONS = {
+    'openrel:CC0-1.0': '🌍',
+    'openrel:CC-BY-4.0': '✍️',
+    'openrel:CC-BY-SA-4.0': '🔄',
+    'openrel:CC-BY-NC-4.0': '🪙',
+    'openrel:CC-BY-ND-4.0': '🔒',
+    'openrel:OR-BY-AC-VI-4.0': '🪪',
+    'openrel:OR-BY-AC-VI-NC-4.0': '🪪',
+    'openrel:OR-TL-0.4': '⏳',
+    'openrel:OR-EA-0.4': '⚖️',
+    'openrel:OR-EU-0.4': '🇪🇺',
+    'openrel:OR-OPENAIRE-PRIVACY-2.7': '🛡️',
+    'openrel:OR-AI-TR-PL-0.4': '🤖',
+    'openrel:OR-EM-0.4': '⌛',
+    'openrel:OR-BY-EM-4.0': '⏰',
+    'openrel:OR-SD-IN-0.4': '🏛️',
+    'openrel:OR-DS-0.4': '🌐',
+    'openrel:OR-IN-RO-0.4': '🔬',
+    'openrel:OR-IN-DS-CC-BY-0.4': '📚',
+    'openrel:OR-IN-HV-0.4': '🌾',
+    'openrel:OR-AI-AU-0.4': '🤖',
+  };
   const state = {
     api: createApiClient(document.getElementById('baseUrl').value),
     policies: [], parsed: new Map(), vocab: {},
@@ -468,12 +497,14 @@
   function renderGrid() {
     const grid = $('grid');
     const cards = state.cards.filter(passesFilters);
-    grid.innerHTML = cards.map((c) => {
+    grid.innerHTML = cards.map((c, idx) => {
       const typeKey = ({ Licence: 'licence', Access: 'access', Process: 'process', PolicyCollection: 'collection' })[c.type] || 'licence';
       const typeBadge = c.type ? `<span class="b ${typeKey}">${esc(c.type)}</span>` : '';
       const statBadge = c.status ? `<span class="b status-${esc(c.status)}">${esc(c.status)}</span>` : '';
       const comp = c.isComposite ? `<span class="badge-comp">COMPOSITE · ${c.childCount}</span>` : '';
       const fph = fp(c);
+      const icon = POLICY_ICONS[c.id] || '📄';
+      const pnum = 'p' + String(idx + 1).padStart(3, '0');
       const rules = [
         ...c.permits.map((l) => `<span class="tag perm">+ ${esc(l)}</span>`),
         ...c.prohibits.map((l) => `<span class="tag proh">− ${esc(l)}</span>`),
@@ -482,7 +513,13 @@
       const ttags = (c.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join('');
       return `<div class="card" data-id="${esc(c.id)}">
         <div class="badge-row">${typeBadge}${statBadge}<span class="b fp" title="fingerprint">${fph}</span>${comp}</div>
-        <div class="title">${esc(c.label)}</div>
+        <div class="card-head">
+          <div class="icon-box" aria-hidden="true">${icon}</div>
+          <div class="title-stack">
+            <div class="pid">${esc(pnum)}</div>
+            <div class="title">${esc(c.label)}</div>
+          </div>
+        </div>
         <div class="desc">${esc(c.desc)}</div>
         <div class="sum">${rules || '<span class="empty-tiny">no rules</span>'}</div>
         ${ttags ? `<div class="sum">${ttags}</div>` : ''}
