@@ -115,6 +115,7 @@
     }
     return {
       baseUrl,
+      get,
       listPolicies: () => get('/openrel/api/v0.4/policies'),
       getPolicyRaw: async (id) => {
         const j = await get('/openrel/api/v0.4/policies/' + encodeURIComponent(id), { format: 'ttl' });
