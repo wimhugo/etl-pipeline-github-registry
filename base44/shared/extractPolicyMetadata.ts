@@ -27,8 +27,13 @@ function normalizeTtl(ttl: string): string {
     if (/^@(prefix|base)\s+\S+\s+<[^>]*>\s*$/.test(t) && !t.endsWith('.')) {
       return line.replace(/\s*$/, '') + ' .';
     }
+    // Escape unescaped inner quotes inside a SINGLE string literal (e.g. the
+    // CC0 "Waiver" legal text). The greedy `"(.*)"` would otherwise swallow a
+    // multi-literal line such as `dct:subject "A", "B" ;` as one literal and
+    // escape the inter-literal quotes — mangling the values into one string.
+    // Guard: only fire when the line is NOT a comma-separated literal list.
     const m = line.match(/^(\s*\S+\s+)"(.*)"(@\w+|\^\^[^ ]+)?\s*([;.]?)\s*$/);
-    if (m && !m[2].includes(';') && /(?<!\\)"/.test(m[2])) {
+    if (m && !m[2].includes(';') && /(?<!\\)"/.test(m[2]) && !/"\s*,\s*"/.test(line)) {
       const escaped = m[2].replace(/(?<!\\)"/g, '\\"');
       return `${m[1]}"${escaped}"${m[3] || ''}${m[4] || ''}`;
     }
