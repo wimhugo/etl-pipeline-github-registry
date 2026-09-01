@@ -76,23 +76,73 @@
   @keyframes sp { to { transform: rotate(360deg); } }
   .pill-row { display:flex; gap:6px; flex-wrap:wrap; }
   a { color: var(--primary); }
+
+  /* Header chrome — logo, breadcrumb, avatar */
+  .logo { display:flex; align-items:center; gap:10px; }
+  .logo svg { width:26px; height:26px; flex:0 0 26px; }
+  .logo .mark { font-size:17px; font-weight:600; letter-spacing:-.01em; line-height:1.1; }
+  .logo .mark .rel { color:#7eb3ff; }
+  .hcrumb { color:var(--muted); font-size:13px; display:flex; align-items:center; gap:6px; padding-left:14px; margin-left:6px; border-left:1px solid var(--border); }
+  .avatar { width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg,var(--primary),var(--accent)); display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:600; flex:0 0 30px; }
+
+  /* Facet sidebar */
+  .layout { display:flex; gap:18px; align-items:flex-start; }
+  .facets { width:230px; flex:0 0 230px; position:sticky; top:84px; display:flex; flex-direction:column; gap:12px; }
+  .facet { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .facet > summary { list-style:none; cursor:pointer; padding:10px 12px; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); display:flex; justify-content:space-between; align-items:center; }
+  .facet > summary::-webkit-details-marker { display:none; }
+  .facet > summary .chev { transition:transform .15s; opacity:.6; }
+  .facet[open] > summary .chev { transform:rotate(90deg); }
+  .facet .body { padding:4px 12px 12px; display:flex; flex-direction:column; gap:6px; max-height:240px; overflow:auto; }
+  .fopt { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); cursor:pointer; padding:3px 0; }
+  .fopt:hover { color:var(--fg); }
+  .fopt .box { width:14px; height:14px; border-radius:4px; border:1px solid var(--border); flex:0 0 14px; }
+  .fopt.on .box { background:var(--primary); border-color:var(--primary); position:relative; }
+  .fopt.on .box::after { content:'✓'; color:#fff; font-size:10px; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .fopt .cnt { margin-left:auto; font-size:11px; opacity:.5; }
+  .content { flex:1; min-width:0; }
+  @media (max-width: 900px) { .layout { flex-direction:column; } .facets { position:static; width:100%; flex-basis:auto; } }
+
+  /* Card badges */
+  .badge-row { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:2px; }
+  .b { font-size:10px; font-weight:600; padding:2px 8px; border-radius:6px; border:1px solid var(--border); text-transform:uppercase; letter-spacing:.04em; line-height:1.4; }
+  .b.licence { color:#34d399; border-color:rgba(52,211,153,.35); background:rgba(52,211,153,.10); }
+  .b.access { color:#a78bfa; border-color:rgba(167,139,250,.35); background:rgba(167,139,250,.10); }
+  .b.process { color:#60a5fa; border-color:rgba(96,165,250,.35); background:rgba(96,165,250,.10); }
+  .b.collection { color:#fbbf24; border-color:rgba(251,191,36,.35); background:rgba(251,191,36,.10); }
+  .b.status-active { color:#34d399; border-color:rgba(52,211,153,.35); background:rgba(52,211,153,.10); }
+  .b.status-draft { color:#fbbf24; border-color:rgba(251,191,36,.35); background:rgba(251,191,36,.10); }
+  .b.status-review { color:#60a5fa; border-color:rgba(96,165,250,.35); background:rgba(96,165,250,.10); }
+  .b.status-deprecated { color:#f87171; border-color:rgba(248,113,113,.35); background:rgba(248,113,113,.10); }
+  .b.fp { font-family:'JetBrains Mono',ui-monospace,monospace; color:var(--muted); background:var(--card-2); text-transform:none; letter-spacing:0; font-weight:400; }
+  .empty-tiny { font-size:11px; color:var(--muted); font-style:italic; }
 </style>
 </head>
 <body>
 <header>
-  <div>
-    <h1>OpenREL Policy Wizard</h1>
-    <div class="sub">Standalone · client-side N3.js · ODRL reference tree</div>
+  <div class="logo">
+    <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="7" fill="#1a4a8a"/><path d="M10 11h7a4 4 0 0 1 0 8h-7v-8z" fill="#3b82f6"/><circle cx="22" cy="21" r="3" fill="#2dd4bf"/></svg>
+    <div>
+      <div class="mark">Open<span class="rel">REL</span> Policy Wizard</div>
+      <div class="sub">Standalone · client-side N3.js · ODRL reference tree</div>
+    </div>
   </div>
+  <div class="hcrumb" id="hcrumb"><span>Template Browser</span></div>
   <div class="grow"></div>
   <input id="baseUrl" type="text" value="https://openrel-platform-poc.base44.app/functions/apiProxy" />
   <button class="btn ghost" id="reloadBtn">Reload</button>
+  <div class="avatar" title="User">U</div>
 </header>
 
 <main>
-  <div class="toolbar" id="filters"></div>
-  <div id="status" class="empty"><span class="spinner"></span> Loading policies…</div>
-  <div class="grid" id="grid"></div>
+  <div class="layout">
+    <aside class="facets" id="facets"></aside>
+    <div class="content">
+      <div class="toolbar" id="filters"></div>
+      <div id="status" class="empty"><span class="spinner"></span> Loading policies…</div>
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
 </main>
 
 <div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
@@ -304,18 +354,39 @@
     return (parsed.hasPolicy || []).map((h) => ({ iri: h, apiId: compactOpenrel(h), isLocal: isLocalPolicy(h) }));
   }
 
+  /* Fingerprint (djb2, order-independent) — card identity badge, mirrors the
+     mock-up fp() over {type, perms, prohs, duties}. Input uses raw action IRIs
+     from the Policy Index so labels don't affect the hash. */
+  function fp(card) {
+    const norm = JSON.stringify({
+      t: (card.type || '').toLowerCase(),
+      p: [...(card.permitsRaw || [])].sort(),
+      pr: [...(card.prohibitsRaw || [])].sort(),
+      ob: [...(card.requiresRaw || [])].sort(),
+    });
+    let h = 5381;
+    for (let i = 0; i < norm.length; i++) h = ((h << 5) + h) ^ norm.charCodeAt(i);
+    return (h >>> 0).toString(16).padStart(8, '0');
+  }
+
   /* ===================================================================
    * Standalone wizard UI
    * =================================================================== */
   const state = {
     api: createApiClient(document.getElementById('baseUrl').value),
     policies: [], parsed: new Map(), vocab: {},
+    filters: { types: new Set(), statuses: new Set(), tags: new Set() },
   };
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const cssEsc = (s) => String(s).replace(/:/g, '\\:');
 
-  function setApi() { state.api = createApiClient($('baseUrl').value); state.parsed.clear(); load(); }
+  function setApi() {
+    state.api = createApiClient($('baseUrl').value);
+    state.parsed.clear();
+    state.filters.types.clear(); state.filters.statuses.clear(); state.filters.tags.clear();
+    load();
+  }
 
   // Policy Index — curated discovery catalogue (see docs/specifications/e.2).
   // Served live from the repo via the public API (apiProxy → getPolicyIndex),
@@ -346,21 +417,63 @@
           permits: (s.simplePerm || []).map(labelOf),
           prohibits: (s.simpleProhibit || []).map(labelOf),
           requires: (s.simpleDuty || []).map(labelOf),
+          permitsRaw: s.simplePerm || [],
+          prohibitsRaw: s.simpleProhibit || [],
+          requiresRaw: s.simpleDuty || [],
         };
       });
       state.vocab = { actions: actions.members || [], constraints: constraints.members || [], countries: countries.members || [], parameters: parameters.members || [], scenarios: scenarios.members || [] };
       if (!state.cards.length) { status.className = 'empty'; status.textContent = 'No policies in the index.'; return; }
       status.textContent = '';
-      filters.innerHTML = `<span class="chip">${state.cards.length} policies</span><span class="chip">index v${indexRes.version || '?'}</span><span class="chip">vocab: ${state.vocab.actions.length} actions</span>`;
+      filters.innerHTML = `<span class="chip" id="countChip">${state.cards.length} policies</span><span class="chip">index v${indexRes.version || '?'}</span><span class="chip">vocab: ${state.vocab.actions.length} actions</span>`;
+      buildFacets();
       renderGrid();
     } catch (e) { status.className = 'err'; status.textContent = 'Error: ' + e.message; }
   }
 
+  function passesFilters(c) {
+    const f = state.filters;
+    if (f.types.size && !f.types.has(c.type)) return false;
+    if (f.statuses.size && !f.statuses.has(c.status)) return false;
+    if (f.tags.size && !(c.tags || []).some((t) => f.tags.has(t))) return false;
+    return true;
+  }
+  function updateFilterCounts() {
+    const chip = $('countChip');
+    if (!chip) return;
+    const shown = state.cards.filter(passesFilters).length;
+    chip.textContent = shown === state.cards.length ? `${state.cards.length} policies` : `${shown} / ${state.cards.length} policies`;
+  }
+  function buildFacets() {
+    const types = new Map(), statuses = new Map(), tags = new Map();
+    state.cards.forEach((c) => {
+      if (c.type) types.set(c.type, (types.get(c.type) || 0) + 1);
+      if (c.status) statuses.set(c.status, (statuses.get(c.status) || 0) + 1);
+      (c.tags || []).forEach((t) => tags.set(t, (tags.get(t) || 0) + 1));
+    });
+    const facet = (title, entries, key) => {
+      const rows = [...entries].sort((a, b) => b[1] - a[1]).map(([v, n]) =>
+        `<label class="fopt" data-facet="${key}" data-val="${esc(v)}"><span class="box"></span><span>${esc(v)}</span><span class="cnt">${n}</span></label>`).join('');
+      return `<details class="facet" open><summary>${title}<span class="chev">›</span></summary><div class="body">${rows || '<span class="empty-tiny">none</span>'}</div></details>`;
+    };
+    $('facets').innerHTML = facet('Policy Type', types, 'types') + facet('Status', statuses, 'statuses') + facet('Tags', tags, 'tags');
+    [...$('facets').querySelectorAll('.fopt')].forEach((el) => el.addEventListener('click', (e) => {
+      e.preventDefault();
+      const set = state.filters[el.dataset.facet];
+      const v = el.dataset.val;
+      if (set.has(v)) { set.delete(v); el.classList.remove('on'); } else { set.add(v); el.classList.add('on'); }
+      renderGrid();
+    }));
+  }
   function renderGrid() {
     const grid = $('grid');
-    grid.innerHTML = state.cards.map((c) => {
+    const cards = state.cards.filter(passesFilters);
+    grid.innerHTML = cards.map((c) => {
+      const typeKey = ({ Licence: 'licence', Access: 'access', Process: 'process', PolicyCollection: 'collection' })[c.type] || 'licence';
+      const typeBadge = c.type ? `<span class="b ${typeKey}">${esc(c.type)}</span>` : '';
+      const statBadge = c.status ? `<span class="b status-${esc(c.status)}">${esc(c.status)}</span>` : '';
       const comp = c.isComposite ? `<span class="badge-comp">COMPOSITE · ${c.childCount}</span>` : '';
-      const stat = c.status ? `<span class="skeleton">· ${esc(c.status)}</span>` : '';
+      const fph = fp(c);
       const rules = [
         ...c.permits.map((l) => `<span class="tag perm">+ ${esc(l)}</span>`),
         ...c.prohibits.map((l) => `<span class="tag proh">− ${esc(l)}</span>`),
@@ -368,13 +481,15 @@
       ].join('');
       const ttags = (c.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join('');
       return `<div class="card" data-id="${esc(c.id)}">
-        <div class="title">${esc(c.label)} ${comp} ${stat}</div>
+        <div class="badge-row">${typeBadge}${statBadge}<span class="b fp" title="fingerprint">${fph}</span>${comp}</div>
+        <div class="title">${esc(c.label)}</div>
         <div class="desc">${esc(c.desc)}</div>
-        <div class="sum">${rules || '<span class="skeleton">no rules</span>'}</div>
+        <div class="sum">${rules || '<span class="empty-tiny">no rules</span>'}</div>
         ${ttags ? `<div class="sum">${ttags}</div>` : ''}
       </div>`;
     }).join('');
     [...grid.querySelectorAll('.card')].forEach((el) => el.addEventListener('click', () => openModal(el.dataset.id)));
+    updateFilterCounts();
   }
 
   async function getParsed(id) {

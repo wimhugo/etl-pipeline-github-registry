@@ -63,8 +63,8 @@ Default stance applied below: **MOCK** for layout, content copy, and wizard view
 
 | ID | Gap | Severity | Source | Fix |
 | :---- | :---- | :---- | :---- | :---- |
-| C1 | **Theme**: mock-up is light-mode navy; refactor is dark-mode blue | Major | DECISION | Phase 0 decision — adopt mock-up light theme or keep dark |
-| C2 | **Typography**: mock-up DM Serif Display / DM Sans / DM Mono; refactor Inter / JetBrains Mono | Minor | DECISION | Phase 0 decision |
+| C1 | **Theme**: mock-up is light-mode navy; refactor is dark-mode blue | Major | REFACTOR | Keep dark theme (decided 2026-09-01) |
+| C2 | **Typography**: mock-up DM Serif Display / DM Sans / DM Mono; refactor Inter / JetBrains Mono | Minor | REFACTOR | Keep Inter / JetBrains Mono (decided 2026-09-01) |
 | C3 | **Card fields**: missing fingerprint badge + constraints summary; status badge style differs | Minor | MOCK | Add fingerprint badge + constraints summary; align status badge |
 | C4 | **Badge colour semantics**: mock-up green=Permission, orange=Obligation, red=Prohibition, purple=Access; refactor teal/red/orange tags | Minor | MOCK | Adopt mock-up palette once C1 decided |
 | C5 | **Preview modal content**: mock-up = rendered policy + JSON-LD + fingerprint; refactor = parsed rules + composite children + preload JSON | Major | MOCK | Align modal to rendered-policy + JSON-LD + fingerprint; keep composite tree as refactor addition |
@@ -78,11 +78,11 @@ Default stance applied below: **MOCK** for layout, content copy, and wizard view
 | R3 | **Standalone HTML distribution** (N3.js, apiProxy) | Core project goal; mock-up was single-file demo |
 | R4 | **Parser tolerance** (missing `.`/unescaped quote normalization) | Necessary for live canonical TTLs; keep as safety net |
 
-## 4. Open Decisions (Phase 0 — block cosmetic phases)
+## 4. Phase 0 Decisions (resolved 2026-09-01)
 
-1. **Theme (C1)**: adopt the mock-up's light navy theme, or keep the refactor's dark theme? Affects every surface.
-2. **Typography (C2)**: adopt DM Serif / DM Sans / DM Mono, or keep Inter / JetBrains Mono?
-3. **Fingerprint (F6)**: implement the mock-up's `fp()` for the template-match banner, or rely on the Policy Index for deduplication?
+1. **Theme (C1)**: **Keep the refactor's dark theme.** Mock-up light navy not adopted.
+2. **Typography (C2)**: **Keep Inter / JetBrains Mono.** DM Serif / DM Sans / DM Mono not adopted.
+3. **Fingerprint (F6)**: **Implement `fp()`** (djb2, order-independent) for card identity badges and the Simple-wizard template-match banner.
 
 ## 5. Execution Phases
 
