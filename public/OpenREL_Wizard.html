@@ -297,17 +297,16 @@
   function setApi() { state.api = createApiClient($('baseUrl').value); state.parsed.clear(); load(); }
 
   // Policy Index — curated discovery catalogue (see docs/specifications/e.2).
-  // The grid renders from the index (instant, no per-card TTL parse). Modal
-  // detail still fetches the live TTL via the API for rules/constraints.
-  const POLICY_INDEX_URL = './odrel-wizard/policy_index.json';
-
+  // Served live from the repo via the public API (apiProxy → getPolicyIndex),
+  // so merged PR data is the single source of truth. Modal detail still
+  // fetches the live TTL via the API for rules/constraints.
   async function load() {
     const status = $('status'), grid = $('grid'), filters = $('filters');
     status.className = 'empty'; status.innerHTML = '<span class="spinner"></span> Loading index…';
     grid.innerHTML = ''; filters.innerHTML = '';
     try {
       const [indexRes, actions, constraints, countries, parameters, scenarios] = await Promise.all([
-        fetch(POLICY_INDEX_URL).then((r) => r.json()),
+        state.api.get('/openrel/api/v0.4/policy-index').catch(() => ({ policies: [] })),
         state.api.listActions().catch(() => ({ members: [] })),
         state.api.listConstraints().catch(() => ({ members: [] })),
         state.api.listCountries().catch(() => ({ members: [] })),
