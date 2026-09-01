@@ -1,6 +1,6 @@
 # E.2 — UI ↔ API Migration Plan: Policy Wizard
 
-*Consolidated plan for converting the OpenREL Policy Wizard from hardcoded JSON to data served by the OpenREL KB API, incorporating the gap analysis and the two refinements (parameter system reuse; scenario-based tags).*
+*Consolidated plan for converting the OpenREL Policy Wizard from hardcoded JSON to data served by the OpenREL KB API, incorporating the gap analysis, the refinements (parameter system reuse; scenario-based tags), and the **Policy Index** discovery architecture.*
 
 ---
 
@@ -15,8 +15,8 @@ This plan supersedes the open-decisions table in `e.1 UI API.md` by resolving ea
 The plan covers four work streams, executed in order:
 
 1. **Data cleanups** — fix TTL syntax errors in vocab files the adapter will depend on.
-2. **New API sections** — register `ApiSourceFile` entries for vocabularies the wizard needs.
-3. **Property additions** — enrich existing source files with the minimal predicates the adapter requires.
+2. **New API sections** — register `ApiSourceFile` entries for vocabularies the wizard needs, including the **Policy Index**.
+3. **Property additions** — enrich existing source files with the minimal predicates the adapter requires (policy TTLs are **not** altered for simple-mode — see Decision 3).
 4. **Adapter** — a client-side module per source that fetches from the API and returns the exact shape the UI consumes.
 
 ---
@@ -27,17 +27,36 @@ The plan covers four work streams, executed in order:
 |---|---|---|---|
 | 1 | Advanced Wizard port | **Option B** — read real `data/policy/` ODRL, near-zero UI change | Real policies are already ODRL; only action-category metadata is missing |
 | 2 | Browser tags/topics | **Hybrid** — reuse `dct:subject` + `type_scenario.ttl`; add `openrel:policyStatus` | Avoids inventing `openrel:topic`; scenarios already exist and constraints already link to them |
-| 3 | Simple Wizard port | **Option B-faithful** — add simple-mode predicates to policy TTLs | Preserves the 4-question UX exactly; reverse-option is recorded as a fallback (§9) |
+| 3 | Simple Wizard port | **Policy Index** — a curated JSON sidecar (`policy_index.json`) carries q1–q4, simple action lists, geo, dates, tags | TTLs stay canonical ODRL; no `openrel:simple*` predicates pollute 20+ policy files; index is the scalable retrieval path for millions of future policies |
 | 4 | Constraint parameters | **Reuse existing `openrel:Parameter` system** — do NOT invent `openrel:hasParam`/`openrel:paramType` | The Parameter + ParameterBindingSource vocabularies already model this richer than the mock, and are future-proof for Assertion-policy binding |
-| 5 | Policy index / dup check | **Client-side** (Option B from e.1 §4.5) | ~20 templates; no new endpoint needed |
-| 6 | Save | Reuse `jsonToTtl` → `submitPolicyPR` | Already implemented |
-| 7 | Countries source | New `Countries` ApiSourceFile section | Data file already exists with the right predicates |
+| 5 | Policy discovery / retrieval | **Policy Index JSON** served via a `PolicyIndex` API section | Replaces the folder-mode list as the primary discovery path; designed to back an Elasticsearch catalogue with zero UI change |
+| 6 | Duplicate check | **Client-side** against index fingerprints | ~20 templates now; index carries fingerprints so the check needs no extra API call |
+| 7 | Save | Reuse `jsonToTtl` → `submitPolicyPR` | Already implemented; writes a TTL, the indexer picks it up on its next run |
+| 8 | Countries source | New `Countries` ApiSourceFile section | Data file already exists with the right predicates |
+| 9 | q2 (Simple Wizard "What") | **Action IRI lists** (`simplePerm`, `simpleDuty`, optional `simpleProhibit`) in the index | More flexible than 7 fixed booleans; covers OpenREL-specific actions; new actions need no schema change; aligns Simple with Advanced |
+
+### 2.1 The Policy Index principle
+
+The index is an **interface, not a file**. The wizard calls `loadPolicyIndex()` and never knows whether the answer comes from a JSON file today or an Elasticsearch query tomorrow. Today's implementation fetches a static JSON; when the catalogue grows, only the adapter is swapped — no UI rework.
+
+### 2.2 Auto-derived vs curated fields
+
+The periodic indexer splits the index fields into two classes:
+
+| Class | Fields | Source |
+|---|---|---|
+| **Auto-derived** (from TTL) | `iri`, `label`, `description`, `type`, `is_composite`, `hasPolicy`, structural perm/proh/duty action lists, `fingerprint` | Parsed from `data/policy/*.ttl` by the indexer |
+| **Curated** (human) | `q1` (Who), `simplePerm`/`simpleDuty`/`simpleProhibit` (Simple Wizard summary), `q3` (Where), `geoInc`/`geoExc`, `q4` (When), `dateStart`/`dateEnd`, `tags`, `status` | Authored in the index by a curator |
+
+The indexer overwrites auto-derived fields on each run and **preserves** curated fields. It flags any entry whose TTL fingerprint differs from the stored fingerprint, so the curator is alerted (not silently overwritten) when a structural change might invalidate a curated summary.
 
 ---
 
 ## 3. Work stream 1 — Data cleanups (prerequisite)
 
 The wizard adapter will silently lose data if these files are not fixed first. The TTL parser is tolerant but cannot recover missing statement terminators or wrong prefixes.
+
+> Note: with the Policy Index approach (Decision 3), **policy TTLs no longer need `openrel:simple*` predicate additions**. The cleanups below concern *vocabulary* files the adapter still reads directly.
 
 ### 3.1 `parameters.ttl`
 
@@ -66,15 +85,16 @@ No blocking syntax errors observed; revisit if the adapter surfaces missing memb
 
 All are served by the existing `fetchApiSourceContent` function — no new backend function required.
 
-| Section | file_path | source_mode | member_identifier / notes | Wizard use |
-|---|---|---|---|---|
-| **Countries** | `data/input/countries.ttl` | file | `skos:Concept` (or whatever the file declares) | Simple Q3 / Advanced geo pickers |
-| **Parameters** | `.openrel/vocabs/openrel/parameters.ttl` | file | `openrel:Parameter` | Constraint parametric inputs (refinement 1) |
-| **Parameter Bindings** | `.openrel/vocabs/openrel/type_parameter_binding.ttl` | file | `openrel:ParameterBindingSource` | Decide whether a param renders an input, is pre-filled, or is read-only |
-| **Scenarios** | `.openrel/vocabs/openrel/type_scenario.ttl` | file | `skos:Concept` | Browser tag/topic axis (refinement 2) |
-| **Policies** | `data/policy/` | **folder** | `id_prefix: "openrel:"`, `title_field: dct:title`, `description_field: dct:description` | Template browser + detail/preload |
+| Section | file_path | source_mode | data_format | member_identifier / notes | Wizard use |
+|---|---|---|---|---|---|
+| **PolicyIndex** | `data/input/policy_index.json` | file | **json** | top-level `policies[]` array | Browser grid + Simple Wizard preload (primary discovery path) |
+| **Countries** | `data/input/countries.ttl` | file | ttl | `skos:Concept` (or whatever the file declares) | Simple Q3 / Advanced geo pickers |
+| **Parameters** | `.openrel/vocabs/openrel/parameters.ttl` | file | ttl | `openrel:Parameter` | Constraint parametric inputs (refinement 1) |
+| **Parameter Bindings** | `.openrel/vocabs/openrel/type_parameter_binding.ttl` | file | ttl | `openrel:ParameterBindingSource` | Decide whether a param renders an input, is pre-filled, or is read-only |
+| **Scenarios** | `.openrel/vocabs/openrel/type_scenario.ttl` | file | ttl | `skos:Concept` | Browser tag/topic axis (refinement 2) |
+| **Policies** | `data/policy/` | **folder** | ttl | `id_prefix: "openrel:"`, `title_field: dct:title`, `description_field: dct:description` | **Detail only** — rules/constraints for the Advanced Wizard and the modal |
 
-> Note: `Actions` and `Constraints` sections already exist; verify their `member_identifier` is correct for the current file content.
+> The `Policies` folder-mode section is now the **detail** source, not the discovery list. The index drives discovery; the TTLs drive detail. This is the discovery/detail split the standalone wizard already implements (index → card, TTL → modal).
 
 ---
 
@@ -95,8 +115,6 @@ The Advanced Wizard routes each action to the permission / prohibition / obligat
 
 #### 5.1.1 Extracted mock-up values (`OpenREL_Wizard_mock.html`)
 
-The table below is the exact source-of-truth to be written into `actions.ttl` as `openrel:actionCategory` (one literal per category) and `openrel:defaultDuty` (single literal where present). A `—` means no default duty is defined for that action.
-
 | Action | Category | Default Duty |
 |---|---|---|
 | Use (`odrl:use`) | perm, proh, obli | — |
@@ -114,38 +132,11 @@ The table below is the exact source-of-truth to be written into `actions.ttl` as
 | Encrypt (`openrel:encrypt`) | perm, obli | preDuty |
 | Apply License (`openrel:applyLicense`) | perm, obli | — |
 
-Notes:
-- Category literals map to the Advanced Wizard grid placement: `perm` → Permissions, `proh` → Prohibitions, `obli` → Obligations.
-- Only 3 of 14 actions carry a `defaultDuty` (`postDuty` / `preDuty`); the adapter falls back to `"postDuty"` when absent (§6.2).
-- IRIs use the mock's `odrl:`/`openrel:` prefixes as written; align with the canonical `actions.ttl` subject IRIs before generating the TTL literals.
+### 5.2 Policies (`data/policy/*.ttl`) — detail only; **no simple-mode additions**
 
-### 5.2 Policies (`data/policy/*.ttl`) — browser card + simple-mode preload
+With the Policy Index approach, policy TTLs are **not** altered for the Simple Wizard. The browser card status/tags and the Simple Wizard preload all live in the index. The TTLs only need the properties they already carry (`odrl:permission`/`prohibition`/`duty`, `rdf:type`, `dct:title`, `dct:description`), which the Advanced Wizard and the modal detail read directly.
 
-#### 5.2.1 Browser card fields
-
-| Predicate | Value | Used by |
-|---|---|---|
-| `openrel:policyStatus` | literal `draft`/`review`/`active` | Status badge |
-| `dct:subject` | repeated → `openrel:<scenario>` IRI | Tags/topics (union with constraint-derived scenarios) |
-
-The card's permits/prohibits/requires summaries and the type badge are derived from `odrl:permission`/`prohibition`/`duty` and `rdf:type` — already present.
-
-#### 5.2.2 Simple-mode preload (Decision 3: Option B-faithful)
-
-These predicates reconstruct the Simple Wizard's `preload` object 1:1. Add per policy:
-
-| `preload` field | Predicate(s) | Mapping |
-|---|---|---|
-| `ptype` | `rdf:type` | strip `openrel:` prefix |
-| `q1` (Who) | `openrel:simpleWho` | `public`/`noncommercial`/`researchers`/`managed` |
-| `q2.{share,modify,commercial,read,reproduce,attribution,sharealike}` | `openrel:simplePerm:<action>` | boolean literals |
-| `q3` (Where) | `openrel:simpleWhere` | `worldwide`/`restricted` |
-| `geoInc[]` / `geoExc[]` | `openrel:geoInclude` / `openrel:geoExclude` | ISO codes or GeoNames URIs |
-| `q4` (When) | `openrel:simpleWhen` | `unlimited`/`fixed` |
-| `dateStart` / `dateEnd` | `openrel:simpleDateStart` / `openrel:simpleDateEnd` | xsd:dateTime |
-| `prose` | `dct:description` (already present) | modal + review prose |
-
-Cost: ~8 predicates × 20 files. This is the largest single addition; it is the price of keeping the Simple Wizard pixel-identical. If the reverse-option is later chosen (§9), these are dropped and the Simple Wizard is rewritten to infer from ODRL instead.
+> The previous version of this plan added `openrel:simpleWho`, `openrel:simplePerm:<action>`, `openrel:simpleWhere`, `openrel:simpleWhen`, `openrel:geoInclude`/`geoExclude`, `openrel:simpleDateStart`/`End` to ~20 policy files. That work is **dropped** — superseded by the index (Decision 3). The reverse-option fallback (former §9) is also dropped, since the index makes it unnecessary.
 
 ### 5.3 Scenarios (`type_scenario.ttl`) — add 4W+why dimension annotation
 
@@ -155,39 +146,25 @@ Lightweight approach (Decision 2): no reparenting; add an annotation property so
 |---|---|---|
 | `openrel:dimension` | literal | `who` / `what` / `where` / `when` / `why` |
 
-Add to existing scenario concepts where they map cleanly:
-- `confirmed-researcher`, `affirmed-research`, `confirmed-rpo` → `who`
-- `non-commercial-only`, `commercial-use`, `attribution`, `licence-preserved` → `what`
-- (new or existing geo scenarios) → `where`
-- `status-revoked`, embargo scenarios → `when`
-- `gdpr-compliance`, `ethics-approval`, `explicit-consent`, `consent-gdpr` → `why`
-
-Optionally extend the scheme with intermediate `openrel:dim-who` … `openrel:dim-why` concepts if a formal hierarchy is preferred later.
-
 ### 5.4 Constraints (`constraints.ttl`) — parameter linkage via existing system
 
-Per Refinement 1, do **not** add `openrel:hasParam`/`openrel:paramType`. Instead, where a constraint uses a parameter, link it:
-
-| Predicate | Value | Used by |
-|---|---|---|
-| `odrl:rightOperand` (or `openrel:hasParameter`) | → `openrel:Parameter` IRI | adapter walks `parameterName`/`expectedDatatype`/`resolutionMethod`/`skos:definition` |
-
-The adapter derives the wizard's parametric input fields entirely from the linked Parameter instance (see §6.4). This keeps the binding model consistent and leaves the path open for Assertion-policy value resolution later.
+Per Refinement 1, do **not** add `openrel:hasParam`/`openrel:paramType`. Instead, where a constraint uses a parameter, link it to the existing `openrel:Parameter` system. The adapter derives the wizard's parametric input fields entirely from the linked Parameter instance (see §6.4).
 
 ### 5.5 Action / constraint grouping alignment
 
-The Advanced Wizard groups ~25 constraints into 8 accordion categories. `constraints.ttl` already has `openrel:constraintType` (purpose/role/context/notification…). **One-time alignment decision:** either rename `openrel:constraintType` values to match the mock's 8 categories, or update the adapter to map `constraintType` values → the mock's category labels via a small lookup table. Recommend the lookup table (no source-data rename) to avoid touching constraint IRIs.
+The Advanced Wizard groups ~25 constraints into 8 accordion categories. `constraints.ttl` already has `openrel:constraintType`. Use a client-side lookup table (no source-data rename) to map `constraintType` values → the mock's category labels.
 
 ---
 
 ## 6. Work stream 4 — Adapter (client-side)
 
-One thin module per source. Each fetches via `base44.functions.invoke('fetchApiSourceContent', { section, … })` and returns the *exact* shape the UI consumes today, so UI components are untouched.
+One thin module per source. Each fetches via `base44.functions.invoke('fetchApiSourceContent', { section, … })` (or a static file for the standalone build) and returns the *exact* shape the UI consumes today, so UI components are untouched.
 
 ### 6.1 Adapter registry (loaded at app init, parallel)
 
 ```js
-const [actions, constraints, countries, parameters, bindings, scenarios] = await Promise.all([
+const [index, actions, constraints, countries, parameters, bindings, scenarios] = await Promise.all([
+  loadPolicyIndex(),    // discovery + simple preload
   loadActions(),
   loadConstraints(),
   loadCountries(),
@@ -195,119 +172,129 @@ const [actions, constraints, countries, parameters, bindings, scenarios] = await
   loadParameterBindings(),
   loadScenarios(),
 ]);
-const templates = await loadTemplates(); // browser view mount
 ```
 
 ### 6.2 `loadActions()` → `ACTIONS[]`
 
 ```
 fetch({ section:"Actions", keep_properties:true })
-→ map each member:
-   { id: <short code from openrel:actionId or list index>,
-     label, iri,
-     cat: collect all openrel:actionCategory literals,
-     dd: openrel:defaultDuty || "postDuty" }
+→ { id, label, iri, cat: [openrel:actionCategory...], dd: openrel:defaultDuty || "postDuty" }
 ```
 
 ### 6.3 `loadConstraints()` → `CONSTRAINTS[]` (grouped)
 
 ```
 fetch({ section:"Constraints", keep_properties:true })
-→ group by openrel:constraintType (mapped via lookup table to mock categories)
-→ per item:
-   { id, label, iri,
-     param: <bool, true if linked to an openrel:Parameter>,
-     paramType: <derived from Parameter.expectedDatatype>,
-     pname: Parameter.parameterName,
-     placeholder: Parameter.parameterName (or derived),
-     tooltip: member.definition }
+→ group by openrel:constraintType (mapped via lookup table)
+→ { id, label, iri, param, paramType, pname, placeholder, tooltip }
 ```
 
-### 6.4 Parameter resolution (Refinement 1) — the key new logic
+### 6.4 Parameter resolution (Refinement 1)
 
-For each constraint linked to a Parameter, resolve the Parameter from the `Parameters` section and decide UI behaviour from `resolutionMethod` (from `Parameter Bindings` section):
+For each constraint linked to a Parameter, resolve the Parameter and decide UI behaviour from `resolutionMethod` (from `Parameter Bindings`):
 
 | `resolutionMethod` | UI behaviour |
 |---|---|
 | `PolicyValue` | read-only literal, no input |
-| `SuppliedParameterValue` | render the parametric input (the mock's field) |
+| `SuppliedParameterValue` | render the parametric input |
 | `AssetMetadataValue` | pre-filled read-only, labelled "from asset metadata" |
-| `PartyContext` / `RequestorContext` / `SubjectContext` | pre-filled read-only, labelled "from profile/assignee/data subject" |
+| `PartyContext` / `RequestorContext` / `SubjectContext` | pre-filled read-only, labelled by source |
 | `RepositoryContext` / `RuntimeContext` / others | read-only, labelled by source |
-
-> Future Assertion-policy binding: when `resolutionMethod` values become live bindings, the adapter already exposes them; only the UI rendering of "pre-filled" fields changes from placeholder to live value. No adapter contract change.
-
-**Policy-level parameters** (e.g. target asset) are handled by the same mechanism at the policy member level — the adapter checks the policy's own parameter links, not only constraints'. The mock has no policy-level param input today; the adapter is written to surface one if present, so the capability is available without rework.
 
 ### 6.5 `loadCountries()` → `COUNTRIES[]`
 
 ```
 fetch({ section:"Countries", keep_properties:true })
-→ { label, iso: openrel:isoCode, eu: openrel:isEU, flag: openrel:flag, gn: iri }
+→ { label, iso, eu, flag, gn }
 ```
 
 ### 6.6 `loadScenarios()` → tag/topic axis
 
 ```
 fetch({ section:"Scenarios", keep_properties:true })
-→ index by IRI: { iri, label, dimension: openrel:dimension, broader }
+→ { iri, label, dimension, broader }
 ```
 
-### 6.7 `loadTemplates()` → `TEMPLATES[]` (list, lean)
+### 6.7 `loadPolicyIndex()` → discovery list (NEW)
 
-```
-fetch({ section:"Policies" })  // folder mode, list view
-→ per member:
-   { id: iri (local name), label, desc: definition,
-     type: strip "openrel:" from rdf:type,
-     status: openrel:policyStatus,
-     tags: union(dct:subject IRIs → scenario labels,
-                 constraint-derived scenarios via cons links),
-     topics: same set grouped by openrel:dimension,
-     perms/prohs/cons: resolved from odrl:permission/prohibition/duty + constraints,
-     fingerprint: computed client-side }
+This is the **primary discovery path**, replacing the folder-mode list as the source of the browser grid.
+
+```js
+// framework-agnostic adapter (see public/odrel-wizard/lib/policyIndex.js)
+const adapter = createPolicyIndexAdapter({ fetchIndex: () =>
+  base44.functions.invoke('fetchApiSourceContent', { section: 'PolicyIndex' })
+    .then(r => /* unwrap the JSON document */)
+});
+const cards = await adapter.listCards(actions);  // { id, label, desc, type, status, tags, isComposite, childCount, permits, prohibits, requires }
 ```
 
-### 6.8 `loadTemplateDetail(iri)` → `preload` object
+- **No TTL parse per card.** The index already carries curated perm/proh/duty action lists (resolved to labels via the actions vocab), status, tags, and composite children. The grid renders instantly.
+- Action lists are **IRIs** (`openrel:read`, `openrel:attribute`, …), resolved to labels client-side — new actions need no index schema change (Decision 9).
+- `simplePerm` / `simpleDuty` / optional `simpleProhibit` express the Simple Wizard's "What"; `q1`/`q3`/`q4`/`geoInc`/`geoExc`/`dateStart`/`dateEnd` are also curated in the index entry.
+
+### 6.8 `loadTemplateDetail(iri)` → rules + constraints (TTL, unchanged)
+
+The Advanced Wizard and the modal still fetch the **live TTL** for the full rule/constraint tree:
 
 ```
-fetch({ section:"Policies", id, keep_properties:true })
-→ map properties to preload (§5.2.2 table)
+fetch({ section:"Policies", id, format:"ttl" })  // folder mode, raw TTL
+→ parse via odrlParser (N3.js) → permission/prohibition/duty/constraint tree
 ```
 
-### 6.9 Duplicate check (client-side)
+### 6.9 `getPreload(iri)` → Simple Wizard preload (from index)
 
-On entering a review step, compute the fingerprint of the live policy (mock's `fp()`/`simpleToCanonical()` — unchanged) and match against the fetched templates' fingerprints. No API call. Migrate to a `PolicyIndex` section only when the template count grows past ~50.
+```js
+const preload = await adapter.getPreload(iri);
+// { iri, ptype, label, desc, simple: { q1, simplePerm[], simpleProhibit[], simpleDuty[], q3, geoInc[], geoExc[], q4, dateStart, dateEnd }, hasPolicy[] }
+```
 
-### 6.10 Save (unchanged)
+The Simple Wizard consumes this directly — pixel-identical to the mock, with no TTL inference.
+
+### 6.10 Duplicate check (client-side, index-backed)
+
+On entering a review step, compute the fingerprint of the live policy (mock's `fp()`/`simpleToCanonical()`) and match against the fingerprints in the index. No extra API call. The index's fingerprint field is the canonical source; at scale, an Elasticsearch query replaces it with no UI change.
+
+### 6.11 Save (unchanged)
 
 ```js
 base44.functions.invoke('jsonToTtl', {
-  json_policy: <ODRL JSON-LD>,
-  github_target_folder: "data/policy",
-  github_target_file: "<slug>.ttl",
-  github_branch: "main",
-  namespace: "openrel"
+  json_policy, github_target_folder: "data/policy", github_target_file: "<slug>.ttl",
+  github_branch: "main", namespace: "openrel"
 })
-→ surface res.pr_url in the saved confirmation
+→ surface res.pr_url; the periodic indexer picks up the new TTL on its next run
 ```
+
+### 6.12 Periodic indexer (NEW)
+
+A scheduled backend function (or automation) rebuilds the index:
+
+1. List all TTLs in `data/policy/` (folder mode).
+2. Parse each with the shared N3 parser (reuse `odrlParser`).
+3. **Auto-derive** structural fields: `iri`, `label`, `description`, `type`, `is_composite`, `hasPolicy`, perm/proh/duty action lists, `fingerprint`.
+4. **Preserve** curated fields (`q1`, `simplePerm`/`simpleDuty`/`simpleProhibit`, `q3`, `geoInc`/`geoExc`, `q4`, `dates`, `tags`, `status`) from the existing index entry.
+5. **Flag drift**: if a TTL's fingerprint ≠ stored fingerprint, mark the entry `needs_review` so the curator is alerted.
+6. Write the merged JSON back to `data/input/policy_index.json` (via the GitHub write path).
+
+This is the bridge to scale: today it regenerates a 20-entry JSON; tomorrow it writes to Elasticsearch. The adapter contract (`loadPolicyIndex`) does not change.
 
 ---
 
 ## 7. Migration order (shippable increments)
 
-Each increment leaves the UI fully working. The adapter is introduced first as a parallel path; the hardcoded constants are only removed once the adapter for that source is verified.
+Each increment leaves the UI fully working.
 
 | Step | Scope | Verifies |
 |---|---|---|
 | 1 | Data cleanups (§3) | adapter will not silently lose data |
-| 2 | Register `Countries` section + `loadCountries()` adapter; swap `COUNTRIES` const | end-to-end adapter pattern works |
+| 2 | Register `Countries` section + `loadCountries()`; swap `COUNTRIES` const | end-to-end adapter pattern works |
 | 3 | Register `Parameters` + `Parameter Bindings` sections; `loadParameters()`/`loadParameterBindings()` | parameter vocab loads |
-| 4 | `actions.ttl` category additions + `loadActions()` adapter; swap `ACTIONS` | Advanced palette grids populate |
-| 5 | `constraints.ttl` parameter linkage + `loadConstraints()` adapter (with §6.4 resolution); swap `CONSTRAINTS` | parametric inputs render via Parameter system |
+| 4 | `actions.ttl` category additions + `loadActions()`; swap `ACTIONS` | Advanced palette grids populate |
+| 5 | `constraints.ttl` parameter linkage + `loadConstraints()` (with §6.4 resolution); swap `CONSTRAINTS` | parametric inputs render via Parameter system |
 | 6 | `type_scenario.ttl` dimension annotations + register `Scenarios` section + `loadScenarios()` | tag axis available |
-| 7 | Policy property additions (§5.2) + `loadTemplates()`/`loadTemplateDetail()`; swap `TEMPLATES` + `preload` | Browser + Simple + Advanced preload from real library |
-| 8 | Duplicate check + Save wiring | full flow end-to-end |
+| 7 | **Seed `policy_index.json` (20 entries) + register `PolicyIndex` section + `loadPolicyIndex()` adapter; swap `TEMPLATES` list + Simple Wizard preload** | Browser grid + Simple Wizard from real index |
+| 8 | `loadTemplateDetail()` wired to folder-mode TTL for Advanced Wizard rules/constraints | Advanced preload from real library |
+| 9 | Duplicate check (index fingerprints) + Save wiring | full flow end-to-end |
+| 10 | Periodic indexer (§6.12) — auto-derive structural fields, preserve curated, flag drift | index stays in sync as policies are added |
 
 ---
 
@@ -315,21 +302,6 @@ Each increment leaves the UI fully working. The adapter is introduced first as a
 
 - Assertion-policy value resolution for parameters (the `resolutionMethod` → live binding path). The adapter is shaped for it; the UI rendering of pre-filled fields is the only future change.
 - Policy-level parametric inputs in the UI (the adapter supports the data; no UI built yet).
-- A server-side `PolicyIndex` section (client-side suffices at current scale).
+- **Elasticsearch catalogue backend** — the `loadPolicyIndex()` adapter is the contract; swapping the fetcher to an ES query is a future backend change with no UI rework.
 - Theme alignment (mock is light-mode; app is dark-mode) — separate UI decision.
 - Reparenting the scenario taxonomy under 4W+why groups (lightweight annotation used instead).
-
----
-
-## 9. Fallback: reverse-option for the Simple Wizard
-
-If, after Step 7, the simple-mode predicate additions prove too costly to maintain across 20+ policy files, the fallback is to **rewrite View 2 (Simple Wizard)** to infer q1–q4 from the real ODRL:
-
-| Simple field | Inferred from |
-|---|---|
-| q1 (Who) | constraints (`openrel:verifiedResearcher`, `openrel:nonCommercial`) + `openrel:accessType` |
-| q2 (What) | action presence in `odrl:permission`/`prohibition` (distribute, modify, use) |
-| q3 (Where) | `openrel:jurisdiction` + `odrl:spatial` constraints |
-| q4 (When) | `openrel:validityType` + `odrl:dateTime` constraints |
-
-Trade-off: no new predicates, but the Simple Wizard becomes approximate (some templates won't round-trip cleanly) and "who" has no clean ODRL source. This is a product decision, not a data decision; it is recorded here so the choice can be revisited without re-deriving the analysis.

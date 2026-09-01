@@ -296,63 +296,65 @@
 
   function setApi() { state.api = createApiClient($('baseUrl').value); state.parsed.clear(); load(); }
 
+  // Policy Index — curated discovery catalogue (see docs/specifications/e.2).
+  // The grid renders from the index (instant, no per-card TTL parse). Modal
+  // detail still fetches the live TTL via the API for rules/constraints.
+  const POLICY_INDEX_URL = './odrel-wizard/policy_index.json';
+
   async function load() {
     const status = $('status'), grid = $('grid'), filters = $('filters');
-    status.className = 'empty'; status.innerHTML = '<span class="spinner"></span> Loading policies…';
+    status.className = 'empty'; status.innerHTML = '<span class="spinner"></span> Loading index…';
     grid.innerHTML = ''; filters.innerHTML = '';
     try {
-      const [policies, actions, constraints, countries, parameters, scenarios] = await Promise.all([
-        state.api.listPolicies(),
+      const [indexRes, actions, constraints, countries, parameters, scenarios] = await Promise.all([
+        fetch(POLICY_INDEX_URL).then((r) => r.json()),
         state.api.listActions().catch(() => ({ members: [] })),
         state.api.listConstraints().catch(() => ({ members: [] })),
         state.api.listCountries().catch(() => ({ members: [] })),
         state.api.listParameters().catch(() => ({ members: [] })),
         state.api.listScenarios().catch(() => ({ members: [] })),
       ]);
-      state.policies = policies.members || [];
+      const actionByIri = new Map((actions.members || []).map((a) => [a.iri, a.label || a.iri]));
+      const labelOf = (i) => actionByIri.get(i) || i;
+      state.cards = (indexRes.policies || []).map((p) => {
+        const s = p.simple || {};
+        return {
+          id: p.iri, label: p.label, desc: p.description || '', type: p.type || 'Policy',
+          status: p.status || '', tags: p.tags || [], isComposite: !!p.is_composite,
+          childCount: (p.hasPolicy || []).length,
+          children: (p.hasPolicy || []).map((h) => ({ iri: h, isLocal: h.startsWith('openrel:') })),
+          permits: (s.simplePerm || []).map(labelOf),
+          prohibits: (s.simpleProhibit || []).map(labelOf),
+          requires: (s.simpleDuty || []).map(labelOf),
+        };
+      });
       state.vocab = { actions: actions.members || [], constraints: constraints.members || [], countries: countries.members || [], parameters: parameters.members || [], scenarios: scenarios.members || [] };
-      if (!state.policies.length) { status.className = 'empty'; status.textContent = 'No policies returned by the API.'; return; }
+      if (!state.cards.length) { status.className = 'empty'; status.textContent = 'No policies in the index.'; return; }
       status.textContent = '';
-      filters.innerHTML = `<span class="chip">${state.policies.length} policies</span><span class="chip">vocab: ${state.vocab.actions.length} actions · ${state.vocab.constraints.length} constraints</span>`;
+      filters.innerHTML = `<span class="chip">${state.cards.length} policies</span><span class="chip">index v${indexRes.version || '?'}</span><span class="chip">vocab: ${state.vocab.actions.length} actions</span>`;
       renderGrid();
-      state.policies.forEach((m) => lazyCard(m));
     } catch (e) { status.className = 'err'; status.textContent = 'Error: ' + e.message; }
   }
 
   function renderGrid() {
     const grid = $('grid');
-    grid.innerHTML = state.policies.map((m) => {
-      const label = m.label || localName(m.iri);
-      return `<div class="card" data-id="${esc(m.iri)}">
-        <div class="title">${esc(label)} <span class="skeleton" data-pending="${esc(m.iri)}"></span></div>
-        <div class="desc">${esc(m.definition || '')}</div>
-        <div class="sum" data-sum="${esc(m.iri)}"><span class="skeleton">parsing ODRL…</span></div>
+    grid.innerHTML = state.cards.map((c) => {
+      const comp = c.isComposite ? `<span class="badge-comp">COMPOSITE · ${c.childCount}</span>` : '';
+      const stat = c.status ? `<span class="skeleton">· ${esc(c.status)}</span>` : '';
+      const rules = [
+        ...c.permits.map((l) => `<span class="tag perm">+ ${esc(l)}</span>`),
+        ...c.prohibits.map((l) => `<span class="tag proh">− ${esc(l)}</span>`),
+        ...c.requires.map((l) => `<span class="tag req">↳ ${esc(l)}</span>`),
+      ].join('');
+      const ttags = (c.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join('');
+      return `<div class="card" data-id="${esc(c.id)}">
+        <div class="title">${esc(c.label)} ${comp} ${stat}</div>
+        <div class="desc">${esc(c.desc)}</div>
+        <div class="sum">${rules || '<span class="skeleton">no rules</span>'}</div>
+        ${ttags ? `<div class="sum">${ttags}</div>` : ''}
       </div>`;
     }).join('');
     [...grid.querySelectorAll('.card')].forEach((el) => el.addEventListener('click', () => openModal(el.dataset.id)));
-  }
-
-  async function lazyCard(m) {
-    try {
-      const parsed = await getParsed(m.iri);
-      const card = buildTemplateCard(parsed, state.vocab);
-      const pend = document.querySelector(`[data-pending="${cssEsc(m.iri)}"]`);
-      const sum = document.querySelector(`[data-sum="${cssEsc(m.iri)}"]`);
-      const title = pend?.closest('.title');
-      if (title && card.isComposite) title.insertAdjacentHTML('beforeend', `<span class="badge-comp">COMPOSITE · ${card.children.length}</span>`);
-      if (pend) pend.textContent = card.status ? '· ' + card.status : '';
-      if (sum) {
-        const tags = [
-          ...card.permits.map((l) => `<span class="tag perm">+ ${esc(l)}</span>`),
-          ...card.prohibits.map((l) => `<span class="tag proh">− ${esc(l)}</span>`),
-          ...card.requires.map((l) => `<span class="tag req">↳ ${esc(l)}</span>`),
-        ].join('');
-        sum.innerHTML = tags || '<span class="skeleton">no rules</span>';
-      }
-    } catch (e) {
-      const sum = document.querySelector(`[data-sum="${cssEsc(m.iri)}"]`);
-      if (sum) sum.innerHTML = `<span class="skeleton" style="color:var(--danger)">parse failed</span>`;
-    }
   }
 
   async function getParsed(id) {
