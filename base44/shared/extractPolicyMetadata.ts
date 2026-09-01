@@ -39,6 +39,10 @@ function normalizeTtl(ttl: string): string {
 export interface PolicyMetadata {
   subject_iri: string;
   subject_curie: string;
+  // Parameter IRIs referenced as right operands in the policy's constraints
+  // (full scan of the TTL, including the rules block the flat extractor skips).
+  // Resolved to prefLabels by the indexer via the parameters concept scheme.
+  parameter_iris: string[];
   legal_code: {
     legal_code: string | null;
     policy_text_html: string | null;
@@ -95,7 +99,7 @@ const PUBLICATION_PREDS: Record<string, keyof PolicyMetadata['publication']> = {
   [OPENREL + 'policyStatus']: 'policy_status',
 };
 
-function compactForIndex(iri: string): string {
+export function compactForIndex(iri: string): string {
   if (iri.startsWith(OPENREL)) return 'openrel:' + iri.substring(OPENREL.length);
   if (iri.startsWith(DCT)) return 'dct:' + iri.substring(DCT.length);
   return iri;
@@ -249,6 +253,22 @@ export function extractPolicyMetadata(ttl: string): PolicyMetadata | null {
   };
   const getAll = (iri: string): string[] => (rawProps[iri] || []).map((v) => v.value);
 
+  // Parameters: full-scan the TTL for odrl:rightOperand / rightOperandReference
+  // tokens that are IRI/CURIE references (skip literal right operands). These
+  // live inside the rules block the flat extractor deliberately stops at, so
+  // we scan the whole normalized document. Each token is resolved to a full
+  // IRI; the indexer maps it to a prefLabel via parameters.ttl.
+  const paramSet = new Set<string>();
+  const paramRe = /odrl:rightOperand(?:Reference)?\s+("[^"]*"|<[^>]+>|\S+)/g;
+  let pmm: RegExpExecArray | null;
+  while ((pmm = paramRe.exec(normalized)) !== null) {
+    let tok = pmm[1].replace(/[;,\]\s]+$/, '').trim();
+    if (!tok || tok.startsWith('"')) continue; // literal right operand — not a parameter ref
+    if (tok.startsWith('<') && tok.endsWith('>')) tok = tok.slice(1, -1);
+    paramSet.add(resolveTerm(tok));
+  }
+  const parameter_iris = [...paramSet];
+
   const legal_code = {
     legal_code: getLiteral(OPENREL + 'legalCode') || getLiteral(OPENREL + 'legalcode'),
     policy_text_html: getLiteral(OPENREL + 'policyTextHtml'),
@@ -279,6 +299,7 @@ export function extractPolicyMetadata(ttl: string): PolicyMetadata | null {
   return {
     subject_iri: subjectIri,
     subject_curie: compactForIndex(subjectIri),
+    parameter_iris,
     legal_code, citation, publication,
   };
 }

@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { resolveGithubCredentials } from '../../shared/resolveGithubCredentials.ts';
 import {
   extractPolicyMetadata,
+  compactForIndex,
   CURATED_FIELDS,
   DERIVED_FIELDS,
 } from '../../shared/extractPolicyMetadata.ts';
@@ -143,6 +144,25 @@ export default async function indexPolicies(req: Request): Promise<Response> {
       }
     }
 
+    // 4.5. Parameter concept scheme (parameters.ttl) via the API — map each
+    // parameter IRI to its prefLabel so the index stores human-readable labels
+    // instead of IRIs. Keyed by both the member's full IRI and its openrel:
+    // CURIE form so policy right-operand refs resolve regardless of form.
+    const paramPrefLabel = new Map<string, string>();
+    try {
+      const pRes = await base44.asServiceRole.functions.invoke('fetchApiSourceContent', { section: 'Parameters' });
+      const pData = (pRes as any)?.data ?? pRes;
+      for (const m of pData?.members || []) {
+        if (!m.iri || !m.label) continue;
+        paramPrefLabel.set(m.iri, m.label);
+        const c = compactForIndex(m.iri);
+        if (c !== m.iri) paramPrefLabel.set(c, m.label);
+      }
+    } catch (e: any) {
+      // Non-fatal: the parameters field just stays empty if the scheme can't load.
+      console.warn('indexPolicies: could not load parameters scheme:', e?.message || e);
+    }
+
     // 5. Determine target index entries.
     const targets = requestedIris.length
       ? policies.filter((p) => requestedIris.includes(p.iri))
@@ -175,21 +195,42 @@ export default async function indexPolicies(req: Request): Promise<Response> {
         notFoundCount++;
         continue;
       }
+      const paramLabels = [...new Set(
+        (md.parameter_iris || [])
+          .map((pi: string) => paramPrefLabel.get(pi) || paramPrefLabel.get(compactForIndex(pi)))
+          .filter(Boolean) as string[]
+      )].sort();
       const newDerived = {
         legal_code: md.legal_code,
         citation: md.citation,
         publication: md.publication,
+        parameters: paramLabels,
       };
       const oldDerived = {
         legal_code: entry.legal_code,
         citation: entry.citation,
         publication: entry.publication,
+        parameters: entry.parameters,
       };
       const added: LeafDiff[] = [];
       const changed: LeafDiff[] = [];
       for (const field of DERIVED_FIELDS) {
         const d = diffDerived((oldDerived as any)[field], (newDerived as any)[field]);
         for (const x of d) (x.status === 'added' ? added : changed).push({ field: `${field}.${x.field}`, ...x, status: x.status } as any);
+      }
+      // parameters is a flat prefLabel array (not a nested object): diff whole-array.
+      {
+        const oldP = oldDerived.parameters || [];
+        const newP = newDerived.parameters;
+        if (JSON.stringify(oldP) !== JSON.stringify(newP)) {
+          const wasEmpty = !oldP || (Array.isArray(oldP) && oldP.length === 0);
+          (wasEmpty ? added : changed).push({
+            field: 'parameters',
+            before: wasEmpty ? null : oldP,
+            after: newP,
+            status: wasEmpty ? 'added' : 'changed',
+          });
+        }
       }
       const hasChanges = added.length + changed.length > 0;
       if (hasChanges) changedCount++; else unchangedCount++;

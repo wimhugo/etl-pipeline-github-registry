@@ -7,11 +7,11 @@ import IndexScopeSelector from '@/components/indexing/IndexScopeSelector';
 import IndexDiffPreview from '@/components/indexing/IndexDiffPreview';
 
 /**
- * IndexingUtility — KB Manager page that re-indexes the curated Policy Index
- * with auto-derived metadata (legal-code links, citation, publication) pulled
- * from the canonical policy TTLs. Curated fields are preserved; only the
- * three auto-derived objects are written. One-click batch run → diff preview
- * → apply (creates a PR via submitPolicyPR).
+ * IndexingUtility (v0.4) — re-indexes the curated Policy Index with
+ * auto-derived metadata: legal-code links, citation metadata, publication
+ * info, AND the set of parameters (by prefLabel) that apply to each policy.
+ * Curated fields are preserved; only the auto-derived objects are written
+ * back via a pull request.
  */
 export default function IndexingUtility() {
   const { toast } = useToast();
@@ -93,8 +93,9 @@ export default function IndexingUtility() {
         </h1>
         <p className="text-sm text-muted-foreground mt-1.5 max-w-2xl">
           Re-index the curated Policy Index with auto-derived metadata — legal-code links, citation metadata,
-          and publication info — extracted from the canonical policy TTL files. Human-curated fields are preserved;
-          only the auto-derived objects are written back via a pull request.
+          publication info, and the parameters (by prefLabel) that apply to each policy — extracted from the
+          canonical policy TTL files. Human-curated fields are preserved; only the auto-derived objects are
+          written back via a pull request.
         </p>
       </div>
 
