@@ -6,33 +6,62 @@ import { submitGithubPR } from '../../shared/submitGithubPR.ts';
  * ReasonerUpdate
  * --------------
  * Builds the OpenREL Reasoner Graph (data/reasoner/graph_reasoner.ttl) — a
- * reified, human-editable graph of assertions between actions (and, later,
- * constraints) using the five type_evaluation relations:
+ * reified, human-editable graph of assertions between actions using the
+ * type_evaluation relations:
  *   openrel:includedIn · openrel:contradicts · openrel:implies ·
- *   openrel:compatible · openrel:missing
+ *   openrel:allows · openrel:compatible · openrel:missing
  *
- * Assertions are produced in two tiers:
- *   - Deterministic  — derived mechanically from actions.ttl:
- *       · odrl:includedIn edges (verbatim)
- *       · includedIn propagated via skos:exactMatch / broadMatch / narrowMatch
- *       · openrel:defaultDuty  → implies
- *       · openrel:contradicts   → contradicts (authored)
- *   - Probabilistic  — LLM-draft edges (contradicts / implies / includedIn
- *     gaps) with confidence + rationale, for human review.
+ * Assertions are produced in three tiers:
+ *   - Deterministic  — derived mechanically:
+ *       · actions.ttl: odrl:includedIn, skos mapping propagation,
+ *         openrel:defaultDuty (→ implies), authored openrel:contradicts
+ *       · DALICC dependency graph (dg_default.ttl, live from dalicc/dalicc):
+ *         odrl:includedIn, odrl:implies (object role Duty),
+ *         dalicc:contradicts — canonicalized via owl:sameAs and resolved to
+ *         openrel IRIs through the actions.ttl skos mappings. Unmapped
+ *         external IRIs are kept as-is.
+ *   - Corpus         — statistical evidence from the DALICC licence corpus
+ *     (live, ~343 odrl:Set TTLs): permission→duty co-occurrence (→ implies)
+ *     and prohibition∩permission co-existence (→ openrel:allows), each with
+ *     a support count, filtered by a minimum-support threshold. The corpus is
+ *     fetched in UI-driven batches (mode "corpus_fetch"); the frontend
+ *     accumulates pair evidence locally (with a progress counter) and passes
+ *     it back as corpus_evidence on the preview/apply call. A single-shot
+ *     fetch remains as fallback for non-UI callers.
+ *   - Probabilistic  — LLM-draft edges with confidence + rationale, for
+ *     human review.
  *
- * Merge rule: a probabilistic assertion whose edge key already exists as a
- * deterministic assertion is dropped ("ignore probabilistic if a deterministic
- * one is already present").
+ * Assertion model: subject/object IRIs plus a role pair (subjectRole /
+ * objectRole: odrl:Permission / Prohibition / Duty). Legacy graphs that only
+ * carry openrel:role are read with role → objectRole.
  *
- * Preservation: re-runs regenerate every deterministic-from-source edge, but
- * PRESERVE:
- *   - existing human-authored deterministic assertions (dct:source "manual")
- *   - existing probabilistic assertions (so curator review of LLM drafts
- *     survives) — unless a new deterministic edge now shadows them.
+ * Merge rule (extended shadow rule): Deterministic > Corpus > Probabilistic —
+ * an assertion is dropped when an assertion of a stronger tier already exists
+ * for the same edge key (subject | relation | object | roles).
  *
- * Output is a reified, commented, editable TTL file committed via a PR.
+ * Preservation: re-runs regenerate every from-source edge, but PRESERVE:
+ *   - existing human-authored deterministic/corpus assertions
+ *     (dct:source "manual"/"curated")
+ *   - existing probabilistic assertions (curator review survives) — unless a
+ *     stronger tier now shadows them.
  *
- * Payload: { dry_run?: boolean, skip_llm?: boolean, model?: string, message?: string }
+ * On apply, openrel:allows is authored into actions.ttl (same PR) when not
+ * yet defined. Output is a reified, commented, editable TTL committed via PR.
+ *
+ * Payload:
+ * {
+ *   dry_run?: boolean, skip_llm?: boolean, model?: string, message?: string,
+ *   mode?: 'corpus_fetch',
+ *   corpus_start?: number, corpus_count?: number,
+ *   corpus_evidence?: { licences: number, pd: Record<string, number>, pp: Record<string, number> },
+ *   curated_assertions?: Assertion[],
+ *   sources?: {
+ *     actions_path?: string,
+ *     dg_enabled?: boolean, dg_repo?: string, dg_branch?: string, dg_path?: string,
+ *     corpus_enabled?: boolean, corpus_repo?: string, corpus_branch?: string,
+ *     corpus_folder?: string, corpus_min_support?: number
+ *   }
+ * }
  */
 
 const GRAPH_FILE = 'data/reasoner/graph_reasoner.ttl';
@@ -41,7 +70,33 @@ const ODRL = 'http://www.w3.org/ns/odrl/2/';
 const SKOS = 'http://www.w3.org/2004/02/skos/core#';
 const DCT = 'http://purl.org/dc/terms/';
 const XSD = 'http://www.w3.org/2001/XMLSchema#';
+const OWL = 'http://www.w3.org/2002/07/owl#';
+const DALICC = 'https://dalicc.net/ns#';
+const CC = 'http://creativecommons.org/ns#';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
+
+const REL_INCLUDEDIN = OPENREL + 'includedIn';
+const REL_CONTRADICTS = OPENREL + 'contradicts';
+const REL_IMPLIES = OPENREL + 'implies';
+const REL_ALLOWS = OPENREL + 'allows';
+const ROLE_PERMISSION = ODRL + 'Permission';
+const ROLE_PROHIBITION = ODRL + 'Prohibition';
+const ROLE_DUTY = ODRL + 'Duty';
+
+type Derivation = 'Deterministic' | 'Corpus' | 'Probabilistic';
+
+interface Assertion {
+  subject: string;
+  relation: string;
+  object: string;
+  subjectRole: string | null;
+  objectRole: string | null;
+  derivation: Derivation;
+  source: string;
+  confidence?: number;
+  rationale?: string;
+  support?: number;
+}
 
 interface ActionInfo {
   iri: string;
@@ -57,34 +112,19 @@ interface ActionInfo {
   contradicts: string[];
 }
 
-interface Assertion {
-  subject: string;
-  relation: string;   // openrel:includedIn | openrel:contradicts | openrel:implies
-  object: string;
-  role: string | null;
-  derivation: 'Deterministic' | 'Probabilistic';
-  source: string;
-  confidence?: number;
-  rationale?: string;
-}
-
-const REL_INCLUDEDIN = OPENREL + 'includedIn';
-const REL_CONTRADICTS = OPENREL + 'contradicts';
-const REL_IMPLIES = OPENREL + 'implies';
-
 function curieOf(iri: string): string {
   if (iri.startsWith(OPENREL)) return 'openrel:' + iri.substring(OPENREL.length);
   if (iri.startsWith(ODRL)) return 'odrl:' + iri.substring(ODRL.length);
   if (iri.startsWith(SKOS)) return 'skos:' + iri.substring(SKOS.length);
   if (iri.startsWith(DCT)) return 'dct:' + iri.substring(DCT.length);
+  if (iri.startsWith(CC)) return 'cc:' + iri.substring(CC.length);
+  if (iri.startsWith(DALICC)) return 'dalicc:' + iri.substring(DALICC.length);
   return iri;
 }
 
 // ---------------------------------------------------------------------------
-// Flat Turtle parser — sufficient for actions.ttl (flat predicate-object
-// statements; no blank-node rule blocks). Mirrors the normalization used by
-// the policy extractor (append '.' to bare @prefix/@base; escape stray
-// inner quotes) but returns a per-subject predicate→objects map.
+// Flat Turtle parsing helpers (flat statements + balanced-bracket handling
+// for ODRL rule blank nodes in licence files).
 // ---------------------------------------------------------------------------
 function normalizeTtl(ttl: string): string {
   return ttl.split('\n').map((line) => {
@@ -126,16 +166,20 @@ function splitTopLevel(text: string, delim: string): string[] {
   return parts;
 }
 
-function parseActionsTtl(ttl: string): { actions: Map<string, ActionInfo>; prefixes: Record<string, string> } {
-  const normalized = normalizeTtl(ttl);
+interface PrefixCtx {
+  prefixes: Record<string, string>;
+  baseIri: string | null;
+  resolveTerm(term: string): string;
+}
+
+function makePrefixCtx(normalized: string): PrefixCtx {
   const prefixes: Record<string, string> = {};
   let pm: RegExpExecArray | null;
   const prefixRe = /@prefix\s+([^:\s]+):\s+<([^>]+)>\s*\./g;
   while ((pm = prefixRe.exec(normalized)) !== null) prefixes[pm[1].trim()] = pm[2];
   const baseMatch = normalized.match(/@base\s+<([^>]+)>\s*\./);
   const baseIri = baseMatch ? baseMatch[1] : null;
-
-  function resolveTerm(term: string): string {
+  const resolveTerm = (term: string): string => {
     term = term.trim();
     if (term === 'a') return RDF_TYPE;
     if (term.startsWith('<') && term.endsWith('>')) {
@@ -152,34 +196,45 @@ function parseActionsTtl(ttl: string): { actions: Map<string, ActionInfo>; prefi
       if (prefixes[pfx]) return prefixes[pfx] + local;
     }
     return term;
-  }
+  };
+  return { prefixes, baseIri, resolveTerm };
+}
 
-  let body = stripComments(normalized.replace(/@prefix[^\n]*\n?/g, '').replace(/@base[^\n]*\n?/g, ''));
-  body = body.replace(/\s+/g, ' ').trim();
-  if (!body) return { actions: new Map(), prefixes };
+function ttlBody(normalized: string): string {
+  return stripComments(normalized.replace(/@prefix[^\n]*\n?/g, '').replace(/@base[^\n]*\n?/g, ''))
+    .replace(/\s+/g, ' ').trim();
+}
 
+// ---------------------------------------------------------------------------
+// actions.ttl parser (flat, class-filtered)
+// ---------------------------------------------------------------------------
+function parseActionsTtl(ttl: string): { actions: Map<string, ActionInfo> } {
+  const normalized = normalizeTtl(ttl);
+  const ctx = makePrefixCtx(normalized);
+  const body = ttlBody(normalized);
   const actions = new Map<string, ActionInfo>();
+  if (!body) return { actions };
   const ACTION_CLASS = new Set([ODRL + 'Action', OPENREL + 'Action']);
 
   for (const stmt of splitTopLevel(body, '.')) {
     const segs = splitTopLevel(stmt, ';').map((s) => s.trim()).filter(Boolean);
     if (!segs.length) continue;
-    const first = segs[0].match(/^(\S+)\s+(.*)/);
+    const first = segs[0].match(/^(\S+)\s+([\s\S]*)$/);
     if (!first) continue;
-    const subjectIri = resolveTerm(first[1]);
+    const subjectIri = ctx.resolveTerm(first[1]);
     const segRest = [first[2], ...segs.slice(1)];
     const props: Record<string, string[]> = {};
     for (const seg of segRest) {
-      const m = seg.match(/^(\S+)\s+(.*)/);
+      const m = seg.match(/^(\S+)\s+([\s\S]*)$/);
       if (!m) continue;
-      const pred = resolveTerm(m[1]);
+      const pred = ctx.resolveTerm(m[1]);
       const objs = splitTopLevel(m[2], ',').map((o) => o.trim()).filter(Boolean);
       for (const o of objs) {
         if (!props[pred]) props[pred] = [];
         props[pred].push(o);
       }
     }
-    const types = (props[RDF_TYPE] || []).map(resolveTerm);
+    const types = (props[RDF_TYPE] || []).map(ctx.resolveTerm);
     if (!types.some((t) => ACTION_CLASS.has(t))) continue;
 
     const lit = (iri: string): string => {
@@ -188,10 +243,10 @@ function parseActionsTtl(ttl: string): { actions: Map<string, ActionInfo>; prefi
       return m ? m[1].replace(/\\"/g, '"') : '';
     };
     const iris = (iri: string): string[] => (props[iri] || [])
-      .filter((o) => !o.startsWith('"'))
-      .map(resolveTerm);
+      .filter((o) => !o.startsWith('"') && !o.startsWith('('))
+      .map(ctx.resolveTerm);
 
-    const info: ActionInfo = {
+    actions.set(subjectIri, {
       iri: subjectIri,
       curie: curieOf(subjectIri),
       label: lit(SKOS + 'prefLabel') || lit('http://www.w3.org/2000/01/rdf-schema#label'),
@@ -203,25 +258,122 @@ function parseActionsTtl(ttl: string): { actions: Map<string, ActionInfo>; prefi
       narrowMatch: iris(SKOS + 'narrowMatch'),
       defaultDuty: iris(OPENREL + 'defaultDuty'),
       contradicts: iris(OPENREL + 'contradicts'),
-    };
-    actions.set(subjectIri, info);
+    });
   }
-  return { actions, prefixes };
+  return { actions };
 }
 
 // ---------------------------------------------------------------------------
-// Deterministic assertion generation
+// Generic flat triple parser (dependency graph)
 // ---------------------------------------------------------------------------
-function edgeKey(a: Pick<Assertion, 'subject' | 'relation' | 'object' | 'role'>): string {
-  return [a.subject, a.relation, a.object, a.role || ''].join('|');
+function parseFlatTriples(ttl: string): { triples: Array<{ s: string; p: string; o: string }> } {
+  const normalized = normalizeTtl(ttl);
+  const ctx = makePrefixCtx(normalized);
+  const body = ttlBody(normalized);
+  const triples: Array<{ s: string; p: string; o: string }> = [];
+  if (!body) return { triples };
+  for (const stmt of splitTopLevel(body, '.')) {
+    const segs = splitTopLevel(stmt, ';').map((s) => s.trim()).filter(Boolean);
+    if (!segs.length) continue;
+    const first = segs[0].match(/^(\S+)\s+([\s\S]*)$/);
+    if (!first) continue;
+    const s = ctx.resolveTerm(first[1]);
+    const rest = [first[2], ...segs.slice(1)];
+    for (const seg of rest) {
+      const m = seg.match(/^(\S+)\s+([\s\S]*)$/);
+      if (!m) continue;
+      const p = ctx.resolveTerm(m[1]);
+      for (const o of splitTopLevel(m[2], ',')) {
+        const oi = ctx.resolveTerm(o.trim());
+        if (oi && !oi.startsWith('(')) triples.push({ s, p, o: oi });
+      }
+    }
+  }
+  return { triples };
 }
 
+// ---------------------------------------------------------------------------
+// IRI resolution: owl:sameAs canonicalization + skos reverse map → openrel
+// ---------------------------------------------------------------------------
+function buildReverseMap(actions: Map<string, ActionInfo>): Map<string, string> {
+  const m = new Map<string, string>();
+  // exactMatch first (equivalence), then broad/narrow (approximation).
+  for (const a of actions.values()) {
+    for (const em of a.exactMatch) if (!m.has(em)) m.set(em, a.iri);
+  }
+  for (const a of actions.values()) {
+    for (const x of [...a.broadMatch, ...a.narrowMatch]) if (!m.has(x)) m.set(x, a.iri);
+    if (!m.has(a.iri)) m.set(a.iri, a.iri);
+  }
+  return m;
+}
+
+function addSameAs(adj: Map<string, Set<string>>, a: string, b: string) {
+  if (!adj.has(a)) adj.set(a, new Set());
+  if (!adj.has(b)) adj.set(b, new Set());
+  adj.get(a)!.add(b);
+  adj.get(b)!.add(a);
+}
+
+function resolveExternal(
+  iri: string,
+  reverseMap: Map<string, string>,
+  sameAsAdj: Map<string, Set<string>>,
+): string {
+  if (reverseMap.has(iri)) return reverseMap.get(iri)!;
+  const seen = new Set([iri]);
+  const queue = [iri];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    for (const nb of sameAsAdj.get(cur) || []) {
+      if (seen.has(nb)) continue;
+      seen.add(nb);
+      if (reverseMap.has(nb)) return reverseMap.get(nb)!;
+      queue.push(nb);
+    }
+  }
+  // No openrel mapping: prefer an odrl-namespace representative.
+  for (const nb of sameAsAdj.get(iri) || []) {
+    if (nb.startsWith(ODRL)) return nb;
+  }
+  return iri;
+}
+
+// ---------------------------------------------------------------------------
+// Edge keys, dedup, sort
+// ---------------------------------------------------------------------------
+function edgeKey(
+  a: Pick<Assertion, 'subject' | 'relation' | 'object' | 'subjectRole' | 'objectRole'>,
+): string {
+  return [a.subject, a.relation, a.object, a.subjectRole || '', a.objectRole || ''].join('|');
+}
+
+function dedupByKey(list: Assertion[]): Assertion[] {
+  const seen = new Set<string>();
+  return list.filter((a) => {
+    const k = edgeKey(a);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+function dedupSorted(list: Assertion[]): Assertion[] {
+  return dedupByKey(list).sort((a, b) =>
+    curieOf(a.subject).localeCompare(curieOf(b.subject)) ||
+    curieOf(a.relation).localeCompare(curieOf(b.relation)) ||
+    curieOf(a.object).localeCompare(curieOf(b.object)),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Deterministic pass 1 — actions.ttl
+// ---------------------------------------------------------------------------
 function deterministicPass(actions: Map<string, ActionInfo>): Assertion[] {
   const out: Assertion[] = [];
-  const push = (s: string, rel: string, o: string, role: string | null, source: string) =>
-    out.push({ subject: s, relation: rel, object: o, role, derivation: 'Deterministic', source });
+  const push = (s: string, rel: string, o: string, objectRole: string | null, source: string) =>
+    out.push({ subject: s, relation: rel, object: o, subjectRole: null, objectRole, derivation: 'Deterministic', source });
 
-  // Reverse lookup: odrl action → openrel action that exactMatches it.
   const odrlToOpenrel = new Map<string, string>();
   for (const a of actions.values()) {
     for (const em of a.exactMatch) {
@@ -231,12 +383,9 @@ function deterministicPass(actions: Map<string, ActionInfo>): Assertion[] {
   const resolveTarget = (iri: string): string => odrlToOpenrel.get(iri) || iri;
 
   for (const a of actions.values()) {
-    // 1. Verbatim includedIn
     for (const inc of a.includedIn) {
       push(a.iri, REL_INCLUDEDIN, resolveTarget(inc), null, 'odrl:includedIn');
     }
-    // 2. Propagate via skos mappings
-    //    A exactMatch B, B includedIn C  ⇒  A includedIn C
     for (const em of a.exactMatch) {
       const b = actions.get(em);
       if (!b) continue;
@@ -244,26 +393,338 @@ function deterministicPass(actions: Map<string, ActionInfo>): Assertion[] {
         push(a.iri, REL_INCLUDEDIN, resolveTarget(c), null, 'skos:exactMatch propagation');
       }
     }
-    //    A broadMatch B  ⇒  B includedIn A   (A is the broader)
     for (const bm of a.broadMatch) {
       push(resolveTarget(bm), REL_INCLUDEDIN, a.iri, null, 'skos:broadMatch propagation');
     }
-    //    A narrowMatch B ⇒  A includedIn B   (B is the broader)
     for (const nm of a.narrowMatch) {
       push(a.iri, REL_INCLUDEDIN, resolveTarget(nm), null, 'skos:narrowMatch propagation');
     }
-    // 3. defaultDuty → implies (role Duty)
     for (const d of a.defaultDuty) {
-      push(a.iri, REL_IMPLIES, resolveTarget(d), ODRL + 'Duty', 'openrel:defaultDuty');
+      push(a.iri, REL_IMPLIES, resolveTarget(d), ROLE_DUTY, 'openrel:defaultDuty');
     }
-    // 4. authored contradicts
     for (const c of a.contradicts) {
       push(a.iri, REL_CONTRADICTS, resolveTarget(c), null, 'authored (openrel:contradicts)');
     }
   }
-  // Dedup deterministic (same key → keep first)
-  const seen = new Set<string>();
-  return out.filter((a) => { const k = edgeKey(a); if (seen.has(k)) return false; seen.add(k); return true; });
+  return dedupByKey(out);
+}
+
+// ---------------------------------------------------------------------------
+// Corpus pass — DALICC licence TTLs (odrl:Set with blank-node rule blocks)
+// ---------------------------------------------------------------------------
+interface LicenceRules {
+  permissions: Array<{ action: string; duties: string[] }>;
+  prohibitions: string[];
+}
+
+function extractBracketGroups(s: string): string[] {
+  const groups: string[] = [];
+  let depth = 0, start = -1, inStr = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '"' && s[i - 1] !== '\\') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === '[') { if (depth === 0) start = i; depth++; }
+    else if (ch === ']') { depth--; if (depth === 0 && start >= 0) { groups.push(s.slice(start + 1, i)); start = -1; } }
+  }
+  return groups;
+}
+
+function parseRuleBlock(
+  block: string,
+  resolveTerm: (t: string) => string,
+): { actions: string[]; duties: string[] } {
+  const actions: string[] = [];
+  const dutyBlocks: string[] = [];
+  for (const seg of splitTopLevel(block, ';').map((s) => s.trim()).filter(Boolean)) {
+    const m = seg.match(/^(\S+)\s+([\s\S]*)$/);
+    if (!m) continue;
+    const pred = resolveTerm(m[1]);
+    if (pred === ODRL + 'action') {
+      for (const o of splitTopLevel(m[2], ',')) {
+        const t = resolveTerm(o.trim());
+        if (t && !t.startsWith('(')) actions.push(t);
+      }
+    } else if (pred === ODRL + 'duty') {
+      dutyBlocks.push(...extractBracketGroups(m[2]));
+    }
+  }
+  const duties = dutyBlocks.flatMap((b) => parseRuleBlock(b, resolveTerm).actions);
+  return { actions, duties };
+}
+
+function parseLicenceTtl(ttl: string): LicenceRules | null {
+  const normalized = normalizeTtl(ttl);
+  const ctx = makePrefixCtx(normalized);
+  const body = ttlBody(normalized);
+  const permissions: Array<{ action: string; duties: string[] }> = [];
+  const prohibitions: string[] = [];
+  if (!body) return null;
+
+  for (const stmt of splitTopLevel(body, '.')) {
+    const segs = splitTopLevel(stmt, ';').map((s) => s.trim()).filter(Boolean);
+    if (!segs.length) continue;
+    const first = segs[0].match(/^(\S+)\s+([\s\S]*)$/);
+    if (!first) continue;
+    const rest = [first[2], ...segs.slice(1)];
+    for (const seg of rest) {
+      const m = seg.match(/^(\S+)\s+([\s\S]*)$/);
+      if (!m) continue;
+      const pred = ctx.resolveTerm(m[1]);
+      if (pred !== ODRL + 'permission' && pred !== ODRL + 'prohibition') continue;
+      for (const block of extractBracketGroups(m[2])) {
+        const rule = parseRuleBlock(block, ctx.resolveTerm);
+        if (pred === ODRL + 'permission') {
+          for (const act of rule.actions) permissions.push({ action: act, duties: rule.duties });
+        } else {
+          prohibitions.push(...rule.actions);
+        }
+      }
+    }
+  }
+  if (!permissions.length && !prohibitions.length) return null;
+  return { permissions, prohibitions };
+}
+
+interface CorpusSummary {
+  licences_fetched: number;
+  licences_parsed: number;
+  fetch_errors: number;
+  implies_candidates: number;
+  allows_candidates: number;
+  min_support: number;
+  error?: string;
+}
+
+// Single-shot corpus pass (fallback; the UI normally drives corpus_fetch batches).
+function corpusPass(
+  licences: Array<{ name: string; text: string }>,
+  resolve: (iri: string) => string,
+  minSupport: number,
+): { assertions: Assertion[]; summary: CorpusSummary } {
+  const permDuty = new Map<string, Set<string>>();
+  const prohibPerm = new Map<string, Set<string>>();
+  let parsed = 0;
+  for (const lic of licences) {
+    let rules: LicenceRules | null = null;
+    try { rules = parseLicenceTtl(lic.text); } catch { rules = null; }
+    if (!rules) continue;
+    parsed++;
+    const perms = rules.permissions
+      .map((p) => ({ action: resolve(p.action), duties: [...new Set(p.duties.map(resolve))] }))
+      .filter((p) => p.action);
+    const prohibs = [...new Set(rules.prohibitions.map(resolve).filter(Boolean))];
+    for (const p of perms) {
+      for (const d of p.duties) {
+        if (!d || d === p.action) continue;
+        const k = p.action + '|' + d;
+        if (!permDuty.has(k)) permDuty.set(k, new Set());
+        permDuty.get(k)!.add(lic.name);
+      }
+    }
+    for (const pr of prohibs) {
+      for (const p of perms) {
+        if (pr === p.action) continue;
+        const k = pr + '|' + p.action;
+        if (!prohibPerm.has(k)) prohibPerm.set(k, new Set());
+        prohibPerm.get(k)!.add(lic.name);
+      }
+    }
+  }
+
+  const assertions: Assertion[] = [];
+  for (const [k, set] of permDuty) {
+    if (set.size < minSupport) continue;
+    const [a, d] = k.split('|');
+    assertions.push({
+      subject: a, relation: REL_IMPLIES, object: d,
+      subjectRole: ROLE_PERMISSION, objectRole: ROLE_DUTY,
+      derivation: 'Corpus',
+      source: `DALICC licence corpus (${parsed} licences)`,
+      support: set.size,
+      rationale: `Permission ${curieOf(a)} is accompanied by duty ${curieOf(d)} in ${set.size} of ${parsed} licences.`,
+    });
+  }
+  for (const [k, set] of prohibPerm) {
+    if (set.size < minSupport) continue;
+    const [pr, p] = k.split('|');
+    assertions.push({
+      subject: pr, relation: REL_ALLOWS, object: p,
+      subjectRole: ROLE_PROHIBITION, objectRole: ROLE_PERMISSION,
+      derivation: 'Corpus',
+      source: `DALICC licence corpus (${parsed} licences)`,
+      support: set.size,
+      rationale: `Prohibition ${curieOf(pr)} co-exists with permission ${curieOf(p)} in ${set.size} of ${parsed} licences.`,
+    });
+  }
+
+  return {
+    assertions,
+    summary: {
+      licences_fetched: licences.length,
+      licences_parsed: parsed,
+      fetch_errors: 0,
+      implies_candidates: permDuty.size,
+      allows_candidates: prohibPerm.size,
+      min_support: minSupport,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Batched corpus support — per-licence pair extraction + evidence aggregation
+// ---------------------------------------------------------------------------
+function extractLicencePairs(
+  text: string,
+  resolve: (iri: string) => string,
+): { pd: string[][]; pp: string[][] } {
+  let rules: LicenceRules | null = null;
+  try { rules = parseLicenceTtl(text); } catch { rules = null; }
+  if (!rules) return { pd: [], pp: [] };
+  const pd = new Set<string>();
+  const pp = new Set<string>();
+  const perms = rules.permissions
+    .map((p) => ({ action: resolve(p.action), duties: [...new Set(p.duties.map(resolve))] }))
+    .filter((p) => p.action);
+  const prohibs = [...new Set(rules.prohibitions.map(resolve).filter(Boolean))];
+  for (const p of perms) {
+    for (const d of p.duties) {
+      if (!d || d === p.action) continue;
+      pd.add(p.action + '|' + d);
+    }
+  }
+  for (const pr of prohibs) {
+    for (const p of perms) {
+      if (pr === p.action) continue;
+      pp.add(pr + '|' + p.action);
+    }
+  }
+  return {
+    pd: [...pd].map((k) => k.split('|')),
+    pp: [...pp].map((k) => k.split('|')),
+  };
+}
+
+function corpusAssertionsFromEvidence(ev: any, minSupport: number): Assertion[] {
+  const n = Number(ev.licences) || 0;
+  const out: Assertion[] = [];
+  for (const [k, v] of Object.entries(ev.pd || {})) {
+    const support = Number(v) || 0;
+    if (support < minSupport) continue;
+    const [s, o] = k.split('|');
+    out.push({
+      subject: s, relation: REL_IMPLIES, object: o,
+      subjectRole: ROLE_PERMISSION, objectRole: ROLE_DUTY,
+      derivation: 'Corpus',
+      source: `DALICC licence corpus (${n} licences)`,
+      support,
+      rationale: `Permission ${curieOf(s)} is accompanied by duty ${curieOf(o)} in ${support} of ${n} licences.`,
+    });
+  }
+  for (const [k, v] of Object.entries(ev.pp || {})) {
+    const support = Number(v) || 0;
+    if (support < minSupport) continue;
+    const [s, o] = k.split('|');
+    out.push({
+      subject: s, relation: REL_ALLOWS, object: o,
+      subjectRole: ROLE_PROHIBITION, objectRole: ROLE_PERMISSION,
+      derivation: 'Corpus',
+      source: `DALICC licence corpus (${n} licences)`,
+      support,
+      rationale: `Prohibition ${curieOf(s)} co-exists with permission ${curieOf(o)} in ${support} of ${n} licences.`,
+    });
+  }
+  return out;
+}
+
+async function resolveActionsPath(base44: any, src: any): Promise<string> {
+  let actionsPath = (src.actions_path as string) || '';
+  if (!actionsPath) {
+    const sourceFiles = await base44.asServiceRole.entities.ApiSourceFile.filter({ section: 'Actions' });
+    actionsPath = sourceFiles[0]?.file_path || '.openrel/vocabs/openrel/actions.ttl';
+  }
+  return actionsPath;
+}
+
+interface Prepared {
+  ttlText: string;
+  actions: Map<string, ActionInfo>;
+  dgTriples: Array<{ s: string; p: string; o: string }>;
+  resolve: (iri: string) => string;
+  dgError: string | null;
+}
+
+async function loadActionsAndResolve(
+  ghHeaders: Record<string, string>,
+  repo: string,
+  branch: string,
+  actionsPath: string,
+  dgEnabled: boolean,
+  dgRepo: string,
+  dgBranch: string,
+  dgPath: string,
+): Promise<Prepared> {
+  const rawRes = await fetch(`https://raw.githubusercontent.com/${repo}/${branch}/${actionsPath}`, { headers: ghHeaders });
+  if (!rawRes.ok) throw new Error(`Failed to fetch actions.ttl (${rawRes.status})`);
+  const ttlText = await rawRes.text();
+  const { actions } = parseActionsTtl(ttlText);
+  if (!actions.size) throw new Error('No actions parsed from actions.ttl');
+  const reverseMap = buildReverseMap(actions);
+  const sameAsAdj = new Map<string, Set<string>>();
+  const dgTriples: Array<{ s: string; p: string; o: string }> = [];
+  let dgError: string | null = null;
+  if (dgEnabled) {
+    try {
+      const dgRes = await fetch(`https://raw.githubusercontent.com/${dgRepo}/${dgBranch}/${dgPath}`);
+      if (!dgRes.ok) throw new Error(`fetch dg (${dgRes.status})`);
+      const parsed = parseFlatTriples(await dgRes.text());
+      dgTriples.push(...parsed.triples);
+      for (const t of dgTriples) {
+        if (t.p === OWL + 'sameAs') addSameAs(sameAsAdj, t.s, t.o);
+      }
+    } catch (e: any) {
+      dgError = e?.message || String(e);
+    }
+  }
+  const resolve = (iri: string) => resolveExternal(iri, reverseMap, sameAsAdj);
+  return { ttlText, actions, dgTriples, resolve, dgError };
+}
+
+// Single-shot folder fetch (fallback path).
+async function fetchDaliccLicences(
+  repo: string,
+  branch: string,
+  folder: string,
+  headers: Record<string, string>,
+): Promise<{ files: Array<{ name: string; text: string }>; errors: number; error?: string }> {
+  const listRes = await fetch(
+    `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(folder)}?ref=${branch}`,
+    { headers },
+  );
+  if (!listRes.ok) {
+    return { files: [], errors: 0, error: `list folder (${listRes.status})` };
+  }
+  const entries = await listRes.json();
+  const ttlFiles = (Array.isArray(entries) ? entries : [])
+    .filter((f: any) => f.name?.endsWith('.ttl') && f.download_url)
+    .slice(0, 400);
+  const files: Array<{ name: string; text: string }> = [];
+  let errors = 0;
+  const CHUNK = 20;
+  for (let i = 0; i < ttlFiles.length; i += CHUNK) {
+    const batch = ttlFiles.slice(i, i + CHUNK);
+    const results = await Promise.all(batch.map(async (f: any) => {
+      try {
+        const r = await fetch(f.download_url);
+        if (!r.ok) return null;
+        return { name: f.name, text: await r.text() };
+      } catch {
+        return null;
+      }
+    }));
+    for (const r of results) { if (r) files.push(r as { name: string; text: string }); else errors++; }
+  }
+  return { files, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +744,11 @@ async function llmPass(
 
   const vocab = [...actions.values()].map((a) => `${a.curie} (${a.label || curieOf(a.iri)})`).join('\n');
   const relations = ['includedIn', 'contradicts', 'implies'];
-  const roles = ['Permission', 'Prohibition', 'Duty'];
+  const roleMap: Record<string, string> = {
+    Permission: ROLE_PERMISSION,
+    Prohibition: ROLE_PROHIBITION,
+    Duty: ROLE_DUTY,
+  };
 
   const results: Assertion[] = [];
   const batch = chunks.map(async (chunk) => {
@@ -355,9 +820,10 @@ Return JSON: { "assertions": [ { "subject": "openrel:...", "relation": "included
         const subjIri = actions.has(r.subject) ? r.subject : null;
         const objIri = actions.has(r.object) ? r.object : null;
         if (!subjIri || !objIri) continue;
-        const role = r.role && roles.includes(r.role) ? ODRL + r.role : null;
+        const objectRole = r.role && roleMap[r.role] ? roleMap[r.role] : null;
         results.push({
-          subject: subjIri, relation: rel, object: objIri, role,
+          subject: subjIri, relation: rel, object: objIri,
+          subjectRole: null, objectRole,
           derivation: 'Probabilistic', source: `LLM draft (${model})`,
           confidence: typeof r.confidence === 'number' ? r.confidence : 0.5,
           rationale: String(r.rationale || '').slice(0, 300),
@@ -368,13 +834,11 @@ Return JSON: { "assertions": [ { "subject": "openrel:...", "relation": "included
     }
   });
   await Promise.all(batch);
-  // Dedup within the LLM batch (same edge key → keep first).
-  const seen = new Set<string>();
-  return results.filter((a) => { const k = edgeKey(a); if (seen.has(k)) return false; seen.add(k); return true; });
+  return dedupByKey(results);
 }
 
 // ---------------------------------------------------------------------------
-// Existing-graph preservation parse (our own reified format)
+// Existing-graph preservation parse (our own reified format; legacy role → objectRole)
 // ---------------------------------------------------------------------------
 function parseExistingGraph(ttl: string): Assertion[] {
   if (!ttl) return [];
@@ -383,31 +847,59 @@ function parseExistingGraph(ttl: string): Assertion[] {
   for (const b of blocks) {
     if (!b.includes('openrel:Assertion')) continue;
     const g = (re: RegExp): string | null => { const m = b.match(re); return m ? m[1] : null; };
-    const subj = g(/openrel:subject\s+(openrel:[^\s;]+|odrl:[^\s;]+|<[^>]+>)/);
+    const subj = g(/openrel:subject\s+(openrel:[^\s;]+|odrl:[^\s;]+|cc:[^\s;]+|dalicc:[^\s;]+|<[^>]+>)/);
     const rel = g(/openrel:relation\s+(openrel:[^\s;]+)/);
-    const obj = g(/openrel:object\s+(openrel:[^\s;]+|odrl:[^\s;]+|<[^>]+>)/);
-    const role = g(/openrel:role\s+(odrl:[^\s;]+)/);
-    const deriv = g(/openrel:derivationType\s+openrel:(Deterministic|Probabilistic)/);
+    const obj = g(/openrel:object\s+(openrel:[^\s;]+|odrl:[^\s;]+|cc:[^\s;]+|dalicc:[^\s;]+|<[^>]+>)/);
+    const srole = g(/openrel:subjectRole\s+(odrl:[^\s;]+)/);
+    const orole = g(/openrel:objectRole\s+(odrl:[^\s;]+)/);
+    const legacyRole = g(/openrel:role\s+(odrl:[^\s;]+)/);
+    const deriv = g(/openrel:derivationType\s+openrel:(Deterministic|Corpus|Probabilistic)/);
     const source = g(/dct:source\s+"((?:[^"\\]|\\.)*)"/);
     const conf = g(/openrel:confidence\s+([0-9.]+)/);
     const rat = g(/openrel:rationale\s+"((?:[^"\\]|\\.)*)"/);
+    const sup = g(/openrel:support\s+([0-9]+)/);
     if (!subj || !rel || !obj || !deriv) continue;
     const expand = (c: string) => {
       if (c.startsWith('<') && c.endsWith('>')) return c.slice(1, -1);
       if (c.startsWith('openrel:')) return OPENREL + c.substring(8);
       if (c.startsWith('odrl:')) return ODRL + c.substring(5);
+      if (c.startsWith('cc:')) return CC + c.substring(3);
+      if (c.startsWith('dalicc:')) return DALICC + c.substring(7);
       return c;
     };
     out.push({
       subject: expand(subj), relation: expand(rel), object: expand(obj),
-      role: role ? ODRL + role.substring(5) : null,
-      derivation: deriv as 'Deterministic' | 'Probabilistic',
+      subjectRole: srole ? expand(srole) : null,
+      objectRole: (orole ? expand(orole) : null) || (legacyRole ? expand(legacyRole) : null),
+      derivation: deriv as Derivation,
       source: source ? source.replace(/\\"/g, '"') : '',
       confidence: conf ? parseFloat(conf) : undefined,
       rationale: rat ? rat.replace(/\\"/g, '"') : undefined,
+      support: sup ? parseInt(sup, 10) : undefined,
     });
   }
   return out;
+}
+
+// Fetch + parse the existing graph (for preservation).
+async function fetchExistingGraph(
+  repo: string,
+  branch: string,
+  ghHeaders: Record<string, string>,
+): Promise<Assertion[]> {
+  try {
+    const exRes = await fetch(
+      `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(GRAPH_FILE)}?ref=${branch}`,
+      { headers: ghHeaders },
+    );
+    if (!exRes.ok) return [];
+    const exJson = await exRes.json();
+    if (!exJson.content) return [];
+    const raw = decodeURIComponent(escape(atob(exJson.content.replace(/\n/g, ''))));
+    return parseExistingGraph(raw);
+  } catch {
+    return [];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -418,24 +910,24 @@ function ttlString(s: string): string {
 }
 
 function serializeGraph(assertions: Assertion[], generatedAt: string): string {
-  const relOrder = [REL_INCLUDEDIN, REL_CONTRADICTS, REL_IMPLIES];
-  const sorted = [...assertions].sort((a, b) => {
-    const dr = (a.derivation === 'Deterministic' ? 0 : 1) - (b.derivation === 'Deterministic' ? 0 : 1);
-    if (dr) return dr;
-    const rr = relOrder.indexOf(a.relation) - relOrder.indexOf(b.relation);
-    if (rr) return rr;
-    return curieOf(a.subject).localeCompare(curieOf(b.subject));
-  });
+  const detCount = assertions.filter((a) => a.derivation === 'Deterministic').length;
+  const corpusCount = assertions.filter((a) => a.derivation === 'Corpus').length;
+  const probCount = assertions.filter((a) => a.derivation === 'Probabilistic').length;
 
   const lines: string[] = [];
   lines.push('# -------------------------------------------------------------------------------------------------------------');
   lines.push('# OpenREL Reasoner Graph');
-  lines.push('# Auto-generated by reasonerUpdate. Editable: human-authored deterministic assertions');
-  lines.push('# (dct:source "manual") and reviewed probabilistic assertions are preserved across re-runs.');
-  lines.push('# Merge rule: probabilistic assertions are dropped where a deterministic edge already exists.');
+  lines.push('# Auto-generated by reasonerUpdate. Editable: human-authored assertions');
+  lines.push('# (dct:source "manual") are preserved across re-runs; reviewed probabilistic assertions survive too.');
+  lines.push('# Merge rule: Deterministic > Corpus > Probabilistic — a weaker tier is dropped when a');
+  lines.push('# stronger one asserts the same edge (subject | relation | object | roles).');
+  lines.push('# Sources: actions.ttl (deterministic) · DALICC dependency graph (deterministic) ·');
+  lines.push('# DALICC licence corpus (statistical, openrel:support = licence count) · LLM drafts (probabilistic).');
   lines.push('# -------------------------------------------------------------------------------------------------------------');
   lines.push('@prefix openrel: <http://www.w3.org/ns/openrel/0/> .');
   lines.push('@prefix odrl: <http://www.w3.org/ns/odrl/2/> .');
+  lines.push('@prefix cc: <http://creativecommons.org/ns#> .');
+  lines.push('@prefix dalicc: <https://dalicc.net/ns#> .');
   lines.push('@prefix dct: <http://purl.org/dc/terms/> .');
   lines.push('@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .');
   lines.push('@prefix reasoner: <http://www.w3.org/ns/openrel/0/reasoner/> .');
@@ -443,19 +935,24 @@ function serializeGraph(assertions: Assertion[], generatedAt: string): string {
   lines.push(`reasoner:graph a openrel:ReasonerGraph ;`);
   lines.push(`  dct:title "OpenREL Reasoner Graph"@en ;`);
   lines.push(`  dct:modified "${generatedAt}"^^xsd:dateTime ;`);
-  lines.push(`  openrel:deterministicCount ${assertions.filter((a) => a.derivation === 'Deterministic').length} ;`);
-  lines.push(`  openrel:probabilisticCount ${assertions.filter((a) => a.derivation === 'Probabilistic').length} .`);
+  lines.push(`  openrel:deterministicCount ${detCount} ;`);
+  lines.push(`  openrel:corpusCount ${corpusCount} ;`);
+  lines.push(`  openrel:probabilisticCount ${probCount} .`);
   lines.push('');
 
-  sorted.forEach((a, i) => {
+  assertions.forEach((a, i) => {
     const id = 'assertion-' + String(i + 1).padStart(4, '0');
     lines.push(`reasoner:${id}`);
     lines.push(`  a openrel:Assertion ;`);
     lines.push(`  openrel:subject ${curieOf(a.subject)} ;`);
     lines.push(`  openrel:relation ${curieOf(a.relation)} ;`);
     lines.push(`  openrel:object ${curieOf(a.object)} ;`);
-    if (a.role) lines.push(`  openrel:role ${curieOf(a.role)} ;`);
+    if (a.subjectRole) lines.push(`  openrel:subjectRole ${curieOf(a.subjectRole)} ;`);
+    if (a.objectRole) lines.push(`  openrel:objectRole ${curieOf(a.objectRole)} ;`);
     lines.push(`  openrel:derivationType openrel:${a.derivation} ;`);
+    if (a.derivation === 'Corpus' && typeof a.support === 'number') {
+      lines.push(`  openrel:support ${a.support} ;`);
+    }
     if (a.derivation === 'Probabilistic' && typeof a.confidence === 'number') {
       lines.push(`  openrel:confidence ${a.confidence.toFixed(2)} ;`);
     }
@@ -465,6 +962,26 @@ function serializeGraph(assertions: Assertion[], generatedAt: string): string {
     lines.push('');
   });
   return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Vocabulary authoring — openrel:allows into actions.ttl (idempotent)
+// ---------------------------------------------------------------------------
+function ensureAllowsDefinition(actionsTtl: string): string | null {
+  if (/openrel:allows\b/.test(actionsTtl)) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  return actionsTtl.replace(/\s*$/, '') + `
+
+# -------------------------------------------------------------------------------------------------------------
+# openrel:allows — directional co-existence relation for the Reasoner Graph (authored ${today}).
+# A Prohibition of the subject action allows a Permission of the object action within the same
+# policy, as attested by licence corpus evidence (DALICC).
+# -------------------------------------------------------------------------------------------------------------
+openrel:allows a skos:Concept ;
+    skos:prefLabel "allows"@en ;
+    skos:definition "Indicates that a prohibition on the subject action can co-exist with a permission on the object action within the same policy."@en ;
+    skos:scopeNote "One of the OpenREL type_evaluation relations used by the Reasoner Graph."@en .
+`;
 }
 
 // ---------------------------------------------------------------------------
@@ -480,12 +997,24 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
     const dryRun = !!body.dry_run;
     const skipLlm = !!body.skip_llm;
     const model = (body.model as string) || 'gemini_3_flash';
-    const message = body.message || 'Update OpenREL Reasoner Graph (action assertions)';
+    const message = body.message || 'Update OpenREL Reasoner Graph (actions, DALICC sources, corpus evidence)';
 
     const isAdmin = !!user && /admin/i.test(user.role || '');
-    if (!dryRun && user && !isAdmin) {
+    if (!dryRun && (body.mode as string) !== 'corpus_fetch' && user && !isAdmin) {
       return Response.json({ error: 'Admin role required to apply reasoner update' }, { status: 403 });
     }
+
+    // Source configuration (UI-supplied, with defaults).
+    const src = body.sources || {};
+    const dgEnabled = src.dg_enabled !== false;
+    const dgRepo = (src.dg_repo as string) || 'dalicc/dalicc';
+    const dgBranch = (src.dg_branch as string) || 'main';
+    const dgPath = (src.dg_path as string) || 'licensedata/dependencygraph/dg_default.ttl';
+    const corpusEnabled = src.corpus_enabled !== false;
+    const corpusRepo = (src.corpus_repo as string) || dgRepo;
+    const corpusBranch = (src.corpus_branch as string) || dgBranch;
+    const corpusFolder = ((src.corpus_folder as string) || 'licensedata/licenses').replace(/\/+$/, '');
+    const minSupport = Number(src.corpus_min_support) || 2;
 
     const creds = await resolveGithubCredentials(base44, {});
     const { token, githubRepo: repo, branch } = creds;
@@ -497,122 +1026,187 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'OpenREL-App',
     };
+    const warnings: string[] = [];
 
-    // 1. Locate the Actions source file.
-    const sourceFiles = await base44.asServiceRole.entities.ApiSourceFile.filter({ section: 'Actions' });
-    const actionsPath = sourceFiles[0]?.file_path || '.openrel/vocabs/openrel/actions.ttl';
+    // 1. Locate actions.ttl (UI path override → API configuration → default).
+    const actionsPath = await resolveActionsPath(base44, src);
 
-    // 2. Fetch raw actions.ttl.
-    const rawUrl = `https://raw.githubusercontent.com/${repo}/${branch}/${actionsPath}`;
-    const rawRes = await fetch(rawUrl, { headers: ghHeaders });
-    if (!rawRes.ok) {
-      return Response.json({ error: `Failed to fetch actions.ttl (${rawRes.status})` }, { status: 500 });
+    // 1b. Batched corpus fetch mode — supports the UI progress counter. The
+    //     frontend loops this in slices, accumulates pair evidence locally, and
+    //     passes the aggregated evidence into the preview/apply invocation.
+    if ((body.mode as string) === 'corpus_fetch') {
+      const start = Number(body.corpus_start) || 0;
+      const count = Math.min(Number(body.corpus_count) || 40, 100);
+      const prep = await loadActionsAndResolve(ghHeaders, repo, branch, actionsPath, dgEnabled, dgRepo, dgBranch, dgPath);
+      const listRes = await fetch(
+        `https://api.github.com/repos/${corpusRepo}/contents/${encodeURIComponent(corpusFolder)}?ref=${corpusBranch}`,
+        { headers: ghHeaders },
+      );
+      if (!listRes.ok) {
+        return Response.json({ error: `list licence folder (${listRes.status})` }, { status: 500 });
+      }
+      const entries = await listRes.json();
+      const ttlFiles = (Array.isArray(entries) ? entries : [])
+        .filter((f: any) => f.name?.endsWith('.ttl') && f.download_url);
+      const slice = ttlFiles.slice(start, start + count);
+      let errors = 0;
+      const licences = await Promise.all(slice.map(async (f: any) => {
+        try {
+          const r = await fetch(f.download_url);
+          if (!r.ok) { errors++; return { name: f.name, pd: [] as string[][], pp: [] as string[][] }; }
+          return { name: f.name, ...extractLicencePairs(await r.text(), prep.resolve) };
+        } catch {
+          errors++;
+          return { name: f.name, pd: [] as string[][], pp: [] as string[][] };
+        }
+      }));
+      return Response.json({ total: ttlFiles.length, start, fetched: slice.length, errors, licences });
     }
-    const ttlText = await rawRes.text();
-    const { actions } = parseActionsTtl(ttlText);
-    if (!actions.size) {
-      return Response.json({ error: 'No actions parsed from actions.ttl' }, { status: 500 });
-    }
 
-    // 3. Deterministic pass.
-    const det = deterministicPass(actions);
+    // 2. Actions + DALICC dependency graph (shared loader).
+    const prep = await loadActionsAndResolve(ghHeaders, repo, branch, actionsPath, dgEnabled, dgRepo, dgBranch, dgPath);
+    const { ttlText, actions, resolve } = prep;
 
-    // 4. Fetch + parse the existing graph (for preservation).
-    let existing: Assertion[] = [];
-    const exRes = await fetch(
-      `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(GRAPH_FILE)}?ref=${branch}`,
-      { headers: ghHeaders },
-    );
-    if (exRes.ok) {
-      const exJson = await exRes.json();
-      if (exJson.content) {
-        const raw = decodeURIComponent(escape(atob(exJson.content.replace(/\n/g, ''))));
-        existing = parseExistingGraph(raw);
+    // 3. DALICC dependency graph edges (deterministic tier).
+    const dgAssertions: Assertion[] = [];
+    const dgSummary: any = { enabled: dgEnabled, edges: 0, same_as: 0, unresolved: 0, error: prep.dgError };
+    if (dgEnabled) {
+      if (prep.dgError) warnings.push(`Dependency graph skipped: ${prep.dgError}`);
+      for (const t of prep.dgTriples) {
+        if (t.p === OWL + 'sameAs') { dgSummary.same_as++; continue; }
+        let rel: string | null = null;
+        let objectRole: string | null = null;
+        let relName = '';
+        if (t.p === ODRL + 'includedIn') { rel = REL_INCLUDEDIN; relName = 'odrl:includedIn'; }
+        else if (t.p === ODRL + 'implies') { rel = REL_IMPLIES; objectRole = ROLE_DUTY; relName = 'odrl:implies'; }
+        else if (t.p === DALICC + 'contradicts') { rel = REL_CONTRADICTS; relName = 'dalicc:contradicts'; }
+        if (!rel) continue;
+        dgSummary.edges++;
+        const s = resolve(t.s);
+        const o = resolve(t.o);
+        if (s === o) continue;
+        if (!s.startsWith(OPENREL) || !o.startsWith(OPENREL)) dgSummary.unresolved++;
+        dgAssertions.push({
+          subject: s, relation: rel, object: o,
+          subjectRole: null, objectRole,
+          derivation: 'Deterministic',
+          source: `DALICC dependency graph (${relName})`,
+        });
       }
     }
 
-    // 5. LLM probabilistic pass.
-    const llm = await llmPass(base44, actions, model, skipLlm);
-
-    // 6. Merge.
-    const detKeys = new Set(det.map(edgeKey));
-    const preservedManualDet = existing.filter((a) => a.derivation === 'Deterministic' && /manual/i.test(a.source));
-    const preservedProb = existing.filter((a) => a.derivation === 'Probabilistic');
-    const manualKeys = new Set(preservedManualDet.map(edgeKey));
-
-    const finalDet = [...det, ...preservedManualDet.filter((a) => !detKeys.has(edgeKey(a)))];
-    const finalDetKeys = new Set(finalDet.map(edgeKey));
-
-    // New LLM probabilistic: drop if shadowed by deterministic OR already preserved.
-    const preservedProbKeys = new Set(preservedProb.map(edgeKey));
-    const newProb = llm.filter((a) => !finalDetKeys.has(edgeKey(a)) && !preservedProbKeys.has(edgeKey(a)));
-    // Preserved probabilistic: drop if now shadowed by a new deterministic.
-    const keptPreservedProb = preservedProb.filter((a) => !finalDetKeys.has(edgeKey(a)));
-    const finalProb = [...keptPreservedProb, ...newProb];
-
-    let merged = [...finalDet, ...finalProb];
-    // Safety-net dedup across the whole graph (deterministic wins, since it
-    // is first) + alphabetical sort so adjacent duplicates are visible to humans.
-    {
-      const seen = new Set<string>();
-      merged = merged.filter((a) => { const k = edgeKey(a); if (seen.has(k)) return false; seen.add(k); return true; });
+    // 4. Corpus tier — UI-provided batch evidence, else single-shot fallback.
+    const corpusSummary: CorpusSummary = {
+      licences_fetched: 0,
+      licences_parsed: 0,
+      fetch_errors: 0,
+      implies_candidates: 0,
+      allows_candidates: 0,
+      min_support: minSupport,
+    };
+    let corpusAssertions: Assertion[] = [];
+    const corpusEvidence = body.corpus_evidence;
+    if (corpusEvidence && typeof corpusEvidence === 'object') {
+      corpusAssertions = corpusAssertionsFromEvidence(corpusEvidence, minSupport);
+      corpusSummary.licences_fetched = Number(corpusEvidence.licences) || 0;
+      corpusSummary.licences_parsed = corpusSummary.licences_fetched;
+      corpusSummary.implies_candidates = Object.keys(corpusEvidence.pd || {}).length;
+      corpusSummary.allows_candidates = Object.keys(corpusEvidence.pp || {}).length;
+    } else if (corpusEnabled) {
+      try {
+        const { files, errors, error } = await fetchDaliccLicences(corpusRepo, corpusBranch, corpusFolder, ghHeaders);
+        if (error) throw new Error(error);
+        corpusSummary.fetch_errors = errors;
+        if (errors) warnings.push(`${errors} licence file(s) could not be fetched`);
+        const res = corpusPass(files, resolve, minSupport);
+        corpusAssertions = res.assertions;
+        Object.assign(corpusSummary, res.summary);
+      } catch (e: any) {
+        corpusSummary.error = e?.message || String(e);
+        warnings.push(`Licence corpus skipped: ${corpusSummary.error}`);
+      }
     }
-    merged.sort((a, b) =>
-      curieOf(a.subject).localeCompare(curieOf(b.subject)) ||
-      curieOf(a.relation).localeCompare(curieOf(b.relation)) ||
-      curieOf(a.object).localeCompare(curieOf(b.object)),
+
+    // 5. Deterministic tier (actions.ttl + dg), with manual preservation.
+    const existing: Assertion[] = await fetchExistingGraph(repo, branch, ghHeaders);
+    const detFromSource = dedupByKey([...deterministicPass(actions), ...dgAssertions]);
+    const manualDetAll = existing.filter(
+      (a) => a.derivation === 'Deterministic' && /manual|curated/i.test(a.source),
     );
-    const droppedProbabilistic = (preservedProb.length + llm.length) - finalProb.length;
+    const det = dedupByKey([...detFromSource, ...manualDetAll]);
+    const detKeys = new Set(det.map(edgeKey));
+
+    // 6. Corpus tier (shadowed by deterministic), with manual preservation.
+    const corpusRegen = corpusAssertions.filter((a) => !detKeys.has(edgeKey(a)));
+    const manualCorpus = existing.filter(
+      (a) => a.derivation === 'Corpus' && /manual|curated/i.test(a.source),
+    ).filter((a) => !detKeys.has(edgeKey(a)));
+    const corpus = dedupByKey([...corpusRegen, ...manualCorpus]);
+    const corpusKeys = new Set(corpus.map(edgeKey));
+
+    // 7. Probabilistic tier (LLM + preserved), shadowed by det/corpus.
+    const llm = await llmPass(base44, actions, model, skipLlm);
+    const preservedProb = existing.filter((a) => a.derivation === 'Probabilistic');
+    const probAll = dedupByKey([...preservedProb, ...llm]);
+    const prob = probAll.filter((a) => !detKeys.has(edgeKey(a)) && !corpusKeys.has(edgeKey(a)));
+    const dropped = probAll.length - prob.length;
+
+    const llmKeys = new Set(llm.map(edgeKey));
+    const probabilisticNew = prob.filter((a) => llmKeys.has(edgeKey(a))).length;
+
+    const merged = dedupSorted([...det, ...corpus, ...prob]);
 
     const summary = {
       actions_parsed: actions.size,
-      deterministic_count: finalDet.length,
-      deterministic_new: det.length,
-      deterministic_preserved_manual: preservedManualDet.length,
-      probabilistic_count: finalProb.length,
-      probabilistic_new: newProb.length,
-      probabilistic_preserved: keptPreservedProb.length,
-      probabilistic_dropped_shadowed: Math.max(0, droppedProbabilistic),
+      deterministic_count: det.length,
+      deterministic_new: detFromSource.length,
+      deterministic_preserved_manual: det.length - detFromSource.length,
+      corpus_count: corpus.length,
+      corpus_new: corpusRegen.length,
+      corpus_preserved_manual: corpus.length - corpusRegen.length,
+      probabilistic_count: prob.length,
+      probabilistic_new: probabilisticNew,
+      probabilistic_preserved: prob.length - probabilisticNew,
+      probabilistic_dropped_shadowed: Math.max(0, dropped),
       llm_skipped: skipLlm,
       model,
+      dg_summary: dgSummary,
+      corpus_summary: corpusSummary,
+      warnings,
     };
 
     if (dryRun) {
-      // Return the full, deduped, alphabetically-sorted assertion list so the
-      // UI can render an editable preview (delete / reverse per row) and send
-      // the curated set back on apply.
-      const assertions = merged.map((a) => ({
+      const assertionsOut = merged.map((a) => ({
         subject: a.subject, relation: a.relation, object: a.object,
-        role: a.role, derivation: a.derivation,
+        subjectRole: a.subjectRole, objectRole: a.objectRole,
+        derivation: a.derivation,
         confidence: a.confidence, rationale: a.rationale, source: a.source,
+        support: a.support,
       }));
-      return Response.json({ dry_run: true, ...summary, assertions, total: merged.length });
+      return Response.json({ dry_run: true, ...summary, assertions: assertionsOut, total: merged.length });
     }
 
-    // 7. Apply — serialize + PR. If the UI sends a curated assertion list
-    //    (post delete/reverse edits), commit that verbatim instead of the
-    //    regenerated set, so preview curation persists.
+    // 8. Apply — serialize + PR (graph +, when needed, openrel:allows in actions.ttl).
     let toCommit = merged;
     if (Array.isArray(body.curated_assertions) && body.curated_assertions.length) {
       toCommit = (body.curated_assertions as any[]).map((a) => ({
         subject: a.subject, relation: a.relation, object: a.object,
-        role: a.role || null,
-        derivation: a.derivation === 'Probabilistic' ? 'Probabilistic' : 'Deterministic',
+        subjectRole: a.subjectRole || null,
+        objectRole: a.objectRole || null,
+        derivation: (['Deterministic', 'Corpus', 'Probabilistic'] as const).includes(a.derivation)
+          ? a.derivation : 'Deterministic',
         source: a.source || 'curated (UI)',
-        confidence: a.confidence, rationale: a.rationale,
+        confidence: a.confidence, rationale: a.rationale, support: a.support,
       }));
-      // Re-dedup + re-sort the curated set for a clean file.
-      const seen = new Set<string>();
-      toCommit = toCommit.filter((a) => { const k = edgeKey(a); if (seen.has(k)) return false; seen.add(k); return true; });
-      toCommit.sort((a, b) =>
-        curieOf(a.subject).localeCompare(curieOf(b.subject)) ||
-        curieOf(a.relation).localeCompare(curieOf(b.relation)) ||
-        curieOf(a.object).localeCompare(curieOf(b.object)),
-      );
+      toCommit = dedupSorted(toCommit);
     }
 
     const generatedAt = new Date().toISOString();
     const serialized = serializeGraph(toCommit, generatedAt);
+
+    const extraFiles: Array<{ path: string; content: string }> = [];
+    const allowsActionsTtl = ensureAllowsDefinition(ttlText);
+    if (allowsActionsTtl) extraFiles.push({ path: actionsPath, content: allowsActionsTtl });
 
     let prResult: { pr_url: string; pr_number: number; branch: string };
     try {
@@ -623,13 +1217,22 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
         message,
         prTitle: 'Update OpenREL Reasoner Graph',
         branchPrefix: 'reasoner-update',
+        extra_files: extraFiles.length ? extraFiles : undefined,
       });
     } catch (e: any) {
       return Response.json({ error: `submitGithubPR failed: ${e?.message || String(e)}` }, { status: 500 });
     }
 
-    return Response.json({ dry_run: false, ...summary, total: merged.length, pr_url: prResult.pr_url, pr_number: prResult.pr_number, branch: prResult.branch });
+    return Response.json({
+      dry_run: false,
+      ...summary,
+      total: toCommit.length,
+      vocabulary_updated: extraFiles.length > 0,
+      pr_url: prResult.pr_url,
+      pr_number: prResult.pr_number,
+      branch: prResult.branch,
+    });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: (error as any).message }, { status: 500 });
   }
 }

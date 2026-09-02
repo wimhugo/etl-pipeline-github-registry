@@ -20,6 +20,8 @@ export interface SubmitPRParams {
   filePath: string;
   /** full new file content. */
   content: string;
+  /** additional files committed to the same PR branch (path + full content). */
+  extra_files?: Array<{ path: string; content: string }>;
   /** commit message + PR body description. */
   message: string;
   /** optional PR title (defaults to `[Update] <filePath>`). */
@@ -93,21 +95,39 @@ export async function submitGithubPR(p: SubmitPRParams): Promise<SubmitPRResult>
     throw new Error(`create branch (${brRes.status}): ${e.slice(0, 200)}`);
   }
 
-  // 4. Commit the file to the PR branch.
-  const enc = btoa(unescape(encodeURIComponent(p.content)));
-  const commitRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
-    method: 'PUT',
-    headers: { ...H, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message: p.message || `Update ${filePath}`,
-      content: enc,
-      sha: sha || undefined,
-      branch: prBranch,
-    }),
-  });
-  if (!commitRes.ok) {
-    const e = await commitRes.text();
-    throw new Error(`commit file (${commitRes.status}): ${e.slice(0, 200)}`);
+  // 4. Commit the file (and any extra files) to the PR branch.
+  const files: Array<{ path: string; content: string; sha?: string | null }> = [
+    { path: filePath, content: p.content, sha },
+    ...(p.extra_files || []),
+  ];
+  for (const f of files) {
+    let fSha = f.sha ?? null;
+    if (!fSha) {
+      const r = await fetch(
+        `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(f.path)}?ref=${branch}`,
+        { headers: H },
+      );
+      if (r.ok) fSha = (await r.json()).sha ?? null;
+      else if (r.status !== 404) {
+        const e = await r.text();
+        throw new Error(`fetch ${f.path} (${r.status}): ${e.slice(0, 200)}`);
+      }
+    }
+    const enc = btoa(unescape(encodeURIComponent(f.content)));
+    const commitRes = await fetch(`https://api.github.com/repos/${repo}/contents/${f.path}`, {
+      method: 'PUT',
+      headers: { ...H, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: p.message || `Update ${f.path}`,
+        content: enc,
+        sha: fSha || undefined,
+        branch: prBranch,
+      }),
+    });
+    if (!commitRes.ok) {
+      const e = await commitRes.text();
+      throw new Error(`commit file (${commitRes.status}): ${e.slice(0, 200)}`);
+    }
   }
 
   // 5. Open the pull request.
@@ -116,7 +136,7 @@ export async function submitGithubPR(p: SubmitPRParams): Promise<SubmitPRResult>
     headers: { ...H, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       title: p.prTitle || `[Update] ${filePath}`,
-      body: `Submitting update to "${filePath}" for review.\n\nChanges: ${p.message || 'Content update'}`,
+      body: `Submitting update to "${filePath}"${p.extra_files?.length ? ` (+ ${p.extra_files.length} more file(s))` : ''} for review.\n\nChanges: ${p.message || 'Content update'}`,
       head: prBranch,
       base: branch,
     }),

@@ -1,44 +1,136 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Play, GitPullRequest, Loader2, Network, Sparkles, Trash2, ArrowLeftRight } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import ReasonerSourceSteps from '@/components/reasoner/ReasonerSourceSteps';
+import ReasonerAssertionPreview from '@/components/reasoner/ReasonerAssertionPreview';
+import { Play, GitPullRequest, Loader2, Network, AlertTriangle } from 'lucide-react';
 
-/**
- * ReasonerUpdate (v0.4) — builds the OpenREL Reasoner Graph
- * (data/reasoner/graph_reasoner.ttl): a reified, editable graph of assertions
- * between actions using the type_evaluation relations (includedIn /
- * contradicts / implies). Deterministic edges are derived from actions.ttl
- * (odrl:includedIn, skos mappings, defaultDuty, authored contradicts);
- * probabilistic edges are LLM drafts for human review. Probabilistic edges
- * are dropped where a deterministic edge already exists. Human-authored
- * deterministic (source "manual") and reviewed probabilistic assertions are
- * preserved across re-runs. Output is committed via a pull request.
- */
+const CONFIG_KEY = 'openrel_reasoner_config_v2';
+const CORPUS_BATCH = 40;
+const DEFAULT_CONFIG = {
+  actions_path: '',
+  dg_enabled: true,
+  dg_repo: 'dalicc/dalicc',
+  dg_branch: 'main',
+  dg_path: 'licensedata/dependencygraph/dg_default.ttl',
+  corpus_enabled: true,
+  corpus_repo: 'dalicc/dalicc',
+  corpus_branch: 'main',
+  corpus_folder: 'licensedata/licenses',
+  corpus_min_support: 2,
+  llm_enabled: true,
+  model: 'gemini_3_flash',
+};
+
+function loadConfig() {
+  try {
+    const stored = localStorage.getItem(CONFIG_KEY);
+    return stored ? { ...DEFAULT_CONFIG, ...JSON.parse(stored) } : { ...DEFAULT_CONFIG };
+  } catch {
+    return { ...DEFAULT_CONFIG };
+  }
+}
+
 export default function ReasonerUpdate() {
   const { toast } = useToast();
-  const [skipLlm, setSkipLlm] = useState(false);
+  const [config, setConfig] = useState(loadConfig);
   const [result, setResult] = useState(null);
   const [running, setRunning] = useState(false);
   const [applying, setApplying] = useState(false);
   const [prUrl, setPrUrl] = useState(null);
   const [assertions, setAssertions] = useState([]);
+  const [corpusProgress, setCorpusProgress] = useState(null);
+  const corpusEvidenceRef = useRef(null);
+
+  useEffect(() => {
+    try { localStorage.setItem(CONFIG_KEY, JSON.stringify(config)); } catch { /* ignore */ }
+  }, [config]);
+
+  const patchConfig = (patch) => setConfig((prev) => ({ ...prev, ...patch }));
+
+  const buildPayload = (dryRun) => ({
+    dry_run: dryRun,
+    skip_llm: !config.llm_enabled,
+    model: config.model,
+    sources: {
+      actions_path: config.actions_path || undefined,
+      dg_enabled: config.dg_enabled,
+      dg_repo: config.dg_repo,
+      dg_branch: config.dg_branch,
+      dg_path: config.dg_path,
+      corpus_enabled: config.corpus_enabled,
+      corpus_repo: config.corpus_repo,
+      corpus_branch: config.corpus_branch,
+      corpus_folder: config.corpus_folder,
+      corpus_min_support: Number(config.corpus_min_support) || 2,
+    },
+  });
+
+  // Fetch the licence corpus in backend batches, accumulating pair evidence
+  // locally while reporting live progress (fetched/total) to the UI.
+  const fetchCorpusEvidence = async () => {
+    const evidence = { licences: 0, pd: {}, pp: {} };
+    let start = 0;
+    let total = 0;
+    let fetchErrors = 0;
+    do {
+      const res = await base44.functions.invoke('reasonerUpdate', {
+        mode: 'corpus_fetch',
+        sources: { ...buildPayload(true).sources, corpus_start: start, corpus_count: CORPUS_BATCH },
+      });
+      const data = res?.data ?? res;
+      if (data?.error) throw new Error(data.error);
+      total = data.total || 0;
+      fetchErrors += data.errors || 0;
+      for (const lic of data.licences || []) {
+        evidence.licences++;
+        for (const [s, o] of lic.pd || []) {
+          const k = `${s}|${o}`;
+          evidence.pd[k] = (evidence.pd[k] || 0) + 1;
+        }
+        for (const [s, o] of lic.pp || []) {
+          const k = `${s}|${o}`;
+          evidence.pp[k] = (evidence.pp[k] || 0) + 1;
+        }
+      }
+      start += data.fetched || 0;
+      setCorpusProgress({ fetched: start, total, errors: fetchErrors });
+    } while (total > 0 && start < total);
+    return evidence;
+  };
 
   const runPreview = async () => {
     setRunning(true);
     setResult(null);
     setPrUrl(null);
+    setCorpusProgress(null);
     try {
-      const res = await base44.functions.invoke('reasonerUpdate', { dry_run: true, skip_llm: skipLlm });
+      let corpusEvidence;
+      if (config.corpus_enabled) {
+        try {
+          corpusEvidence = await fetchCorpusEvidence();
+        } catch (e) {
+          // Degrade gracefully: continue without corpus evidence.
+          corpusEvidence = { licences: 0, pd: {}, pp: {} };
+          toast({ title: 'Licence corpus unavailable', description: e.message, duration: 30000 });
+        }
+      }
+      corpusEvidenceRef.current = corpusEvidence || null;
+      const res = await base44.functions.invoke('reasonerUpdate', {
+        ...buildPayload(true),
+        corpus_evidence: corpusEvidence || undefined,
+      });
       const data = res?.data ?? res;
       if (data?.error) throw new Error(data.error);
       setResult(data);
       setAssertions(data.assertions || []);
     } catch (e) {
-      toast({ title: 'Preview failed', description: e.message, variant: 'destructive' });
+      toast({ title: 'Preview failed', description: e.message, variant: 'destructive', duration: 30000 });
     } finally {
       setRunning(false);
+      setCorpusProgress(null);
     }
   };
 
@@ -46,32 +138,35 @@ export default function ReasonerUpdate() {
     setApplying(true);
     try {
       const res = await base44.functions.invoke('reasonerUpdate', {
-        dry_run: false, skip_llm: skipLlm, curated_assertions: assertions,
+        ...buildPayload(false),
+        corpus_evidence: corpusEvidenceRef.current || undefined,
+        curated_assertions: assertions,
       });
       const data = res?.data ?? res;
       if (data?.error) throw new Error(data.error);
       setResult(data);
       if (data.pr_url) {
         setPrUrl(data.pr_url);
-        toast({ title: 'Pull request created', description: 'Reasoner graph update submitted for review.', duration: 30000 });
+        toast({
+          title: 'Pull request created',
+          description: data.vocabulary_updated
+            ? 'Reasoner graph update and openrel:allows vocabulary definition submitted for review.'
+            : 'Reasoner graph update submitted for review.',
+          duration: 30000,
+        });
       }
     } catch (e) {
-      toast({ title: 'Apply failed', description: e.message, variant: 'destructive' });
+      toast({ title: 'Apply failed', description: e.message, variant: 'destructive', duration: 30000 });
     } finally {
       setApplying(false);
     }
   };
 
-  const curieOf = (iri) => {
-    if (!iri) return '';
-    if (iri.startsWith('http://www.w3.org/ns/openrel/0/')) return 'openrel:' + iri.slice('http://www.w3.org/ns/openrel/0/'.length);
-    if (iri.startsWith('http://www.w3.org/ns/odrl/2/')) return 'odrl:' + iri.slice('http://www.w3.org/ns/odrl/2/'.length);
-    if (iri.startsWith('http://www.w3.org/2004/02/skos/core#')) return 'skos:' + iri.slice('http://www.w3.org/2004/02/skos/core#'.length);
-    return iri;
-  };
-  const relLabel = (iri) => curieOf(iri).replace(/^openrel:/, '').replace(/^odrl:/, '');
-  const reverseAt = (i) => setAssertions((prev) => prev.map((x, idx) => idx === i ? { ...x, subject: x.object, object: x.subject } : x));
-  const deleteAt = (i) => setAssertions((prev) => prev.filter((_, idx) => idx !== i));
+  const dg = result?.dg_summary;
+  const corpus = result?.corpus_summary;
+  const progressPct = corpusProgress && corpusProgress.total > 0
+    ? (corpusProgress.fetched / corpusProgress.total) * 100
+    : 0;
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -84,107 +179,103 @@ export default function ReasonerUpdate() {
           Build the OpenREL Reasoner Graph (<code className="text-xs">data/reasoner/graph_reasoner.ttl</code>) — a
           reified, editable graph of assertions between actions using the type_evaluation relations
           (<code className="text-xs">includedIn</code>, <code className="text-xs">contradicts</code>,{' '}
-          <code className="text-xs">implies</code>). Deterministic edges are derived from actions.ttl
-          (<code className="text-xs">odrl:includedIn</code>, skos mappings, <code className="text-xs">defaultDuty</code>,
-          authored contradicts); probabilistic edges are LLM drafts for review. Probabilistic edges are dropped where a
-          deterministic edge already exists. Human-authored deterministic and reviewed probabilistic assertions are
-          preserved across re-runs.
+          <code className="text-xs">implies</code>, <code className="text-xs">allows</code>). Assertions are
+          derived in three tiers — deterministic (actions.ttl + the DALICC dependency graph), corpus
+          (statistical evidence from the DALICC licence corpus), and probabilistic (LLM drafts) — merged
+          under the shadow rule Deterministic &gt; Corpus &gt; Probabilistic. Human-authored and curated
+          assertions are preserved across re-runs.
         </p>
       </div>
 
-      <section className="rounded-xl border border-border bg-card/50 p-5 space-y-4">
-        <div className="flex items-center gap-3">
-          <input
-            id="skipLlm"
-            type="checkbox"
-            checked={skipLlm}
-            onChange={(e) => setSkipLlm(e.target.checked)}
-            className="w-4 h-4 rounded border-border accent-primary"
-          />
-          <Label htmlFor="skipLlm" className="text-sm font-normal cursor-pointer">
-            Deterministic-only (skip LLM probabilistic pass)
-          </Label>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <Button onClick={runPreview} disabled={running || applying}>
-            {running ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-            Generate preview
-          </Button>
-          {result && !prUrl && (
-            <Button onClick={applyUpdate} disabled={applying}>
-              {applying ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <GitPullRequest className="w-4 h-4 mr-2" />}
-              Apply &amp; create PR
+      <section className="space-y-2.5">
+        <h2 className="text-sm font-semibold text-foreground">Run steps &amp; sources</h2>
+        <ReasonerSourceSteps config={config} onChange={patchConfig} disabled={running || applying} />
+        <div className="flex flex-col gap-3 pt-1">
+          <div className="flex items-center gap-2.5">
+            <Button onClick={runPreview} disabled={running || applying}>
+              {running ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+              Generate preview
             </Button>
-          )}
-          {prUrl && (
-            <a href={prUrl} target="_blank" rel="noopener noreferrer"
-               className="inline-flex items-center gap-2 text-sm text-primary hover:underline">
-              <GitPullRequest className="w-4 h-4" /> View pull request ↗
-            </a>
+            {result && !prUrl && (
+              <Button onClick={applyUpdate} disabled={running || applying}>
+                {applying ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <GitPullRequest className="w-4 h-4 mr-2" />}
+                Apply &amp; create PR
+              </Button>
+            )}
+            {prUrl && (
+              <a href={prUrl} target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center gap-2 text-sm text-primary hover:underline">
+                <GitPullRequest className="w-4 h-4" /> View pull request ↗
+              </a>
+            )}
+          </div>
+          {corpusProgress && (
+            <div className="w-full max-w-sm space-y-1.5">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Fetching DALICC licences…</span>
+                <span className="font-mono">
+                  {corpusProgress.fetched}/{corpusProgress.total}
+                  {corpusProgress.errors > 0 && ` · ${corpusProgress.errors} errors`}
+                </span>
+              </div>
+              <Progress value={progressPct} />
+            </div>
           )}
         </div>
       </section>
 
       {result && (
         <section className="rounded-xl border border-border bg-card/50 p-5 space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <Stat label="Actions parsed" value={result.actions_parsed} />
             <Stat label="Deterministic" value={result.deterministic_count}
                   sub={`${result.deterministic_new} new · ${result.deterministic_preserved_manual} preserved`} />
+            <Stat label="Corpus" value={result.corpus_count}
+                  sub={`${result.corpus_new} new · ${result.corpus_preserved_manual} preserved`} />
             <Stat label="Probabilistic" value={result.probabilistic_count}
                   sub={`${result.probabilistic_new} new · ${result.probabilistic_preserved} preserved`} />
             <Stat label="Dropped (shadowed)" value={result.probabilistic_dropped_shadowed} />
+            <Stat label="Total" value={result.total ?? assertions.length} />
           </div>
 
-          <div>
-            <h2 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary" /> Assertion preview ({assertions.length})
-            </h2>
-            <div className="rounded-lg border border-border bg-background/40 max-h-[520px] overflow-y-auto divide-y divide-border">
-              {assertions.map((a, i) => (
-                <div key={i} className="px-3 py-2 flex items-start gap-2 text-xs">
-                  <span className={`font-mono px-1.5 py-0.5 rounded shrink-0 ${
-                    a.derivation === 'Deterministic'
-                      ? 'bg-accent/15 text-accent'
-                      : 'bg-primary/15 text-primary'
-                  }`}>
-                    {a.derivation === 'Deterministic' ? 'DET' : 'PROB'}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-mono">
-                      <span className="text-foreground">{curieOf(a.subject)}</span>{' '}
-                      <span className="text-muted-foreground">{relLabel(a.relation)}</span>{' '}
-                      <span className="text-foreground">{curieOf(a.object)}</span>
-                      {a.role && <span className="text-muted-foreground"> · {relLabel(a.role)}</span>}
-                    </div>
-                    {a.rationale && <div className="text-muted-foreground mt-0.5">{a.rationale}</div>}
-                    <div className="text-muted-foreground/70 mt-0.5">
-                      {a.source}{a.confidence != null ? ` · conf ${a.confidence.toFixed(2)}` : ''}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-0.5 shrink-0">
-                    <button title="Reverse direction (swap subject/object)"
-                      onClick={() => reverseAt(i)}
-                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
-                      <ArrowLeftRight className="w-3.5 h-3.5" />
-                    </button>
-                    <button title="Delete assertion"
-                      onClick={() => deleteAt(i)}
-                      className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+          {(dg || corpus) && (
+            <div className="grid gap-2 sm:grid-cols-2 text-xs">
+              {dg && (
+                <div className="rounded-lg border border-border bg-background/40 px-3 py-2 text-muted-foreground">
+                  <span className="text-foreground font-medium">Dependency graph</span>
+                  {!dg.enabled && ' — disabled'}
+                  {dg.enabled && ` — ${dg.edges} edges · ${dg.same_as} sameAs pairs · ${dg.unresolved} unresolved targets`}
+                  {dg.enabled && dg.error && <span className="text-destructive"> · error: {dg.error}</span>}
                 </div>
-              ))}
-              {!assertions.length && (
-                <div className="px-3 py-4 text-xs text-muted-foreground italic">No assertions.</div>
+              )}
+              {corpus && (
+                <div className="rounded-lg border border-border bg-background/40 px-3 py-2 text-muted-foreground">
+                  <span className="text-foreground font-medium">Licence corpus</span>
+                  {` — ${corpus.licences_parsed}/${corpus.licences_fetched} licences parsed · ${corpus.implies_candidates} duty pairs · ${corpus.allows_candidates} co-existence pairs (min support ${corpus.min_support})`}
+                  {corpus.error && <span className="text-destructive"> · error: {corpus.error}</span>}
+                </div>
               )}
             </div>
+          )}
+
+          {result.warnings?.length > 0 && (
+            <div className="space-y-1">
+              {result.warnings.map((w, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs text-amber-400/90">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>{w}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div>
+            <h2 className="text-sm font-semibold text-foreground mb-2">Assertion preview — grouped by relation ({assertions.length})</h2>
+            <ReasonerAssertionPreview assertions={assertions} onChange={setAssertions} />
             <p className="text-[11px] text-muted-foreground/70 mt-2">
-              Duplicates are detected and dropped before preview; the list is alphabetical by subject so
-              any residual near-duplicates are easy to spot. Use the icons to reverse a misdirected edge
-              or delete an assertion — your curated set is committed on Apply.
+              Duplicates are detected and dropped before preview; the list is alphabetical within each
+              relation group. Use the icons to reverse a misdirected edge or delete an assertion — your
+              curated set is committed on Apply.
             </p>
           </div>
         </section>
