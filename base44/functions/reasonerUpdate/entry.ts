@@ -123,6 +123,16 @@ function curieOf(iri: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Outbound fetches are timeout-bounded so a stalled GitHub request fails fast
+// instead of hanging the whole invocation.
+// ---------------------------------------------------------------------------
+const FETCH_TIMEOUT_MS = 25000;
+
+async function fetchT(url: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
+
+// ---------------------------------------------------------------------------
 // Flat Turtle parsing helpers (flat statements + balanced-bracket handling
 // for ODRL rule blank nodes in licence files).
 // ---------------------------------------------------------------------------
@@ -664,7 +674,7 @@ async function loadActionsAndResolve(
   dgBranch: string,
   dgPath: string,
 ): Promise<Prepared> {
-  const rawRes = await fetch(`https://raw.githubusercontent.com/${repo}/${branch}/${actionsPath}`, { headers: ghHeaders });
+  const rawRes = await fetchT(`https://raw.githubusercontent.com/${repo}/${branch}/${actionsPath}`, { headers: ghHeaders });
   if (!rawRes.ok) throw new Error(`Failed to fetch actions.ttl (${rawRes.status})`);
   const ttlText = await rawRes.text();
   const { actions } = parseActionsTtl(ttlText);
@@ -675,7 +685,7 @@ async function loadActionsAndResolve(
   let dgError: string | null = null;
   if (dgEnabled) {
     try {
-      const dgRes = await fetch(`https://raw.githubusercontent.com/${dgRepo}/${dgBranch}/${dgPath}`);
+      const dgRes = await fetchT(`https://raw.githubusercontent.com/${dgRepo}/${dgBranch}/${dgPath}`);
       if (!dgRes.ok) throw new Error(`fetch dg (${dgRes.status})`);
       const parsed = parseFlatTriples(await dgRes.text());
       dgTriples.push(...parsed.triples);
@@ -697,7 +707,7 @@ async function fetchDaliccLicences(
   folder: string,
   headers: Record<string, string>,
 ): Promise<{ files: Array<{ name: string; text: string }>; errors: number; error?: string }> {
-  const listRes = await fetch(
+  const listRes = await fetchT(
     `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(folder)}?ref=${branch}`,
     { headers },
   );
@@ -715,7 +725,7 @@ async function fetchDaliccLicences(
     const batch = ttlFiles.slice(i, i + CHUNK);
     const results = await Promise.all(batch.map(async (f: any) => {
       try {
-        const r = await fetch(f.download_url);
+        const r = await fetchT(f.download_url);
         if (!r.ok) return null;
         return { name: f.name, text: await r.text() };
       } catch {
@@ -888,7 +898,7 @@ async function fetchExistingGraph(
   ghHeaders: Record<string, string>,
 ): Promise<Assertion[]> {
   try {
-    const exRes = await fetch(
+    const exRes = await fetchT(
       `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(GRAPH_FILE)}?ref=${branch}`,
       { headers: ghHeaders },
     );
@@ -1038,7 +1048,7 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
       const start = Number(body.corpus_start) || 0;
       const count = Math.min(Number(body.corpus_count) || 40, 100);
       const prep = await loadActionsAndResolve(ghHeaders, repo, branch, actionsPath, dgEnabled, dgRepo, dgBranch, dgPath);
-      const listRes = await fetch(
+      const listRes = await fetchT(
         `https://api.github.com/repos/${corpusRepo}/contents/${encodeURIComponent(corpusFolder)}?ref=${corpusBranch}`,
         { headers: ghHeaders },
       );
@@ -1052,7 +1062,7 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
       let errors = 0;
       const licences = await Promise.all(slice.map(async (f: any) => {
         try {
-          const r = await fetch(f.download_url);
+          const r = await fetchT(f.download_url);
           if (!r.ok) { errors++; return { name: f.name, pd: [] as string[][], pp: [] as string[][] }; }
           return { name: f.name, ...extractLicencePairs(await r.text(), prep.resolve) };
         } catch {

@@ -8,7 +8,7 @@ import ReasonerAssertionPreview from '@/components/reasoner/ReasonerAssertionPre
 import { Play, GitPullRequest, Loader2, Network, AlertTriangle } from 'lucide-react';
 
 const CONFIG_KEY = 'openrel_reasoner_config_v2';
-const CORPUS_BATCH = 40;
+const CORPUS_BATCH = 10;
 const DEFAULT_CONFIG = {
   actions_path: '',
   dg_enabled: true,
@@ -69,19 +69,39 @@ export default function ReasonerUpdate() {
   });
 
   // Fetch the licence corpus in backend batches, accumulating pair evidence
-  // locally while reporting live progress (fetched/total) to the UI.
+  // locally while reporting live progress (fetched/total) to the UI. Each
+  // batch invocation is timeout-bounded: a stuck batch is skipped (counted
+  // as errors) instead of hanging the whole run.
   const fetchCorpusEvidence = async () => {
     const evidence = { licences: 0, pd: {}, pp: {} };
     let start = 0;
-    let total = 0;
+    let total = null;
     let fetchErrors = 0;
-    do {
-      const res = await base44.functions.invoke('reasonerUpdate', {
-        mode: 'corpus_fetch',
-        sources: { ...buildPayload(true).sources, corpus_start: start, corpus_count: CORPUS_BATCH },
-      });
-      const data = res?.data ?? res;
-      if (data?.error) throw new Error(data.error);
+
+    const invokeBatch = (offset) =>
+      Promise.race([
+        base44.functions.invoke('reasonerUpdate', {
+          mode: 'corpus_fetch',
+          sources: { ...buildPayload(true).sources, corpus_start: offset, corpus_count: CORPUS_BATCH },
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('DALICC licence batch timed out')), 90000),
+        ),
+      ]);
+
+    while (total === null || start < total) {
+      let data;
+      try {
+        const res = await invokeBatch(start);
+        data = res?.data ?? res;
+        if (data?.error) throw new Error(data.error);
+      } catch (e) {
+        if (total === null) throw e; // cannot continue without the first batch
+        fetchErrors += CORPUS_BATCH;
+        start += CORPUS_BATCH;
+        setCorpusProgress({ fetched: Math.min(start, total), total, errors: fetchErrors });
+        continue;
+      }
       total = data.total || 0;
       fetchErrors += data.errors || 0;
       for (const lic of data.licences || []) {
@@ -97,7 +117,7 @@ export default function ReasonerUpdate() {
       }
       start += data.fetched || 0;
       setCorpusProgress({ fetched: start, total, errors: fetchErrors });
-    } while (total > 0 && start < total);
+    }
     return evidence;
   };
 
