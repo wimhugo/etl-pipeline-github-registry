@@ -180,6 +180,24 @@ export default async function indexPolicies(req: Request): Promise<Response> {
       console.warn('indexPolicies: could not load constraints scheme:', e?.message || e);
     }
 
+    // 4.7. Actions concept scheme (actions.ttl) via the API — map each action
+    // IRI to its prefLabel so the curated `simple` action arrays
+    // (simplePerm / simpleProhibit / simpleDuty) can be stored as
+    // human-readable labels instead of IRIs.
+    const actionPrefLabel = new Map<string, string>();
+    try {
+      const aRes = await base44.asServiceRole.functions.invoke('fetchApiSourceContent', { section: 'Actions' });
+      const aData = (aRes as any)?.data ?? aRes;
+      for (const m of aData?.members || []) {
+        if (!m.iri || !m.label) continue;
+        actionPrefLabel.set(m.iri, m.label);
+        const c = compactForIndex(m.iri);
+        if (c !== m.iri) actionPrefLabel.set(c, m.label);
+      }
+    } catch (e: any) {
+      console.warn('indexPolicies: could not load actions scheme:', e?.message || e);
+    }
+
     // 5. Determine target index entries.
     const targets = requestedIris.length
       ? policies.filter((p) => requestedIris.includes(p.iri))
@@ -273,6 +291,30 @@ export default async function indexPolicies(req: Request): Promise<Response> {
           });
         }
       }
+      // simple action arrays: resolve action IRIs/CURIEs to prefLabels so the
+      // index is human-readable. Only the three action arrays are touched;
+      // the rest of the curated `simple` object (q1..q4, geoInc/geoExc) is
+      // preserved. Unknown values (already a label, or an unmapped IRI) pass
+      // through unchanged, so re-running the indexer is idempotent.
+      const resolveActionArr = (arr: unknown): unknown =>
+        Array.isArray(arr)
+          ? arr.map((v) => actionPrefLabel.get(v as string) || actionPrefLabel.get(compactForIndex(v as string)) || v)
+          : arr;
+      const oldSimple = entry.simple && typeof entry.simple === 'object' ? entry.simple : null;
+      const newSimple = oldSimple ? { ...oldSimple } : entry.simple;
+      for (const key of ['simplePerm', 'simpleProhibit', 'simpleDuty']) {
+        if (newSimple && Array.isArray((newSimple as any)[key])) {
+          (newSimple as any)[key] = resolveActionArr((newSimple as any)[key]);
+        }
+      }
+      for (const key of ['simplePerm', 'simpleProhibit', 'simpleDuty']) {
+        const oldA = (oldSimple as any)?.[key];
+        if (!Array.isArray(oldA)) continue; // nothing curated to resolve
+        const newA = (newSimple as any)[key];
+        if (JSON.stringify(oldA) !== JSON.stringify(newA)) {
+          changed.push({ field: `simple.${key}`, before: oldA, after: newA, status: 'changed' });
+        }
+      }
       const hasChanges = added.length + changed.length > 0;
       if (hasChanges) changedCount++; else unchangedCount++;
       changes.push({
@@ -286,7 +328,7 @@ export default async function indexPolicies(req: Request): Promise<Response> {
       // Apply merge into the working copy.
       const idx = mergedPolicies.findIndex((p) => p.iri === entry.iri);
       if (idx >= 0) {
-        mergedPolicies[idx] = { ...mergedPolicies[idx], ...newDerived };
+        mergedPolicies[idx] = { ...mergedPolicies[idx], ...newDerived, ...(newSimple !== entry.simple ? { simple: newSimple } : {}) };
       }
     }
 
