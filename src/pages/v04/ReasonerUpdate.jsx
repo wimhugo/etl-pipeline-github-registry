@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Play, GitPullRequest, Loader2, Network, Sparkles } from 'lucide-react';
+import { Play, GitPullRequest, Loader2, Network, Sparkles, Trash2, ArrowLeftRight } from 'lucide-react';
 
 /**
  * ReasonerUpdate (v0.4) — builds the OpenREL Reasoner Graph
@@ -23,6 +23,7 @@ export default function ReasonerUpdate() {
   const [running, setRunning] = useState(false);
   const [applying, setApplying] = useState(false);
   const [prUrl, setPrUrl] = useState(null);
+  const [assertions, setAssertions] = useState([]);
 
   const runPreview = async () => {
     setRunning(true);
@@ -33,6 +34,7 @@ export default function ReasonerUpdate() {
       const data = res?.data ?? res;
       if (data?.error) throw new Error(data.error);
       setResult(data);
+      setAssertions(data.assertions || []);
     } catch (e) {
       toast({ title: 'Preview failed', description: e.message, variant: 'destructive' });
     } finally {
@@ -43,7 +45,9 @@ export default function ReasonerUpdate() {
   const applyUpdate = async () => {
     setApplying(true);
     try {
-      const res = await base44.functions.invoke('reasonerUpdate', { dry_run: false, skip_llm: skipLlm });
+      const res = await base44.functions.invoke('reasonerUpdate', {
+        dry_run: false, skip_llm: skipLlm, curated_assertions: assertions,
+      });
       const data = res?.data ?? res;
       if (data?.error) throw new Error(data.error);
       setResult(data);
@@ -58,7 +62,16 @@ export default function ReasonerUpdate() {
     }
   };
 
-  const relLabel = (iri) => iri.replace('openrel:', '').replace('odrl:', '');
+  const curieOf = (iri) => {
+    if (!iri) return '';
+    if (iri.startsWith('http://www.w3.org/ns/openrel/0/')) return 'openrel:' + iri.slice('http://www.w3.org/ns/openrel/0/'.length);
+    if (iri.startsWith('http://www.w3.org/ns/odrl/2/')) return 'odrl:' + iri.slice('http://www.w3.org/ns/odrl/2/'.length);
+    if (iri.startsWith('http://www.w3.org/2004/02/skos/core#')) return 'skos:' + iri.slice('http://www.w3.org/2004/02/skos/core#'.length);
+    return iri;
+  };
+  const relLabel = (iri) => curieOf(iri).replace(/^openrel:/, '').replace(/^odrl:/, '');
+  const reverseAt = (i) => setAssertions((prev) => prev.map((x, idx) => idx === i ? { ...x, subject: x.object, object: x.subject } : x));
+  const deleteAt = (i) => setAssertions((prev) => prev.filter((_, idx) => idx !== i));
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -126,11 +139,11 @@ export default function ReasonerUpdate() {
 
           <div>
             <h2 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary" /> Assertion preview ({result.total})
+              <Sparkles className="w-4 h-4 text-primary" /> Assertion preview ({assertions.length})
             </h2>
-            <div className="rounded-lg border border-border bg-background/40 max-h-[460px] overflow-y-auto divide-y divide-border">
-              {(result.sample || []).map((a, i) => (
-                <div key={i} className="px-3 py-2 flex items-start gap-3 text-xs">
+            <div className="rounded-lg border border-border bg-background/40 max-h-[520px] overflow-y-auto divide-y divide-border">
+              {assertions.map((a, i) => (
+                <div key={i} className="px-3 py-2 flex items-start gap-2 text-xs">
                   <span className={`font-mono px-1.5 py-0.5 rounded shrink-0 ${
                     a.derivation === 'Deterministic'
                       ? 'bg-accent/15 text-accent'
@@ -140,9 +153,9 @@ export default function ReasonerUpdate() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="font-mono">
-                      <span className="text-foreground">{a.subject}</span>{' '}
+                      <span className="text-foreground">{curieOf(a.subject)}</span>{' '}
                       <span className="text-muted-foreground">{relLabel(a.relation)}</span>{' '}
-                      <span className="text-foreground">{a.object}</span>
+                      <span className="text-foreground">{curieOf(a.object)}</span>
                       {a.role && <span className="text-muted-foreground"> · {relLabel(a.role)}</span>}
                     </div>
                     {a.rationale && <div className="text-muted-foreground mt-0.5">{a.rationale}</div>}
@@ -150,14 +163,29 @@ export default function ReasonerUpdate() {
                       {a.source}{a.confidence != null ? ` · conf ${a.confidence.toFixed(2)}` : ''}
                     </div>
                   </div>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <button title="Reverse direction (swap subject/object)"
+                      onClick={() => reverseAt(i)}
+                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                      <ArrowLeftRight className="w-3.5 h-3.5" />
+                    </button>
+                    <button title="Delete assertion"
+                      onClick={() => deleteAt(i)}
+                      className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
-              {result.total > (result.sample || []).length && (
-                <div className="px-3 py-2 text-xs text-muted-foreground italic">
-                  … {result.total - (result.sample || []).length} more in the generated graph
-                </div>
+              {!assertions.length && (
+                <div className="px-3 py-4 text-xs text-muted-foreground italic">No assertions.</div>
               )}
             </div>
+            <p className="text-[11px] text-muted-foreground/70 mt-2">
+              Duplicates are detected and dropped before preview; the list is alphabetical by subject so
+              any residual near-duplicates are easy to spot. Use the icons to reverse a misdirected edge
+              or delete an assertion — your curated set is committed on Apply.
+            </p>
           </div>
         </section>
       )}

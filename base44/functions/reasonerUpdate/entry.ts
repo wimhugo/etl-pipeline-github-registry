@@ -368,7 +368,9 @@ Return JSON: { "assertions": [ { "subject": "openrel:...", "relation": "included
     }
   });
   await Promise.all(batch);
-  return results;
+  // Dedup within the LLM batch (same edge key → keep first).
+  const seen = new Set<string>();
+  return results.filter((a) => { const k = edgeKey(a); if (seen.has(k)) return false; seen.add(k); return true; });
 }
 
 // ---------------------------------------------------------------------------
@@ -548,7 +550,18 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
     const keptPreservedProb = preservedProb.filter((a) => !finalDetKeys.has(edgeKey(a)));
     const finalProb = [...keptPreservedProb, ...newProb];
 
-    const merged = [...finalDet, ...finalProb];
+    let merged = [...finalDet, ...finalProb];
+    // Safety-net dedup across the whole graph (deterministic wins, since it
+    // is first) + alphabetical sort so adjacent duplicates are visible to humans.
+    {
+      const seen = new Set<string>();
+      merged = merged.filter((a) => { const k = edgeKey(a); if (seen.has(k)) return false; seen.add(k); return true; });
+    }
+    merged.sort((a, b) =>
+      curieOf(a.subject).localeCompare(curieOf(b.subject)) ||
+      curieOf(a.relation).localeCompare(curieOf(b.relation)) ||
+      curieOf(a.object).localeCompare(curieOf(b.object)),
+    );
     const droppedProbabilistic = (preservedProb.length + llm.length) - finalProb.length;
 
     const summary = {
@@ -565,17 +578,41 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
     };
 
     if (dryRun) {
-      const sample = merged.slice(0, 40).map((a) => ({
-        subject: curieOf(a.subject), relation: curieOf(a.relation), object: curieOf(a.object),
-        role: a.role ? curieOf(a.role) : null, derivation: a.derivation,
+      // Return the full, deduped, alphabetically-sorted assertion list so the
+      // UI can render an editable preview (delete / reverse per row) and send
+      // the curated set back on apply.
+      const assertions = merged.map((a) => ({
+        subject: a.subject, relation: a.relation, object: a.object,
+        role: a.role, derivation: a.derivation,
         confidence: a.confidence, rationale: a.rationale, source: a.source,
       }));
-      return Response.json({ dry_run: true, ...summary, sample, total: merged.length });
+      return Response.json({ dry_run: true, ...summary, assertions, total: merged.length });
     }
 
-    // 7. Apply — serialize + PR.
+    // 7. Apply — serialize + PR. If the UI sends a curated assertion list
+    //    (post delete/reverse edits), commit that verbatim instead of the
+    //    regenerated set, so preview curation persists.
+    let toCommit = merged;
+    if (Array.isArray(body.curated_assertions) && body.curated_assertions.length) {
+      toCommit = (body.curated_assertions as any[]).map((a) => ({
+        subject: a.subject, relation: a.relation, object: a.object,
+        role: a.role || null,
+        derivation: a.derivation === 'Probabilistic' ? 'Probabilistic' : 'Deterministic',
+        source: a.source || 'curated (UI)',
+        confidence: a.confidence, rationale: a.rationale,
+      }));
+      // Re-dedup + re-sort the curated set for a clean file.
+      const seen = new Set<string>();
+      toCommit = toCommit.filter((a) => { const k = edgeKey(a); if (seen.has(k)) return false; seen.add(k); return true; });
+      toCommit.sort((a, b) =>
+        curieOf(a.subject).localeCompare(curieOf(b.subject)) ||
+        curieOf(a.relation).localeCompare(curieOf(b.relation)) ||
+        curieOf(a.object).localeCompare(curieOf(b.object)),
+      );
+    }
+
     const generatedAt = new Date().toISOString();
-    const serialized = serializeGraph(merged, generatedAt);
+    const serialized = serializeGraph(toCommit, generatedAt);
 
     let prResult: { pr_url: string; pr_number: number; branch: string };
     try {
