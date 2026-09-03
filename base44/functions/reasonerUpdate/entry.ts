@@ -54,7 +54,8 @@ import { submitGithubPR } from '../../shared/submitGithubPR.ts';
  *   sources?: {
  *     actions_path?: string,
  *     dg_enabled?: boolean, dg_repo?: string, dg_branch?: string, dg_path?: string,
- *     corpus_enabled?: boolean, corpus_folder?: string, corpus_min_support?: number
+ *     corpus_enabled?: boolean, corpus_folder?: string, corpus_min_support?: number,
+ *     corpus_limit?: number (test aid: only use the first N licence files)
  *   }
  * }
  */
@@ -165,7 +166,14 @@ function splitTopLevel(text: string, delim: string): string[] {
     if (inAngle) continue;
     if (ch === '[' || ch === '(') depth++;
     else if (ch === ']' || ch === ')') depth = Math.max(0, depth - 1);
-    if (depth === 0 && ch === delim) { parts.push(buf.slice(0, -1)); buf = ''; }
+    if (depth === 0 && ch === delim) {
+      // A '.' is only a Turtle statement terminator when followed by
+      // whitespace or end-of-input — dots inside CURIE locals
+      // (e.g. osl:FPL-1.0.0) or decimals must not split statements.
+      if (delim === '.' && i + 1 < text.length && !/\s/.test(text[i + 1])) continue;
+      parts.push(buf.slice(0, -1));
+      buf = '';
+    }
   }
   if (buf.trim()) parts.push(buf);
   return parts;
@@ -1043,8 +1051,10 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
     let corpusAssertions: Assertion[] = [];
     if (corpusEnabled) {
       try {
-        const { files, errors, error } = await fetchDaliccLicences(repo, branch, corpusFolder, ghHeaders);
+        const { files: allFiles, errors, error } = await fetchDaliccLicences(repo, branch, corpusFolder, ghHeaders);
         if (error) throw new Error(error);
+        const corpusLimit = Number(src.corpus_limit) || 0;
+        const files = corpusLimit > 0 ? allFiles.slice(0, corpusLimit) : allFiles;
         corpusSummary.fetch_errors = errors;
         if (errors) warnings.push(`${errors} licence file(s) could not be fetched`);
         const res = corpusPass(files, resolve, minSupport, corpusFolder);
