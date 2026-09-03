@@ -73,7 +73,7 @@ export default function ReasonerSourceSteps({ config, onChange, disabled }) {
 
       <ReasonerStepCard
         step="3" icon={Library} title="DALICC licence corpus"
-        summary={config.corpus_enabled ? `${config.corpus_repo} · ${config.corpus_folder} · min support ${config.corpus_min_support}` : 'disabled'}
+        summary={config.corpus_enabled ? `${config.corpus_folder} · min support ${config.corpus_min_support}` : 'disabled'}
       >
         <Field label="Enabled">
           <Switch
@@ -82,13 +82,7 @@ export default function ReasonerSourceSteps({ config, onChange, disabled }) {
             disabled={disabled}
           />
         </Field>
-        <Field label="Repository (owner/repo)">
-          <Input value={config.corpus_repo} onChange={(e) => patch({ corpus_repo: e.target.value })} disabled={disabled} className="h-8 text-xs" />
-        </Field>
-        <Field label="Branch">
-          <Input value={config.corpus_branch} onChange={(e) => patch({ corpus_branch: e.target.value })} disabled={disabled} className="h-8 text-xs" />
-        </Field>
-        <Field label="Licence folder">
+        <Field label="Licence folder (Knowledge Base repo)">
           <Input value={config.corpus_folder} onChange={(e) => patch({ corpus_folder: e.target.value })} disabled={disabled} className="h-8 text-xs" />
         </Field>
         <Field label="Minimum support (licences)">
@@ -100,8 +94,8 @@ export default function ReasonerSourceSteps({ config, onChange, disabled }) {
         </Field>
         <p className="text-[11px] text-muted-foreground/70">
           Corpus pass: duty co-occurrence (→ implies) and prohibition∩permission co-existence
-          (→ openrel:allows) across the licence files, with support counts. Fetched in batches with
-          a live progress counter.
+          (→ openrel:allows) across the licence files in the Knowledge Base repo, with support
+          counts. Fetched in a single server-side pass.
         </p>
       </ReasonerStepCard>
 

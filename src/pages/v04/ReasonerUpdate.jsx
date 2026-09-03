@@ -1,14 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import ReasonerSourceSteps from '@/components/reasoner/ReasonerSourceSteps';
 import ReasonerAssertionPreview from '@/components/reasoner/ReasonerAssertionPreview';
 import { Play, GitPullRequest, Loader2, Network, AlertTriangle } from 'lucide-react';
 
-const CONFIG_KEY = 'openrel_reasoner_config_v2';
-const CORPUS_BATCH = 10;
+const CONFIG_KEY = 'openrel_reasoner_config_v3';
 const DEFAULT_CONFIG = {
   actions_path: '',
   dg_enabled: true,
@@ -16,9 +14,7 @@ const DEFAULT_CONFIG = {
   dg_branch: 'main',
   dg_path: 'licensedata/dependencygraph/dg_default.ttl',
   corpus_enabled: true,
-  corpus_repo: 'dalicc/dalicc',
-  corpus_branch: 'main',
-  corpus_folder: 'licensedata/licenses',
+  corpus_folder: 'data/input/dalicc',
   corpus_min_support: 2,
   llm_enabled: true,
   model: 'gemini_3_flash',
@@ -41,8 +37,6 @@ export default function ReasonerUpdate() {
   const [applying, setApplying] = useState(false);
   const [prUrl, setPrUrl] = useState(null);
   const [assertions, setAssertions] = useState([]);
-  const [corpusProgress, setCorpusProgress] = useState(null);
-  const corpusEvidenceRef = useRef(null);
 
   useEffect(() => {
     try { localStorage.setItem(CONFIG_KEY, JSON.stringify(config)); } catch { /* ignore */ }
@@ -61,87 +55,17 @@ export default function ReasonerUpdate() {
       dg_branch: config.dg_branch,
       dg_path: config.dg_path,
       corpus_enabled: config.corpus_enabled,
-      corpus_repo: config.corpus_repo,
-      corpus_branch: config.corpus_branch,
       corpus_folder: config.corpus_folder,
       corpus_min_support: Number(config.corpus_min_support) || 2,
     },
   });
 
-  // Fetch the licence corpus in backend batches, accumulating pair evidence
-  // locally while reporting live progress (fetched/total) to the UI. Each
-  // batch invocation is timeout-bounded: a stuck batch is skipped (counted
-  // as errors) instead of hanging the whole run.
-  const fetchCorpusEvidence = async () => {
-    const evidence = { licences: 0, pd: {}, pp: {} };
-    let start = 0;
-    let total = null;
-    let fetchErrors = 0;
-
-    const invokeBatch = (offset) =>
-      Promise.race([
-        base44.functions.invoke('reasonerUpdate', {
-          mode: 'corpus_fetch',
-          sources: { ...buildPayload(true).sources, corpus_start: offset, corpus_count: CORPUS_BATCH },
-        }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('DALICC licence batch timed out')), 90000),
-        ),
-      ]);
-
-    while (total === null || start < total) {
-      let data;
-      try {
-        const res = await invokeBatch(start);
-        data = res?.data ?? res;
-        if (data?.error) throw new Error(data.error);
-      } catch (e) {
-        if (total === null) throw e; // cannot continue without the first batch
-        fetchErrors += CORPUS_BATCH;
-        start += CORPUS_BATCH;
-        setCorpusProgress({ fetched: Math.min(start, total), total, errors: fetchErrors });
-        continue;
-      }
-      total = data.total || 0;
-      fetchErrors += data.errors || 0;
-      for (const lic of data.licences || []) {
-        evidence.licences++;
-        for (const [s, o] of lic.pd || []) {
-          const k = `${s}|${o}`;
-          evidence.pd[k] = (evidence.pd[k] || 0) + 1;
-        }
-        for (const [s, o] of lic.pp || []) {
-          const k = `${s}|${o}`;
-          evidence.pp[k] = (evidence.pp[k] || 0) + 1;
-        }
-      }
-      start += data.fetched || 0;
-      setCorpusProgress({ fetched: start, total, errors: fetchErrors });
-    }
-    return evidence;
-  };
-
   const runPreview = async () => {
     setRunning(true);
     setResult(null);
     setPrUrl(null);
-    setCorpusProgress(null);
     try {
-      let corpusEvidence;
-      if (config.corpus_enabled) {
-        try {
-          corpusEvidence = await fetchCorpusEvidence();
-        } catch (e) {
-          // Degrade gracefully: continue without corpus evidence.
-          corpusEvidence = { licences: 0, pd: {}, pp: {} };
-          toast({ title: 'Licence corpus unavailable', description: e.message, duration: 30000 });
-        }
-      }
-      corpusEvidenceRef.current = corpusEvidence || null;
-      const res = await base44.functions.invoke('reasonerUpdate', {
-        ...buildPayload(true),
-        corpus_evidence: corpusEvidence || undefined,
-      });
+      const res = await base44.functions.invoke('reasonerUpdate', buildPayload(true));
       const data = res?.data ?? res;
       if (data?.error) throw new Error(data.error);
       setResult(data);
@@ -150,7 +74,6 @@ export default function ReasonerUpdate() {
       toast({ title: 'Preview failed', description: e.message, variant: 'destructive', duration: 30000 });
     } finally {
       setRunning(false);
-      setCorpusProgress(null);
     }
   };
 
@@ -159,7 +82,6 @@ export default function ReasonerUpdate() {
     try {
       const res = await base44.functions.invoke('reasonerUpdate', {
         ...buildPayload(false),
-        corpus_evidence: corpusEvidenceRef.current || undefined,
         curated_assertions: assertions,
       });
       const data = res?.data ?? res;
@@ -184,9 +106,6 @@ export default function ReasonerUpdate() {
 
   const dg = result?.dg_summary;
   const corpus = result?.corpus_summary;
-  const progressPct = corpusProgress && corpusProgress.total > 0
-    ? (corpusProgress.fetched / corpusProgress.total) * 100
-    : 0;
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -210,36 +129,22 @@ export default function ReasonerUpdate() {
       <section className="space-y-2.5">
         <h2 className="text-sm font-semibold text-foreground">Run steps &amp; sources</h2>
         <ReasonerSourceSteps config={config} onChange={patchConfig} disabled={running || applying} />
-        <div className="flex flex-col gap-3 pt-1">
-          <div className="flex items-center gap-2.5">
-            <Button onClick={runPreview} disabled={running || applying}>
-              {running ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Play className="w-4 h-4 mr-2" />}
-              Generate preview
+        <div className="flex items-center gap-2.5 pt-1">
+          <Button onClick={runPreview} disabled={running || applying}>
+            {running ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Play className="w-4 h-4 mr-2" />}
+            Generate preview
+          </Button>
+          {result && !prUrl && (
+            <Button onClick={applyUpdate} disabled={running || applying}>
+              {applying ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <GitPullRequest className="w-4 h-4 mr-2" />}
+              Apply &amp; create PR
             </Button>
-            {result && !prUrl && (
-              <Button onClick={applyUpdate} disabled={running || applying}>
-                {applying ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <GitPullRequest className="w-4 h-4 mr-2" />}
-                Apply &amp; create PR
-              </Button>
-            )}
-            {prUrl && (
-              <a href={prUrl} target="_blank" rel="noopener noreferrer"
-                 className="inline-flex items-center gap-2 text-sm text-primary hover:underline">
-                <GitPullRequest className="w-4 h-4" /> View pull request ↗
-              </a>
-            )}
-          </div>
-          {corpusProgress && (
-            <div className="w-full max-w-sm space-y-1.5">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Fetching DALICC licences…</span>
-                <span className="font-mono">
-                  {corpusProgress.fetched}/{corpusProgress.total}
-                  {corpusProgress.errors > 0 && ` · ${corpusProgress.errors} errors`}
-                </span>
-              </div>
-              <Progress value={progressPct} />
-            </div>
+          )}
+          {prUrl && (
+            <a href={prUrl} target="_blank" rel="noopener noreferrer"
+               className="inline-flex items-center gap-2 text-sm text-primary hover:underline">
+              <GitPullRequest className="w-4 h-4" /> View pull request ↗
+            </a>
           )}
         </div>
       </section>

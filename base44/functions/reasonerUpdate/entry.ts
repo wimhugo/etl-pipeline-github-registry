@@ -21,13 +21,12 @@ import { submitGithubPR } from '../../shared/submitGithubPR.ts';
  *         openrel IRIs through the actions.ttl skos mappings. Unmapped
  *         external IRIs are kept as-is.
  *   - Corpus         — statistical evidence from the DALICC licence corpus
- *     (live, ~343 odrl:Set TTLs): permission→duty co-occurrence (→ implies)
- *     and prohibition∩permission co-existence (→ openrel:allows), each with
- *     a support count, filtered by a minimum-support threshold. The corpus is
- *     fetched in UI-driven batches (mode "corpus_fetch"); the frontend
- *     accumulates pair evidence locally (with a progress counter) and passes
- *     it back as corpus_evidence on the preview/apply call. A single-shot
- *     fetch remains as fallback for non-UI callers.
+ *     snapshot in the Knowledge Base repo (data/input/dalicc, ~343 odrl:Set
+ *     TTLs): permission→duty co-occurrence (→ implies) and prohibition∩
+ *     permission co-existence (→ openrel:allows), each with a support count,
+ *     filtered by a minimum-support threshold. Fetched with a single repo
+ *     tarball download, extracting the licence TTLs in memory (per-file
+ *     downloads caused the earlier hangs).
  *   - Probabilistic  — LLM-draft edges with confidence + rationale, for
  *     human review.
  *
@@ -51,15 +50,11 @@ import { submitGithubPR } from '../../shared/submitGithubPR.ts';
  * Payload:
  * {
  *   dry_run?: boolean, skip_llm?: boolean, model?: string, message?: string,
- *   mode?: 'corpus_fetch',
- *   corpus_start?: number, corpus_count?: number,
- *   corpus_evidence?: { licences: number, pd: Record<string, number>, pp: Record<string, number> },
  *   curated_assertions?: Assertion[],
  *   sources?: {
  *     actions_path?: string,
  *     dg_enabled?: boolean, dg_repo?: string, dg_branch?: string, dg_path?: string,
- *     corpus_enabled?: boolean, corpus_repo?: string, corpus_branch?: string,
- *     corpus_folder?: string, corpus_min_support?: number
+ *     corpus_enabled?: boolean, corpus_folder?: string, corpus_min_support?: number
  *   }
  * }
  */
@@ -128,8 +123,8 @@ function curieOf(iri: string): string {
 // ---------------------------------------------------------------------------
 const FETCH_TIMEOUT_MS = 25000;
 
-async function fetchT(url: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+async function fetchT(url: string, init: RequestInit = {}, timeoutMs: number = FETCH_TIMEOUT_MS): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +132,7 @@ async function fetchT(url: string, init: RequestInit = {}): Promise<Response> {
 // for ODRL rule blank nodes in licence files).
 // ---------------------------------------------------------------------------
 function normalizeTtl(ttl: string): string {
-  return ttl.split('\n').map((line) => {
+  return ttl.replace(/\ufeff/g, '').split('\n').map((line) => {
     const t = line.trim();
     if (/^@(prefix|base)\s+\S+\s+<[^>]*>\s*$/.test(t) && !t.endsWith('.')) {
       return line.replace(/\s*$/, '') + ' .';
@@ -506,11 +501,12 @@ interface CorpusSummary {
   error?: string;
 }
 
-// Single-shot corpus pass (fallback; the UI normally drives corpus_fetch batches).
+// Corpus pass — reads the licence snapshot from the Knowledge Base repo.
 function corpusPass(
   licences: Array<{ name: string; text: string }>,
   resolve: (iri: string) => string,
   minSupport: number,
+  folder: string,
 ): { assertions: Assertion[]; summary: CorpusSummary } {
   const permDuty = new Map<string, Set<string>>();
   const prohibPerm = new Map<string, Set<string>>();
@@ -550,7 +546,7 @@ function corpusPass(
       subject: a, relation: REL_IMPLIES, object: d,
       subjectRole: ROLE_PERMISSION, objectRole: ROLE_DUTY,
       derivation: 'Corpus',
-      source: `DALICC licence corpus (${parsed} licences)`,
+      source: `DALICC licence corpus snapshot ${folder} (${parsed} licences)`,
       support: set.size,
       rationale: `Permission ${curieOf(a)} is accompanied by duty ${curieOf(d)} in ${set.size} of ${parsed} licences.`,
     });
@@ -562,7 +558,7 @@ function corpusPass(
       subject: pr, relation: REL_ALLOWS, object: p,
       subjectRole: ROLE_PROHIBITION, objectRole: ROLE_PERMISSION,
       derivation: 'Corpus',
-      source: `DALICC licence corpus (${parsed} licences)`,
+      source: `DALICC licence corpus snapshot ${folder} (${parsed} licences)`,
       support: set.size,
       rationale: `Prohibition ${curieOf(pr)} co-exists with permission ${curieOf(p)} in ${set.size} of ${parsed} licences.`,
     });
@@ -579,72 +575,6 @@ function corpusPass(
       min_support: minSupport,
     },
   };
-}
-
-// ---------------------------------------------------------------------------
-// Batched corpus support — per-licence pair extraction + evidence aggregation
-// ---------------------------------------------------------------------------
-function extractLicencePairs(
-  text: string,
-  resolve: (iri: string) => string,
-): { pd: string[][]; pp: string[][] } {
-  let rules: LicenceRules | null = null;
-  try { rules = parseLicenceTtl(text); } catch { rules = null; }
-  if (!rules) return { pd: [], pp: [] };
-  const pd = new Set<string>();
-  const pp = new Set<string>();
-  const perms = rules.permissions
-    .map((p) => ({ action: resolve(p.action), duties: [...new Set(p.duties.map(resolve))] }))
-    .filter((p) => p.action);
-  const prohibs = [...new Set(rules.prohibitions.map(resolve).filter(Boolean))];
-  for (const p of perms) {
-    for (const d of p.duties) {
-      if (!d || d === p.action) continue;
-      pd.add(p.action + '|' + d);
-    }
-  }
-  for (const pr of prohibs) {
-    for (const p of perms) {
-      if (pr === p.action) continue;
-      pp.add(pr + '|' + p.action);
-    }
-  }
-  return {
-    pd: [...pd].map((k) => k.split('|')),
-    pp: [...pp].map((k) => k.split('|')),
-  };
-}
-
-function corpusAssertionsFromEvidence(ev: any, minSupport: number): Assertion[] {
-  const n = Number(ev.licences) || 0;
-  const out: Assertion[] = [];
-  for (const [k, v] of Object.entries(ev.pd || {})) {
-    const support = Number(v) || 0;
-    if (support < minSupport) continue;
-    const [s, o] = k.split('|');
-    out.push({
-      subject: s, relation: REL_IMPLIES, object: o,
-      subjectRole: ROLE_PERMISSION, objectRole: ROLE_DUTY,
-      derivation: 'Corpus',
-      source: `DALICC licence corpus (${n} licences)`,
-      support,
-      rationale: `Permission ${curieOf(s)} is accompanied by duty ${curieOf(o)} in ${support} of ${n} licences.`,
-    });
-  }
-  for (const [k, v] of Object.entries(ev.pp || {})) {
-    const support = Number(v) || 0;
-    if (support < minSupport) continue;
-    const [s, o] = k.split('|');
-    out.push({
-      subject: s, relation: REL_ALLOWS, object: o,
-      subjectRole: ROLE_PROHIBITION, objectRole: ROLE_PERMISSION,
-      derivation: 'Corpus',
-      source: `DALICC licence corpus (${n} licences)`,
-      support,
-      rationale: `Prohibition ${curieOf(s)} co-exists with permission ${curieOf(o)} in ${support} of ${n} licences.`,
-    });
-  }
-  return out;
 }
 
 async function resolveActionsPath(base44: any, src: any): Promise<string> {
@@ -700,41 +630,71 @@ async function loadActionsAndResolve(
   return { ttlText, actions, dgTriples, resolve, dgError };
 }
 
-// Single-shot folder fetch (fallback path).
+// ---------------------------------------------------------------------------
+// Corpus fetch — ONE tarball request for the whole repository. Hundreds of
+// individual file downloads are what caused the earlier hangs, so the repo
+// tarball is downloaded once and the licence TTLs are extracted from it
+// in memory.
+// ---------------------------------------------------------------------------
+function tarTextEntries(buf: Uint8Array): Array<{ name: string; text: string }> {
+  const dec = new TextDecoder();
+  const out: Array<{ name: string; text: string }> = [];
+  let off = 0;
+  let longName: string | null = null;
+  while (off + 512 <= buf.length) {
+    const h = buf.subarray(off, off + 512);
+    if (h[0] === 0) break; // zero block: end of archive
+    let size = 0;
+    for (let i = 124; i < 136; i++) {
+      const c = h[i];
+      if (c === 32 || c === 0) continue; // space/NUL padding
+      if (c < 48 || c > 55) { size = -1; break; }
+      size = size * 8 + (c - 48);
+    }
+    if (size < 0) break;
+    const type = String.fromCharCode(h[156] ?? 48);
+    let name = dec.decode(h.subarray(0, 100)).replace(/\0[\s\S]*$/, '');
+    const prefix = dec.decode(h.subarray(345, 500)).replace(/\0[\s\S]*$/, '');
+    if (prefix) name = prefix + '/' + name;
+    const dataStart = off + 512;
+    const dataEnd = dataStart + size;
+    if (type === 'L') {
+      // GNU long name: the real path for the next entry
+      longName = dec.decode(buf.subarray(dataStart, dataEnd)).replace(/\0[\s\S]*$/, '');
+    } else if ((type === '0' || type === '\0') && size > 0) {
+      if (longName) { name = longName; longName = null; }
+      out.push({ name, text: dec.decode(buf.subarray(dataStart, dataEnd)) });
+    } else {
+      longName = null;
+    }
+    off = dataStart + Math.ceil(size / 512) * 512;
+  }
+  return out;
+}
+
 async function fetchDaliccLicences(
   repo: string,
   branch: string,
   folder: string,
   headers: Record<string, string>,
 ): Promise<{ files: Array<{ name: string; text: string }>; errors: number; error?: string }> {
-  const listRes = await fetchT(
-    `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(folder)}?ref=${branch}`,
-    { headers },
-  );
-  if (!listRes.ok) {
-    return { files: [], errors: 0, error: `list folder (${listRes.status})` };
+  const tarRes = await fetchT(`https://api.github.com/repos/${repo}/tarball/${branch}`, { headers }, 60000);
+  if (!tarRes.ok) return { files: [], errors: 0, error: `repo tarball (${tarRes.status})` };
+  try {
+    const gz = tarRes.body!.pipeThrough(new DecompressionStream('gzip'));
+    const buf = new Uint8Array(await new Response(gz).arrayBuffer());
+    const marker = '/' + folder.replace(/^\/+|\/+$/g, '') + '/';
+    const files = tarTextEntries(buf)
+      .filter((f: { name: string }) => f.name.includes(marker) && f.name.endsWith('.ttl'))
+      .map((f: { name: string; text: string }) => ({
+        name: f.name.split(marker).pop() || f.name,
+        text: f.text,
+      }));
+    if (!files.length) return { files: [], errors: 0, error: `no .ttl files under ${folder}` };
+    return { files, errors: 0 };
+  } catch (e: any) {
+    return { files: [], errors: 0, error: `tarball extract: ${e?.message || String(e)}` };
   }
-  const entries = await listRes.json();
-  const ttlFiles = (Array.isArray(entries) ? entries : [])
-    .filter((f: any) => f.name?.endsWith('.ttl') && f.download_url)
-    .slice(0, 400);
-  const files: Array<{ name: string; text: string }> = [];
-  let errors = 0;
-  const CHUNK = 20;
-  for (let i = 0; i < ttlFiles.length; i += CHUNK) {
-    const batch = ttlFiles.slice(i, i + CHUNK);
-    const results = await Promise.all(batch.map(async (f: any) => {
-      try {
-        const r = await fetchT(f.download_url);
-        if (!r.ok) return null;
-        return { name: f.name, text: await r.text() };
-      } catch {
-        return null;
-      }
-    }));
-    for (const r of results) { if (r) files.push(r as { name: string; text: string }); else errors++; }
-  }
-  return { files, errors };
 }
 
 // ---------------------------------------------------------------------------
@@ -1010,7 +970,7 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
     const message = body.message || 'Update OpenREL Reasoner Graph (actions, DALICC sources, corpus evidence)';
 
     const isAdmin = !!user && /admin/i.test(user.role || '');
-    if (!dryRun && (body.mode as string) !== 'corpus_fetch' && user && !isAdmin) {
+    if (!dryRun && user && !isAdmin) {
       return Response.json({ error: 'Admin role required to apply reasoner update' }, { status: 403 });
     }
 
@@ -1021,9 +981,7 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
     const dgBranch = (src.dg_branch as string) || 'main';
     const dgPath = (src.dg_path as string) || 'licensedata/dependencygraph/dg_default.ttl';
     const corpusEnabled = src.corpus_enabled !== false;
-    const corpusRepo = (src.corpus_repo as string) || dgRepo;
-    const corpusBranch = (src.corpus_branch as string) || dgBranch;
-    const corpusFolder = ((src.corpus_folder as string) || 'licensedata/licenses').replace(/\/+$/, '');
+    const corpusFolder = ((src.corpus_folder as string) || 'data/input/dalicc').replace(/^\/+|\/+$/g, '');
     const minSupport = Number(src.corpus_min_support) || 2;
 
     const creds = await resolveGithubCredentials(base44, {});
@@ -1040,38 +998,6 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
 
     // 1. Locate actions.ttl (UI path override → API configuration → default).
     const actionsPath = await resolveActionsPath(base44, src);
-
-    // 1b. Batched corpus fetch mode — supports the UI progress counter. The
-    //     frontend loops this in slices, accumulates pair evidence locally, and
-    //     passes the aggregated evidence into the preview/apply invocation.
-    if ((body.mode as string) === 'corpus_fetch') {
-      const start = Number(body.corpus_start) || 0;
-      const count = Math.min(Number(body.corpus_count) || 40, 100);
-      const prep = await loadActionsAndResolve(ghHeaders, repo, branch, actionsPath, dgEnabled, dgRepo, dgBranch, dgPath);
-      const listRes = await fetchT(
-        `https://api.github.com/repos/${corpusRepo}/contents/${encodeURIComponent(corpusFolder)}?ref=${corpusBranch}`,
-        { headers: ghHeaders },
-      );
-      if (!listRes.ok) {
-        return Response.json({ error: `list licence folder (${listRes.status})` }, { status: 500 });
-      }
-      const entries = await listRes.json();
-      const ttlFiles = (Array.isArray(entries) ? entries : [])
-        .filter((f: any) => f.name?.endsWith('.ttl') && f.download_url);
-      const slice = ttlFiles.slice(start, start + count);
-      let errors = 0;
-      const licences = await Promise.all(slice.map(async (f: any) => {
-        try {
-          const r = await fetchT(f.download_url);
-          if (!r.ok) { errors++; return { name: f.name, pd: [] as string[][], pp: [] as string[][] }; }
-          return { name: f.name, ...extractLicencePairs(await r.text(), prep.resolve) };
-        } catch {
-          errors++;
-          return { name: f.name, pd: [] as string[][], pp: [] as string[][] };
-        }
-      }));
-      return Response.json({ total: ttlFiles.length, start, fetched: slice.length, errors, licences });
-    }
 
     // 2. Actions + DALICC dependency graph (shared loader).
     const prep = await loadActionsAndResolve(ghHeaders, repo, branch, actionsPath, dgEnabled, dgRepo, dgBranch, dgPath);
@@ -1105,7 +1031,7 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
       }
     }
 
-    // 4. Corpus tier — UI-provided batch evidence, else single-shot fallback.
+    // 4. Corpus tier — licence snapshot from the Knowledge Base repo.
     const corpusSummary: CorpusSummary = {
       licences_fetched: 0,
       licences_parsed: 0,
@@ -1115,20 +1041,13 @@ export default async function reasonerUpdate(req: Request): Promise<Response> {
       min_support: minSupport,
     };
     let corpusAssertions: Assertion[] = [];
-    const corpusEvidence = body.corpus_evidence;
-    if (corpusEvidence && typeof corpusEvidence === 'object') {
-      corpusAssertions = corpusAssertionsFromEvidence(corpusEvidence, minSupport);
-      corpusSummary.licences_fetched = Number(corpusEvidence.licences) || 0;
-      corpusSummary.licences_parsed = corpusSummary.licences_fetched;
-      corpusSummary.implies_candidates = Object.keys(corpusEvidence.pd || {}).length;
-      corpusSummary.allows_candidates = Object.keys(corpusEvidence.pp || {}).length;
-    } else if (corpusEnabled) {
+    if (corpusEnabled) {
       try {
-        const { files, errors, error } = await fetchDaliccLicences(corpusRepo, corpusBranch, corpusFolder, ghHeaders);
+        const { files, errors, error } = await fetchDaliccLicences(repo, branch, corpusFolder, ghHeaders);
         if (error) throw new Error(error);
         corpusSummary.fetch_errors = errors;
         if (errors) warnings.push(`${errors} licence file(s) could not be fetched`);
-        const res = corpusPass(files, resolve, minSupport);
+        const res = corpusPass(files, resolve, minSupport, corpusFolder);
         corpusAssertions = res.assertions;
         Object.assign(corpusSummary, res.summary);
       } catch (e: any) {
