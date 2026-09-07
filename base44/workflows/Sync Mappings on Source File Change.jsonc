@@ -1,0 +1,38 @@
+{
+  "name": "Sync Mappings on Source File Change",
+  "description": "When an API source file is created or updated, sync its inverse mappings to mappings.ttl in GitHub. System files are skipped by the function itself.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "entity",
+      "events": [
+        "create",
+        "update"
+      ],
+      "entity_name": "ApiSourceFile"
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "sync_mappings_on_source_file_change",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "syncMappings",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "syncMappings"
+  }
+}
