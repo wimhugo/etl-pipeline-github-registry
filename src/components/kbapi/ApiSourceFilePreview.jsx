@@ -39,14 +39,24 @@ export default function ApiSourceFilePreview({ item }) {
     gcTime: 0,
   });
 
-  const hasUrl = !!(data?.members || []).some(m => m.url);
-  const columns = [
-    { key: 'iri', label: 'IRI', cls: 'w-1/4' },
-    { key: 'label', label: 'Label', cls: 'w-1/4' },
-    hasUrl
-      ? { key: 'url', label: 'URL', cls: '' }
-      : { key: 'definition', label: 'Definition', cls: '' },
-  ];
+  const members = data?.members || [];
+  const isMapping = members.some(m => m.compared_individual);
+  const hasUrl = members.some(m => m.url);
+  const columns = isMapping
+    ? [
+        { key: 'compared_individual', label: 'Compared Individual', cls: '' },
+        { key: 'compared_subject', label: 'Compared Subject', cls: '' },
+        { key: 'evaluation_outcome', label: 'Outcome', cls: '' },
+        { key: 'evaluation_class', label: 'Class', cls: '' },
+        { key: 'derivation_type', label: 'Derivation', cls: '' },
+      ]
+    : [
+        { key: 'iri', label: 'IRI', cls: 'w-1/4' },
+        { key: 'label', label: 'Label', cls: 'w-1/4' },
+        hasUrl
+          ? { key: 'url', label: 'URL', cls: '' }
+          : { key: 'definition', label: 'Definition', cls: '' },
+      ];
 
   return (
     <div className="border-t border-border/30">
@@ -127,20 +137,32 @@ export default function ApiSourceFilePreview({ item }) {
                       })
                       .map((m, i) => (
                       <tr key={i} className={`border-b border-border/30 last:border-0 ${i % 2 === 0 ? '' : 'bg-muted/10'}`}>
-                        <td className="px-3 py-2 font-mono text-primary break-all">{m.iri}</td>
-                        <td className="px-3 py-2">{m.label || <span className="text-muted-foreground/50">—</span>}</td>
-                        {hasUrl ? (
-                          <td className="px-3 py-2 break-all">
-                            {m.url ? (
-                              <a href={m.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                                {m.url}
-                              </a>
-                            ) : (
-                              <span className="text-muted-foreground/50">—</span>
-                            )}
-                          </td>
+                        {isMapping ? (
+                          <>
+                            <td className="px-3 py-2 font-mono text-primary break-all" title={m.iri}>{m.compared_individual || '—'}</td>
+                            <td className="px-3 py-2 font-mono break-all">{m.compared_subject || '—'}</td>
+                            <td className="px-3 py-2 font-mono whitespace-nowrap">{m.evaluation_outcome || '—'}</td>
+                            <td className="px-3 py-2 font-mono whitespace-nowrap">{m.evaluation_class || '—'}</td>
+                            <td className="px-3 py-2 font-mono whitespace-nowrap">{m.derivation_type || '—'}</td>
+                          </>
                         ) : (
-                          <td className="px-3 py-2 text-muted-foreground">{m.definition || <span className="text-muted-foreground/50">—</span>}</td>
+                          <>
+                            <td className="px-3 py-2 font-mono text-primary break-all">{m.iri}</td>
+                            <td className="px-3 py-2">{m.label || <span className="text-muted-foreground/50">—</span>}</td>
+                            {hasUrl ? (
+                              <td className="px-3 py-2 break-all">
+                                {m.url ? (
+                                  <a href={m.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                    {m.url}
+                                  </a>
+                                ) : (
+                                  <span className="text-muted-foreground/50">—</span>
+                                )}
+                              </td>
+                            ) : (
+                              <td className="px-3 py-2 text-muted-foreground">{m.definition || <span className="text-muted-foreground/50">—</span>}</td>
+                            )}
+                          </>
                         )}
                       </tr>
                     ))

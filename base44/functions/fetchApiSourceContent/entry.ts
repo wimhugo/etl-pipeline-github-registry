@@ -565,6 +565,8 @@ const MAPPING_INVERSE = {
 };
 
 const SKOS_NS = 'http://www.w3.org/2004/02/skos/core#';
+const OPENREL_NS = 'http://www.w3.org/ns/openrel/0/';
+const EVALUATION_MAPPING_IRI = OPENREL_NS + 'EvaluationMapping';
 
 async function composeMappingsFromAllSources(base44, config) {
   const creds = await resolveGithubCredentials(base44, {
@@ -870,7 +872,30 @@ Deno.serve(async (req) => {
         'http://www.w3.org/2004/02/skos/core#narrowMatch',
       ]);
 
-      if (sourceFile.section === 'Mappings') {
+      // Reasoner evaluation mappings (openrel:EvaluationMapping individuals):
+      // report the compared individual/subject pair with its evaluation outcome,
+      // and keep every other predicate (evaluationClass, derivationType,
+      // sourceRelation, wasDerivedFrom, rationale, subject/objectRole, support)
+      // since those drive filtering.
+      if (parsed.memberIdentifierResolved === EVALUATION_MAPPING_IRI) {
+        members = members.map(({ iri, properties = [] }) => {
+          const value = (name) => {
+            const found = properties.find((p) => p.predicate === OPENREL_NS + name);
+            return found ? found.object : null;
+          };
+          return {
+            iri,
+            compared_individual: value('comparedIndividual'),
+            compared_subject: value('comparedSubject'),
+            evaluation_outcome: value('evaluationOutcome'),
+            evaluation_class: value('evaluationClass'),
+            derivation_type: value('derivationType'),
+            source_relation: value('sourceRelation'),
+            derived_from: value('wasDerivedFrom'),
+            properties,
+          };
+        });
+      } else if (sourceFile.section === 'Mappings') {
         members = members.map(({ iri, label, properties }) => ({
           iri,
           label,
