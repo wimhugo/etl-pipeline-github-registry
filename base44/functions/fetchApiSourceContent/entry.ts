@@ -23,6 +23,35 @@ import { resolveGithubCredentials } from '../../shared/resolveGithubCredentials.
  * or the frontend — no side effects, no state mutations.
  */
 
+// Strip Turtle comments, leaving '#' alone when it sits inside an IRI (<...>)
+// or a literal ("...").
+function stripTurtleComments(text) {
+  let out = '';
+  let inString = false;
+  let inAngle = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (ch === '"' && text[i - 1] !== '\\') inString = false;
+      out += ch;
+      continue;
+    }
+    if (inAngle) {
+      if (ch === '>') inAngle = false;
+      out += ch;
+      continue;
+    }
+    if (ch === '"') { inString = true; out += ch; continue; }
+    if (ch === '<') { inAngle = true; out += ch; continue; }
+    if (ch === '#') {
+      while (i + 1 < text.length && text[i + 1] !== '\n') i++;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
 // --- TTL parser (regex-based, tolerant of real-world Turtle) ---
 function parseTtl(text, memberIdentifier) {
   const prefixes = {};
@@ -64,8 +93,7 @@ function parseTtl(text, memberIdentifier) {
   const RDFS_LABEL = 'http://www.w3.org/2000/01/rdf-schema#label';
   const SKOS_DEFINITION = 'http://www.w3.org/2004/02/skos/core#definition';
 
-  const cleaned = text
-    .replace(/#[^\n]*/g, '')
+  const cleaned = stripTurtleComments(text)
     .replace(/@prefix[^\n]*/g, '')
     .replace(/@base[^\n]*/g, '');
 
