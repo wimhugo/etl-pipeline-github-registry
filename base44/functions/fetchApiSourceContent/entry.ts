@@ -48,11 +48,16 @@ function parseTtl(text, memberIdentifier) {
     return term;
   }
 
-  let memberIri = memberIdentifier;
+  // member_identifier may list several types (comma-separated), e.g.
+  // "rdfs:Class,owl:Class" — a subject is a member when it matches any of them.
   const allSubjectsMode = !memberIdentifier;
-  if (memberIdentifier && memberIdentifier.includes(':') && !memberIdentifier.startsWith('<')) {
-    memberIri = resolve(memberIdentifier);
+  const memberIris = new Set();
+  for (const part of String(memberIdentifier || '').split(',')) {
+    const term = part.trim();
+    if (!term) continue;
+    memberIris.add(term.includes(':') && !term.startsWith('<') ? resolve(term) : term);
   }
+  const memberIri = [...memberIris].join(', ');
 
   const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
   const SKOS_PREF_LABEL = 'http://www.w3.org/2004/02/skos/core#prefLabel';
@@ -152,7 +157,7 @@ function parseTtl(text, memberIdentifier) {
         const objRaw = extractTerm(o, true);   // raw CURIE — for property storage & filtering
         const isLiteral = o.trim().startsWith('"');
 
-        if (predResolved === RDF_TYPE && objValue === memberIri) {
+        if (predResolved === RDF_TYPE && memberIris.has(objValue)) {
           if (!members[subject]) members[subject] = { iri: subject, label: '', definition: '', properties: [] };
         }
         // Folder mode: every subject is a member.
@@ -309,7 +314,8 @@ function membersToTtl(members, memberIdentifierResolved, prefixes) {
   }
 
   // Resolve the member type IRI to a CURIE if possible
-  let typeCurie = memberIdentifierResolved || 'skos:Concept';
+  // A source may list several member types; the 'a' shorthand carries one.
+  let typeCurie = (memberIdentifierResolved || 'skos:Concept').split(',')[0].trim();
   if (memberIdentifierResolved) {
     for (const [prefix, ns] of Object.entries(prefixes)) {
       if (memberIdentifierResolved.startsWith(ns)) {
@@ -711,6 +717,13 @@ Deno.serve(async (req) => {
 
     const { file_path, data_format = 'ttl', member_identifier = 'skos:Concept' } = sourceFile;
 
+    // file_path may list several repository files (newline- or comma-separated).
+    // Members from every listed file are merged into one member list.
+    const filePaths = String(file_path || '')
+      .split(/[\n,]+/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+
     // 2. Resolve GitHub credentials — checks GlobalConfig AND Project entities,
     //    using the most recently updated token (fixes stale-token issue when
     //    credentials were saved to a Project instead of GlobalConfig).
@@ -726,49 +739,69 @@ Deno.serve(async (req) => {
     if (sourceFile.is_system && sourceFile.section === 'Mappings') {
       parsed = await composeMappingsFromAllSources(base44, config);
     } else {
-      if (!file_path) {
+      if (!filePaths.length) {
         return Response.json({ error: 'Source file has no file_path configured' }, { status: 400 });
       }
 
-      // 3. Fetch the raw file — cache-busting timestamp ensures GitHub's
-      //    CDN never serves a stale copy when the source file has been updated.
-      const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${file_path}?ref=${branch}&_=${Date.now()}`;
-      const resp = await fetch(apiUrl, {
-        headers: {
-          Authorization: `token ${token}`,
-          Accept: 'application/vnd.github.v3.raw',
-          'User-Agent': 'OpenREL-App',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
+      const combined = { members: [], memberIdentifierResolved: null, prefixes: {} };
+      const rawByPath = {};
+
+      for (const path of filePaths) {
+        // 3. Fetch the raw file — cache-busting timestamp ensures GitHub's
+        //    CDN never serves a stale copy when the source file has been updated.
+        const apiUrl = `https://api.github.com/repos/${githubRepo}/contents/${path}?ref=${branch}&_=${Date.now()}`;
+        const resp = await fetch(apiUrl, {
+          headers: {
+            Authorization: `token ${token}`,
+            Accept: 'application/vnd.github.v3.raw',
+            'User-Agent': 'OpenREL-App',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+          }
+        });
+        if (!resp.ok) {
+          const errText = await resp.text();
+          return Response.json({ error: `GitHub ${resp.status} (${path}): ${errText.substring(0, 200)}` }, { status: resp.status });
         }
-      });
-      if (!resp.ok) {
-        const errText = await resp.text();
-        return Response.json({ error: `GitHub ${resp.status}: ${errText.substring(0, 200)}` }, { status: resp.status });
+
+        const text = await resp.text();
+        rawByPath[path] = text;
+
+        // 4. Parse according to data_format
+        let fileParsed;
+        try {
+          switch (data_format) {
+            case 'ttl':
+              fileParsed = parseTtl(text, member_identifier);
+              break;
+            case 'json':
+            case 'json-ld':
+              fileParsed = parseJsonContent(text, member_identifier);
+              break;
+            case 'yaml':
+              fileParsed = parseYamlContent(text, member_identifier);
+              break;
+            default:
+              fileParsed = { members: [], memberIdentifierResolved: member_identifier };
+              parseError = `Unsupported data_format: ${data_format}`;
+          }
+        } catch (e) {
+          fileParsed = { members: [], memberIdentifierResolved: member_identifier };
+          parseError = e.message;
+        }
+
+        if (fileParsed.prefixes) Object.assign(combined.prefixes, fileParsed.prefixes);
+        if (!combined.memberIdentifierResolved) {
+          combined.memberIdentifierResolved = fileParsed.memberIdentifierResolved;
+        }
+        combined.members.push(...(fileParsed.members || []));
       }
 
-      rawContent = await resp.text();
-
-      // 4. Parse according to data_format
-      try {
-        switch (data_format) {
-          case 'ttl':
-            parsed = parseTtl(rawContent, member_identifier);
-            break;
-          case 'json':
-          case 'json-ld':
-            parsed = parseJsonContent(rawContent, member_identifier);
-            break;
-          case 'yaml':
-            parsed = parseYamlContent(rawContent, member_identifier);
-            break;
-          default:
-            parsed = { members: [], memberIdentifierResolved: member_identifier };
-            parseError = `Unsupported data_format: ${data_format}`;
-        }
-      } catch (e) {
-        parsed = { members: [], memberIdentifierResolved: member_identifier };
-        parseError = e.message;
-      }
+      // A member present in more than one listed file appears once.
+      parsed = {
+        ...combined,
+        members: [...new Map(combined.members.map((m) => [m.iri, m])).values()],
+      };
+      rawContent = filePaths.length === 1 ? rawByPath[filePaths[0]] : rawByPath;
     }
 
     // Pipeline:

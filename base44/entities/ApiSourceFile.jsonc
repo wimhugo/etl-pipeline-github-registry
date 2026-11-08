@@ -17,11 +17,11 @@
         "folder"
       ],
       "default": "file",
-      "description": "file = parse members from a single source file; folder = each TTL file in the folder is a member"
+      "description": "file = parse members from the listed source file(s); folder = each TTL file in the folder is a member"
     },
     "file_path": {
       "type": "string",
-      "description": "GitHub path to the source file (file mode) OR the folder containing per-member TTL files (folder mode)"
+      "description": "GitHub path to the source file (file mode) OR the folder containing per-member TTL files (folder mode). In file mode several paths may be listed, separated by commas or newlines; members from all of them are merged."
     },
     "data_format": {
       "type": "string",
@@ -37,7 +37,7 @@
     "member_identifier": {
       "type": "string",
       "default": "skos:Concept",
-      "description": "Identifier used to recognize members/instances in the source file (file mode only)"
+      "description": "Identifier used to recognize members/instances in the source file (file mode only). Several types may be listed, comma-separated (e.g. 'rdfs:Class,owl:Class'); a subject is a member when it matches any of them."
     },
     "id_prefix": {
       "type": "string",
