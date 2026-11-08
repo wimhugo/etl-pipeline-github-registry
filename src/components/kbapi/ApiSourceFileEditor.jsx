@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SOURCE_TYPES } from '@/lib/apiSourceTypes';
 
 export default function ApiSourceFileEditor({ open, onClose, onSave, sourceFile }) {
   const [form, setForm] = useState({});
@@ -14,7 +15,7 @@ export default function ApiSourceFileEditor({ open, onClose, onSave, sourceFile 
   useEffect(() => {
     setForm(sourceFile
       ? { ...sourceFile }
-      : { source_mode: 'file', data_format: 'ttl', is_active: true, sort_order: 0, member_identifier: 'skos:Concept', title_field: 'dct:title', description_field: 'dct:description' });
+      : { source_mode: 'file', data_format: 'ttl', is_active: true, sort_order: 0, source_type: 'Registry', member_identifier: 'skos:Concept', title_field: 'dct:title', description_field: 'dct:description' });
   }, [sourceFile, open]);
 
   const handleSave = () => {
@@ -48,6 +49,25 @@ export default function ApiSourceFileEditor({ open, onClose, onSave, sourceFile 
               value={form.description || ''}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Label</Label>
+            <Select
+              value={form.source_type || 'Registry'}
+              onValueChange={(val) => setForm(f => ({ ...f, source_type: val }))}
+            >
+              <SelectTrigger className="bg-muted/50 text-sm font-mono">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SOURCE_TYPES.map(type => (
+                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Groups this source in the configuration listing and its filter.
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Source Mode</Label>

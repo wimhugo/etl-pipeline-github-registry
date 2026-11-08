@@ -6,6 +6,23 @@
       "type": "string",
       "description": "API section name (e.g. 'Actions', 'Constraints', 'Policies')"
     },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "Registry",
+        "Schema",
+        "Vocabulary",
+        "Example"
+      ],
+      "enumColors": [
+        "blue",
+        "purple",
+        "green",
+        "yellow"
+      ],
+      "default": "Registry",
+      "description": "Label grouping this source belongs to: Registry (vocabularies of terms), Schema (OPENREL classes and properties), Vocabulary (controlled lists), Example (worked policy examples)."
+    },
     "description": {
       "type": "string",
       "description": "Optional description of this API section"

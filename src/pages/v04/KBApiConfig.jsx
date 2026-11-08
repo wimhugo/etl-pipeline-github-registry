@@ -8,6 +8,8 @@ import { Plus, Pencil, Trash2, FileCode2, Settings, Lock } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import ApiSourceFileEditor from '@/components/kbapi/ApiSourceFileEditor';
 import ApiSourceFilePreview from '@/components/kbapi/ApiSourceFilePreview';
+import ApiSourceTypeFilter from '@/components/kbapi/ApiSourceTypeFilter';
+import { deriveSourceType } from '@/lib/apiSourceTypes';
 
 export default function KBApiConfig() {
   const queryClient = useQueryClient();
@@ -20,7 +22,20 @@ export default function KBApiConfig() {
     queryFn: () => base44.entities.ApiSourceFile.list('-sort_order'),
   });
 
-  const sortedFiles = [...sourceFiles].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const [activeTypes, setActiveTypes] = useState([]);
+
+  const toggleType = (type) => setActiveTypes((prev) =>
+    prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]);
+
+  const typeCounts = sourceFiles.reduce((acc, item) => {
+    const type = deriveSourceType(item);
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {});
+
+  const visibleFiles = sourceFiles
+    .filter((item) => activeTypes.length === 0 || activeTypes.includes(deriveSourceType(item)))
+    .sort((a, b) => String(a.section).localeCompare(String(b.section)));
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.ApiSourceFile.create(data),
@@ -92,20 +107,31 @@ export default function KBApiConfig() {
 
       <Card className="bg-card border-border/50">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <FileCode2 className="w-4 h-4" /> API Source Files
-          </CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <FileCode2 className="w-4 h-4" /> API Source Files
+            </CardTitle>
+            {sourceFiles.length > 0 && (
+              <ApiSourceTypeFilter active={activeTypes} onToggle={toggleType} counts={typeCounts} />
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          {sortedFiles.length === 0 ? (
+          {visibleFiles.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground text-sm">
-              No API source files configured yet.
-              <br />
-              Click "Add Source File" to get started.
+              {sourceFiles.length === 0 ? (
+                <>
+                  No API source files configured yet.
+                  <br />
+                  Click "Add Source File" to get started.
+                </>
+              ) : (
+                'No source files match the selected labels.'
+              )}
             </div>
           ) : (
             <div className="space-y-2">
-              {sortedFiles.map((item) => (
+              {visibleFiles.map((item) => (
                 <div
                   key={item.id}
                   className="rounded-lg border border-border/40 bg-muted/20 overflow-hidden"
@@ -114,6 +140,7 @@ export default function KBApiConfig() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="font-semibold text-sm">{item.section}</span>
+                        <Badge variant="outline" className="text-xs">{deriveSourceType(item)}</Badge>
                         {item.is_system && (
                           <Badge variant="secondary" className="text-xs gap-0.5">
                             <Lock className="w-2.5 h-2.5" /> System
