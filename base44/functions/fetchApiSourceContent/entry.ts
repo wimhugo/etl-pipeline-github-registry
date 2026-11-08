@@ -237,9 +237,10 @@ function parseJsonContent(text, memberIdentifier) {
   }
 
   const members = items.map(item => ({
-    iri: item['@id'] || item['id'] || item['iri'] || '',
-    label: item['prefLabel'] || item['label'] || item['name'] || item['skos:prefLabel'] || '',
+    iri: item['@id'] || item['id'] || item['iri'] || item['openrel_IRI'] || item['uri'] || '',
+    label: item['prefLabel'] || item['label'] || item['name'] || item['title'] || item['skos:prefLabel'] || '',
     definition: item['definition'] || item['description'] || item['skos:definition'] || '',
+    url: item['url'] || item['link'] || item['href'] || '',
     properties: item,
   }));
 
@@ -881,7 +882,9 @@ Deno.serve(async (req) => {
             })),
         }));
       } else {
-        members = members.map(({ iri, label, definition }) => ({ iri, label, definition }));
+        members = members.map(({ iri, label, definition, url }) => (
+          url ? { iri, label, definition, url } : { iri, label, definition }
+        ));
       }
     }
 

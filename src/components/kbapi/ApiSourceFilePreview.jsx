@@ -39,6 +39,15 @@ export default function ApiSourceFilePreview({ item }) {
     gcTime: 0,
   });
 
+  const hasUrl = !!(data?.members || []).some(m => m.url);
+  const columns = [
+    { key: 'iri', label: 'IRI', cls: 'w-1/4' },
+    { key: 'label', label: 'Label', cls: 'w-1/4' },
+    hasUrl
+      ? { key: 'url', label: 'URL', cls: '' }
+      : { key: 'definition', label: 'Definition', cls: '' },
+  ];
+
   return (
     <div className="border-t border-border/30">
       <button
@@ -86,11 +95,7 @@ export default function ApiSourceFilePreview({ item }) {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border/40 bg-muted/30">
-                    {[
-                      { key: 'iri', label: 'IRI', cls: 'w-1/4' },
-                      { key: 'label', label: 'Label', cls: 'w-1/4' },
-                      { key: 'definition', label: 'Definition', cls: '' },
-                    ].map(col => (
+                    {columns.map(col => (
                       <th key={col.key} className={`text-left px-3 py-2 font-medium text-muted-foreground ${col.cls}`}>
                         <button
                           onClick={() => toggleSort(col.key)}
@@ -106,8 +111,10 @@ export default function ApiSourceFilePreview({ item }) {
                 <tbody>
                   {data.members.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-3 py-4 text-center text-muted-foreground">
-                        No members found matching "{item.member_identifier || 'skos:Concept'}".
+                      <td colSpan={columns.length} className="px-3 py-4 text-center text-muted-foreground">
+                        {item.member_identifier
+                          ? `No members found matching "${item.member_identifier}".`
+                          : 'No members found in this file.'}
                       </td>
                     </tr>
                   ) : (
@@ -122,7 +129,19 @@ export default function ApiSourceFilePreview({ item }) {
                       <tr key={i} className={`border-b border-border/30 last:border-0 ${i % 2 === 0 ? '' : 'bg-muted/10'}`}>
                         <td className="px-3 py-2 font-mono text-primary break-all">{m.iri}</td>
                         <td className="px-3 py-2">{m.label || <span className="text-muted-foreground/50">—</span>}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{m.definition || <span className="text-muted-foreground/50">—</span>}</td>
+                        {hasUrl ? (
+                          <td className="px-3 py-2 break-all">
+                            {m.url ? (
+                              <a href={m.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                {m.url}
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground/50">—</span>
+                            )}
+                          </td>
+                        ) : (
+                          <td className="px-3 py-2 text-muted-foreground">{m.definition || <span className="text-muted-foreground/50">—</span>}</td>
+                        )}
                       </tr>
                     ))
                   )}
