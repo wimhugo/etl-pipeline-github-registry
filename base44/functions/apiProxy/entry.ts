@@ -82,16 +82,32 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Translate Accept header into a format parameter for content negotiation
-    const accept = body._accept || queryParams._accept;
+    // --- Content negotiation ---
+    // RDF-backed endpoints (fetchApiSourceContent) are Turtle-native: `ttl` is
+    // the default representation, with `json` and `json-ld` as alternatives,
+    // selected by an explicit `format` parameter or the Accept header.
+    // Other logic handlers only produce JSON, so they are left untouched.
+    const accept = String(
+      body._accept || queryParams._accept || req.headers.get('accept') || ''
+    ).toLowerCase();
     delete body._accept;
     delete queryParams._accept;
-    if (accept && accept.includes('text/turtle')) {
-      body.format = 'ttl';
-    }
 
     // Merge logic_config with query params and path params
     const payload = { ...(matched.logic_config || {}), ...queryParams, ...pathParams, ...body };
+
+    if (matched.target_logic_type === 'fetchApiSourceContent') {
+      let negotiated = null;
+      if (accept.includes('text/turtle') || accept.includes('application/x-turtle')) {
+        negotiated = 'ttl';
+      } else if (accept.includes('application/ld+json')) {
+        negotiated = 'json-ld';
+      } else if (accept.includes('application/json')) {
+        negotiated = 'json';
+      }
+      // Explicit ?format= wins, then the Accept header, then TTL (the native default).
+      payload.format = payload.format || negotiated || 'ttl';
+    }
 
     // Invoke the target function
     const result = await base44.asServiceRole.functions.invoke(matched.target_logic_type, payload);

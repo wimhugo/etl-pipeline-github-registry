@@ -10,7 +10,8 @@ function yamlStr(val) {
 export function generateSwaggerYaml(endpoints, meta = {}) {
   const title = meta.title || 'OpenREL KB API';
   const version = meta.version || '0.4.0';
-  const desc = meta.description || 'API for accessing OpenREL knowledge base vocabulary sources';
+  const descBase = meta.description || 'API for accessing OpenREL knowledge base vocabulary sources';
+  const desc = `${descBase}. RDF-backed endpoints return Turtle (text/turtle) by default; application/json and application/ld+json are alternative representations.`;
 
   const active = (endpoints || [])
     .filter(e => e.is_active !== false)
@@ -66,7 +67,23 @@ export function generateSwaggerYaml(endpoints, meta = {}) {
         .filter(name => !existingNames.has(name))
         .map(name => ({ name, in: 'path', required: true, schema_type: 'string', description: `The ${name} of the resource to retrieve` }));
 
-      const params = [...autoPathParams, ...(ep.parameters || [])];
+      // RDF-backed sources are Turtle-native; other handlers only produce JSON.
+      const isRdf = (ep.target_logic_type || 'fetchApiSourceContent') === 'fetchApiSourceContent';
+
+      const formatParam = {
+        name: 'format',
+        in: 'query',
+        required: false,
+        schema_type: 'string',
+        enum: ['ttl', 'json', 'json-ld'],
+        description: 'Response representation. ttl (RDF Turtle) is native and the default; json and json-ld are alternatives. The Accept header is honoured as well.',
+      };
+
+      const params = [
+        ...autoPathParams,
+        ...(ep.parameters || []).filter(p => p.name !== 'format'),
+        ...(isRdf ? [formatParam] : []),
+      ];
       if (params.length > 0) {
         L.push('      parameters:');
         for (const p of params) {
@@ -75,6 +92,11 @@ export function generateSwaggerYaml(endpoints, meta = {}) {
           L.push(`          required: ${p.required ? 'true' : 'false'}`);
           L.push(`          schema:`);
           L.push(`            type: ${p.schema_type || 'string'}`);
+          if (p.enum) {
+            L.push(`            default: ${p.enum[0]}`);
+            L.push(`            enum:`);
+            for (const v of p.enum) L.push(`              - ${v}`);
+          }
           if (p.description) {
             L.push(`          description: ${yamlStr(p.description)}`);
           }
@@ -85,8 +107,22 @@ export function generateSwaggerYaml(endpoints, meta = {}) {
       L.push(`        '200':`);
       L.push(`          description: Successful response`);
       L.push(`          content:`);
-      L.push(`            application/json:`);
-      L.push(`              schema:`);
+      if (isRdf) {
+        L.push(`            text/turtle:`);
+        L.push(`              description: Native default representation (RDF Turtle)`);
+        L.push(`              schema:`);
+        L.push(`                type: string`);
+        L.push(`            application/ld+json:`);
+        L.push(`              description: JSON-LD alternative (Accept: application/ld+json, or ?format=json-ld)`);
+        L.push(`              schema:`);
+        L.push(`                type: object`);
+        L.push(`            application/json:`);
+        L.push(`              description: Plain JSON alternative (Accept: application/json, or ?format=json)`);
+        L.push(`              schema:`);
+      } else {
+        L.push(`            application/json:`);
+        L.push(`              schema:`);
+      }
 
       if (ep.endpoint_type === 'detail') {
         L.push(`                type: object`);

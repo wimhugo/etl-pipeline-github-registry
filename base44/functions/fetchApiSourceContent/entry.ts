@@ -400,6 +400,80 @@ function membersToTtl(members, memberIdentifierResolved, prefixes) {
   return lines.join('\n');
 }
 
+// --- JSON-LD serializer (from parsed members) ---
+const JSONLD_RDF_NS = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+const JSONLD_RDFS_NS = 'http://www.w3.org/2000/01/rdf-schema#';
+const JSONLD_SKOS_NS = 'http://www.w3.org/2004/02/skos/core#';
+
+function toCompact(iri, prefixes) {
+  if (!iri || typeof iri !== 'string') return iri;
+  // Already a CURIE — leave as is.
+  if (!/^https?:\/\//.test(iri)) return iri;
+  for (const [prefix, ns] of Object.entries(prefixes || {})) {
+    if (ns && iri.startsWith(ns)) return `${prefix}:${iri.substring(ns.length)}`;
+  }
+  return iri;
+}
+
+function membersToJsonLd(members, memberIdentifierResolved, prefixes) {
+  const RDF_TYPE = JSONLD_RDF_NS + 'type';
+
+  const nodes = (members || []).map((m) => {
+    const props = Array.isArray(m.properties) ? m.properties : [];
+    const node = { '@id': m.iri };
+
+    const types = props
+      .filter((p) => p.predicate === RDF_TYPE)
+      .map((p) => toCompact(p.object, prefixes));
+    if (types.length === 0 && memberIdentifierResolved) {
+      types.push(toCompact(String(memberIdentifierResolved).split(',')[0].trim(), prefixes));
+    }
+    if (types.length) node['@type'] = types.length === 1 ? types[0] : types;
+
+    if (m.label) node['skos:prefLabel'] = m.label;
+    if (m.definition) node['skos:definition'] = m.definition;
+
+    for (const p of props) {
+      if (p.predicate === RDF_TYPE) continue;
+      const key = toCompact(p.predicate, prefixes);
+      if (key === 'skos:prefLabel' || key === 'skos:definition') continue;
+      const value = p.is_literal ? p.object : { '@id': toCompact(p.object, prefixes) };
+      if (node[key] === undefined) node[key] = value;
+      else if (Array.isArray(node[key])) node[key].push(value);
+      else node[key] = [node[key], value];
+    }
+
+    // Mapping lists (Mappings section) carry match predicates instead of a
+    // full property set — keep them in the JSON-LD node too.
+    for (const mp of m.mappings || []) {
+      if (!mp?.predicate) continue;
+      const value = { '@id': toCompact(mp.object, prefixes) };
+      if (node[mp.predicate] === undefined) node[mp.predicate] = value;
+      else if (Array.isArray(node[mp.predicate])) node[mp.predicate].push(value);
+      else node[mp.predicate] = [node[mp.predicate], value];
+    }
+
+    return node;
+  });
+
+  const context = { rdf: JSONLD_RDF_NS, rdfs: JSONLD_RDFS_NS, skos: JSONLD_SKOS_NS };
+  for (const [prefix, ns] of Object.entries(prefixes || {})) {
+    if (!context[prefix] && ns) context[prefix] = ns;
+  }
+
+  return { '@context': context, '@graph': nodes };
+}
+
+// Wraps a JSON-LD document in the same envelope the TTL branch uses, so the
+// proxy and the UI can reconstruct the response with its proper content type.
+function jsonLdResponse(members, memberIdentifierResolved, prefixes, meta) {
+  return Response.json({
+    _content_type: 'application/ld+json',
+    _raw_body: JSON.stringify(membersToJsonLd(members, memberIdentifierResolved, prefixes), null, 2),
+    _meta: meta,
+  });
+}
+
 // --- Folder mode: list TTL files in a folder, each file is a member ---
 //
 // In folder mode, file_path points to a GitHub folder. Each .ttl file inside
@@ -620,7 +694,9 @@ async function composeMappingsFromAllSources(base44, config) {
 
     // Extract mapping properties and invert them (external term → openrel term)
     for (const member of parsed.members) {
-      if (!member.properties) continue;
+      // Non-TTL sources carry the raw record as `properties` rather than a
+      // predicate list — only array-shaped properties can be scanned here.
+      if (!Array.isArray(member.properties)) continue;
       const openrelIri = member.iri;
       for (const prop of member.properties) {
         const inversePred = MAPPING_INVERSE[prop.predicate];
@@ -718,8 +794,17 @@ Deno.serve(async (req) => {
             _meta: meta,
           });
         }
-        // format=json: return parsed single-subject properties (keep_properties path)
+        // format=json-ld: JSON-LD document for the single member
         const subj = fileEntry.subject;
+        if (format === 'json-ld') {
+          return jsonLdResponse(
+            [{ iri: matched.iri, label: matched.label, definition: matched.definition, properties: subj.properties || [] }],
+            null,
+            fileEntry.parsed.prefixes || {},
+            meta,
+          );
+        }
+        // format=json: return parsed single-subject properties (keep_properties path)
         return Response.json({
           status: 'success',
           ...meta,
@@ -742,6 +827,9 @@ Deno.serve(async (req) => {
           _raw_body: ttlContent,
           _meta: meta,
         });
+      }
+      if (format === 'json-ld') {
+        return jsonLdResponse(detailMembers, null, {}, meta);
       }
       return Response.json({ status: 'success', ...meta, members: detailMembers });
     }
@@ -768,7 +856,7 @@ Deno.serve(async (req) => {
     // properties from ALL active non-system source files at query time,
     // rather than reading from the pre-generated mappings.ttl file.
     if (sourceFile.is_system && sourceFile.section === 'Mappings') {
-      parsed = await composeMappingsFromAllSources(base44, config);
+      parsed = await composeMappingsFromAllSources(base44, { github_repo: repo, github_branch: branch });
     } else {
       if (!filePaths.length) {
         return Response.json({ error: 'Source file has no file_path configured' }, { status: 400 });
@@ -933,6 +1021,10 @@ Deno.serve(async (req) => {
         _raw_body: ttlContent,
         _meta: meta,
       });
+    }
+
+    if (format === 'json-ld') {
+      return jsonLdResponse(members, parsed.memberIdentifierResolved, parsed.prefixes, meta);
     }
 
     // Default: JSON

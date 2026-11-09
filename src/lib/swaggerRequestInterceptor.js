@@ -45,9 +45,12 @@ export function createRequestInterceptor(serverUrl) {
       }
 
       try {
+        // Turtle is the native default representation for RDF-backed
+        // endpoints; the `format` parameter (if supplied) overrides this.
         const result = await base44.functions.invoke('apiProxy', {
           api_path: apiPath,
           _method: (options?.method || 'GET').toUpperCase(),
+          _accept: 'text/turtle',
           ...params,
         });
 
