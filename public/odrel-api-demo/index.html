@@ -227,5 +227,19 @@ async function init() {
 
 init().catch(showFatal);
 </script>
+<script>
+  // Modules and fetch are blocked on file://, so explain it instead of
+  // leaving an empty page.
+  if (window.location.protocol === 'file:') {
+    setTimeout(function () {
+      document.querySelector('.wrap').innerHTML =
+        '<div class="fatal" style="grid-column:1/-1">' +
+        '<h2 style="margin-top:0">Serve this folder over HTTP</h2>' +
+        '<p class="hint">Browsers block local files when a page is opened straight from disk. From inside the unzipped folder run:</p>' +
+        '<pre style="max-height:none">python3 -m http.server 8080\n# then open http://localhost:8080</pre>' +
+        '<p class="hint">or use <code>npx serve .</code></p></div>';
+    }, 400);
+  }
+</script>
 </body>
 </html>

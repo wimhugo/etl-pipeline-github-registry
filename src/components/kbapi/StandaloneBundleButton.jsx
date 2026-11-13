@@ -4,6 +4,20 @@ import { Button } from '@/components/ui/button';
 import { Download, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
+// The demo app is inlined at build time so the bundle never depends on the
+// app host serving files from public/ (it answers unknown paths with the SPA).
+import demoIndexHtml from '../../../public/odrel-api-demo/index.html?raw';
+import demoRdfJs from '../../../public/odrel-api-demo/lib/rdf.js?raw';
+import demoMockApiJs from '../../../public/odrel-api-demo/lib/mockApi.js?raw';
+import demoReadme from '../../../public/odrel-api-demo/README.md?raw';
+
+const DEMO_ASSETS = [
+  { name: 'index.html', content: demoIndexHtml },
+  { name: 'lib/rdf.js', content: demoRdfJs },
+  { name: 'lib/mockApi.js', content: demoMockApiJs },
+  { name: 'README.md', content: demoReadme },
+];
+
 export default function StandaloneBundleButton() {
   const [isBuilding, setIsBuilding] = useState(false);
   const { toast } = useToast();
@@ -11,7 +25,7 @@ export default function StandaloneBundleButton() {
   const download = async () => {
     setIsBuilding(true);
     try {
-      const response = await base44.functions.invoke('bundleStandaloneApi', {});
+      const response = await base44.functions.invoke('bundleStandaloneApi', { assets: DEMO_ASSETS });
       const data = response.data || {};
       if (data.error) throw new Error(data.error);
 

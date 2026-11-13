@@ -14,9 +14,7 @@ import { buildZip, toBase64 } from '../../shared/zipStore.ts';
  * The demo answers requests in the browser, so the bundle needs no server.
  */
 
-const DEMO_DIR = 'odrel-api-demo';
 const DEMO_ASSETS = ['index.html', 'lib/rdf.js', 'lib/mockApi.js', 'README.md'];
-const FALLBACK_ORIGIN = 'https://openrel-platform-poc.base44.app';
 const MAX_FILES = 400;
 const FETCH_BATCH = 6;
 
@@ -37,26 +35,19 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
 
-    let origin = FALLBACK_ORIGIN;
-    try {
-      origin = new URL(req.url).origin;
-    } catch {
-      // keep the fallback
+    // 1. Demo assets — supplied by the caller, which reads them from the app's
+    //    own source at build time. The hosted app answers any unknown path with
+    //    its SPA shell, so fetching them over HTTP here is not reliable.
+    const provided = Array.isArray(body.assets) ? body.assets : [];
+    const byName = new Map(provided.map((a: any) => [a?.name, a?.content]));
+    const missing = DEMO_ASSETS.filter((name) => typeof byName.get(name) !== 'string');
+    if (missing.length) {
+      return Response.json({ error: `Missing demo assets: ${missing.join(', ')}` }, { status: 400 });
     }
-    const assetBase = String(body.asset_base_url || `${origin}/${DEMO_DIR}`).replace(/\/+$/, '');
-
-    // 1. Demo assets
-    const entries: { name: string; content: string }[] = [];
-    for (const path of DEMO_ASSETS) {
-      const res = await fetch(`${assetBase}/${path}?_=${Date.now()}`);
-      if (!res.ok) {
-        return Response.json(
-          { error: `Could not read demo asset "${path}" (${res.status}) from ${assetBase}` },
-          { status: 502 }
-        );
-      }
-      entries.push({ name: path, content: await res.text() });
-    }
+    const entries: { name: string; content: string }[] = DEMO_ASSETS.map((name) => ({
+      name,
+      content: String(byName.get(name)),
+    }));
 
     // 2. Endpoints and sources
     const [endpointRecords, sourceRecords] = await Promise.all([
