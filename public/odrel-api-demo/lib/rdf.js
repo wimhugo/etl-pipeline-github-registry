@@ -7,6 +7,9 @@
  * Turtle, JSON and JSON-LD representations.
  */
 
+(function () {
+'use strict';
+
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
 const RDFS_NS = 'http://www.w3.org/2000/01/rdf-schema#';
 const SKOS_NS = 'http://www.w3.org/2004/02/skos/core#';
@@ -426,3 +429,4 @@ window.RDF = {
   membersToJsonLd,
   findPrimarySubject,
 };
+})();

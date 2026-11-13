@@ -6,6 +6,9 @@
  * browser, and responses are produced in Turtle, JSON or JSON-LD.
  */
 
+(function () {
+'use strict';
+
 const {
   parseTurtle,
   parseJsonMembers,
@@ -386,3 +389,4 @@ async function handleRequest(manifest, method, url) {
 
 // Exposed on window so the demo runs as plain scripts, including from file://.
 window.MockApi = { loadManifest, handleRequest };
+})();

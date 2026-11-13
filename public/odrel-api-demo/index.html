@@ -101,19 +101,24 @@
 <script src="lib/rdf.js"></script>
 <script src="lib/mockApi.js"></script>
 <script>
-const { loadManifest, handleRequest } = window.MockApi;
+(function () {
+'use strict';
+
+const api = window.MockApi;
 
 const state = { manifest: null, endpoints: [], selected: null };
 
 const el = (id) => document.getElementById(id);
 
 function showFatal(err) {
+  el('genBadge').textContent = 'Loading failed';
   document.querySelector('.wrap').innerHTML = `
     <div class="fatal" style="grid-column:1/-1">
       <h2 style="margin-top:0">The demo data could not be loaded</h2>
-      <p class="hint">${String(err && err.message ? err.message : err)}</p>
+      <p class="hint" id="loadError"></p>
       <p class="hint">Keep <code>index.html</code>, <code>data.js</code> and the <code>lib/</code> folder together in the unzipped bundle.</p>
     </div>`;
+  el('loadError').textContent = String(err && err.message ? err.message : err);
 }
 
 function sectionFor(endpoint) {
@@ -192,7 +197,7 @@ async function send() {
   el('respBody').textContent = 'Loading…';
   const started = performance.now();
   try {
-    const res = await handleRequest(state.manifest, el('method').value, url);
+    const res = await api.handleRequest(state.manifest, el('method').value, url);
     renderResponse(res, Math.round(performance.now() - started));
   } catch (err) {
     renderResponse({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: String(err.message || err) }, null, 2) }, Math.round(performance.now() - started));
@@ -211,7 +216,9 @@ function applyFormat(format) {
 }
 
 async function init() {
-  state.manifest = await loadManifest();
+  if (!window.RDF) throw new Error('The RDF library did not load. Extract the complete bundle before opening index.html.');
+  if (!api) throw new Error('The API library did not load. Extract the complete bundle before opening index.html.');
+  state.manifest = await api.loadManifest();
   state.endpoints = (state.manifest.endpoints || []).filter((ep) => ep.is_active !== false);
   const generated = state.manifest.generated_at ? new Date(state.manifest.generated_at) : null;
   el('genBadge').textContent = `${state.endpoints.length} endpoints · ${Object.keys(state.manifest.sections || {}).length} sections${generated ? ' · ' + generated.toLocaleDateString() : ''}`;
@@ -227,6 +234,7 @@ async function init() {
 }
 
 init().catch(showFatal);
+})();
 </script>
 </body>
 </html>
