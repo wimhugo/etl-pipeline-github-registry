@@ -1,0 +1,185 @@
+{
+  "name": "RefreshSource",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Source name shown on its card"
+    },
+    "description": {
+      "type": "string",
+      "description": "What this source holds and where it is used"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Vocabulary",
+        "Schema",
+        "Registry",
+        "Mapping",
+        "Index",
+        "Other"
+      ],
+      "enumColors": [
+        "green",
+        "blue",
+        "purple",
+        "yellow",
+        "pink",
+        "gray"
+      ],
+      "default": "Vocabulary",
+      "description": "Kind of source, used for grouping on the cards"
+    },
+    "upstream_source": {
+      "type": "string",
+      "description": "Authoritative origin: a URL to mirror, or the repository location the content is derived from"
+    },
+    "cache_path": {
+      "type": "string",
+      "description": "Repository path of the stored copy the API sections read"
+    },
+    "refresh_handler": {
+      "type": "string",
+      "enum": [
+        "mirror_upstream",
+        "none"
+      ],
+      "enumColors": [
+        "blue",
+        "gray"
+      ],
+      "default": "none",
+      "description": "mirror_upstream = fetch upstream_source and commit it to cache_path when it changed. none = no automated refresh inside the platform (the card records how the source is produced instead)."
+    },
+    "refresh_strategy": {
+      "type": "string",
+      "enum": [
+        "on_demand",
+        "scheduled",
+        "on_dependency_change",
+        "manual"
+      ],
+      "enumColors": [
+        "blue",
+        "green",
+        "purple",
+        "gray"
+      ],
+      "default": "on_demand",
+      "description": "When this source is expected to be refreshed"
+    },
+    "schedule_note": {
+      "type": "string",
+      "description": "Schedule or triggering event, e.g. 'weekly' or 'after a vocabulary release'"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Sources or files that must be current before this one can be refreshed"
+    },
+    "consumers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "API sections or features that read this source"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Anything that must be remembered about refreshing this source"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this source is tracked on the dashboard"
+    },
+    "last_refresh_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the last refresh attempt"
+    },
+    "last_refresh_status": {
+      "type": "string",
+      "enum": [
+        "never",
+        "updated",
+        "unchanged",
+        "failed"
+      ],
+      "enumColors": [
+        "gray",
+        "green",
+        "yellow",
+        "red"
+      ],
+      "default": "never",
+      "description": "Outcome of the last refresh attempt"
+    },
+    "last_refresh_message": {
+      "type": "string",
+      "description": "Detail of the last refresh attempt"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "rls": {
+    "read": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        }
+      ]
+    },
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "user_condition": {
+            "role": "user"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

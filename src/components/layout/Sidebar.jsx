@@ -24,6 +24,7 @@ const ICON_MAP = {
   'Checklist Manager':    CheckSquare,
   'Indexing Utility':     DatabaseZap,
   'Reasoner Update':       Network,
+  'Source Registry':       RefreshCw,
   'Settings':             Settings2,
   'Search':               Search,
   'Annotate':             Pencil,

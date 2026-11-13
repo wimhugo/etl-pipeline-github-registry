@@ -58,6 +58,7 @@ import V04KBApiPreviewStandalone from './pages/v04/KBApiPreviewStandalone';
 import V04JsonPolicyParser from './pages/v04/JsonPolicyParser';
 import IndexingUtility from './pages/v04/IndexingUtility';
 import ReasonerUpdate from './pages/v04/ReasonerUpdate';
+import SourceRegistry from './pages/v04/SourceRegistry';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -129,6 +130,7 @@ const AuthenticatedApp = () => {
         <Route path="/v0.4/json-policy-parser" element={<V04JsonPolicyParser />} />
         <Route path="/v0.4/indexing-utility" element={<IndexingUtility />} />
         <Route path="/v0.4/reasoner-update" element={<ReasonerUpdate />} />
+        <Route path="/v0.4/source-registry" element={<SourceRegistry />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
