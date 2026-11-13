@@ -12,7 +12,10 @@
  * Shared by the indexPolicies backend function; framework-agnostic vanilla TS.
  */
 
-const OPENREL = 'http://www.w3.org/ns/openrel/0/';
+// The canonical files declare the w3id.org namespace; a few legacy files still
+// use the older w3.org form. Both are recognised so neither is skipped.
+const OPENREL = 'http://www.w3id.org/ns/openrel/0/';
+const OPENREL_LEGACY = 'http://www.w3.org/ns/openrel/0/';
 const DCT = 'http://purl.org/dc/terms/';
 const PROV = 'http://www.w3.org/ns/prov#';
 const RDF_TYPE = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type';
@@ -112,6 +115,7 @@ const PUBLICATION_PREDS: Record<string, keyof PolicyMetadata['publication']> = {
 
 export function compactForIndex(iri: string): string {
   if (iri.startsWith(OPENREL)) return 'openrel:' + iri.substring(OPENREL.length);
+  if (iri.startsWith(OPENREL_LEGACY)) return 'openrel:' + iri.substring(OPENREL_LEGACY.length);
   if (iri.startsWith(DCT)) return 'dct:' + iri.substring(DCT.length);
   return iri;
 }
@@ -256,6 +260,14 @@ export function extractPolicyMetadata(ttl: string): PolicyMetadata | null {
       if (!rawProps[predIri]) rawProps[predIri] = [];
       rawProps[predIri].push(parseObject(o));
     }
+  }
+
+  // Normalise the legacy w3.org namespace onto the current w3id.org one, so the
+  // predicate lookups below behave the same for both file generations.
+  for (const key of Object.keys(rawProps)) {
+    if (!key.startsWith(OPENREL_LEGACY)) continue;
+    const current = OPENREL + key.substring(OPENREL_LEGACY.length);
+    if (!rawProps[current]) rawProps[current] = rawProps[key];
   }
 
   const getLiteral = (iri: string): string | null => {
