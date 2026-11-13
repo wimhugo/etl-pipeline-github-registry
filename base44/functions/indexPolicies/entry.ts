@@ -3,6 +3,7 @@ import { resolveGithubCredentials } from '../../shared/resolveGithubCredentials.
 import {
   extractPolicyMetadata,
   compactForIndex,
+  stripVersionSuffix,
   CURATED_FIELDS,
   DERIVED_FIELDS,
 } from '../../shared/extractPolicyMetadata.ts';
@@ -145,6 +146,16 @@ export default async function indexPolicies(req: Request): Promise<Response> {
       }
     }
 
+    // 4.4. Same metadata keyed without the version suffix, so an index entry
+    // carrying an older version still resolves to the current file.
+    const metadataByVersionlessCurie = new Map<string, any>();
+    for (const [curie, md] of metadataByCurie) {
+      const bare = stripVersionSuffix(curie);
+      if (bare !== curie && !metadataByVersionlessCurie.has(bare)) {
+        metadataByVersionlessCurie.set(bare, md);
+      }
+    }
+
     // 4.5. Parameter concept scheme (parameters.ttl) via the API — map each
     // parameter IRI to its prefLabel so the index stores human-readable labels
     // instead of IRIs. Keyed by both the member's full IRI and its openrel:
@@ -224,7 +235,11 @@ export default async function indexPolicies(req: Request): Promise<Response> {
         notFoundCount++;
         continue;
       }
-      const md = metadataByCurie.get(entry.iri);
+      // Version numbers are ignored when matching: the folder always holds the
+      // latest version of each policy, while the curated index may still carry
+      // an older version in its IRI.
+      const md = metadataByCurie.get(entry.iri)
+        || metadataByVersionlessCurie.get(stripVersionSuffix(entry.iri));
       if (!md) {
         changes.push({ iri: entry.iri, label: entry.label || '', status: 'no_ttl' });
         notFoundCount++;

@@ -120,6 +120,16 @@ export function compactForIndex(iri: string): string {
   return iri;
 }
 
+/**
+ * Drops the version suffix of a policy IRI/CURIE (openrel:OR-EU-0.5 →
+ * openrel:OR-EU). The repository folder always holds the current version of
+ * every policy while the curated index may lag behind, so versions are not
+ * used when matching an index entry to its file.
+ */
+export function stripVersionSuffix(iri: string): string {
+  return String(iri).replace(/-\d+(?:\.\d+)+$/, '');
+}
+
 export function extractPolicyMetadata(ttl: string): PolicyMetadata | null {
   const normalized = normalizeTtl(ttl);
 
