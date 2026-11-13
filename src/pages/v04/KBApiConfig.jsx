@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import ApiSourceFileEditor from '@/components/kbapi/ApiSourceFileEditor';
 import ApiSourceFilePreview from '@/components/kbapi/ApiSourceFilePreview';
 import ApiSourceTypeFilter from '@/components/kbapi/ApiSourceTypeFilter';
+import OdrlCacheRefresh, { ODRL_CACHE_PATH } from '@/components/kbapi/OdrlCacheRefresh';
 import { deriveSourceType } from '@/lib/apiSourceTypes';
 
 export default function KBApiConfig() {
@@ -104,6 +105,10 @@ export default function KBApiConfig() {
           Add Source File
         </Button>
       </div>
+
+      {sourceFiles.some((item) => String(item.file_path || '').includes(ODRL_CACHE_PATH)) && (
+        <OdrlCacheRefresh />
+      )}
 
       <Card className="bg-card border-border/50">
         <CardHeader className="pb-2">

@@ -55,21 +55,38 @@ function stripTurtleComments(text) {
 // --- TTL parser (regex-based, tolerant of real-world Turtle) ---
 function parseTtl(text, memberIdentifier) {
   const prefixes = {};
-  const prefixRegex = /@prefix\s+([^:]+):\s+<([^>]+)>\s*\./g;
+  // A default prefix declaration (":") carries no name, so it is captured as
+  // the empty string — files like the ODRL vocabulary use "@prefix : <...>"
+  // next to their named prefixes.
+  const prefixRegex = /@prefix\s+([A-Za-z0-9_.-]*):\s*<([^>]+)>\s*\./g;
   let pmatch;
   while ((pmatch = prefixRegex.exec(text)) !== null) {
-    prefixes[pmatch[1].trim()] = pmatch[2];
+    prefixes[pmatch[1]] = pmatch[2];
   }
 
   // Capture @base for folder-mode ID prefix substitution.
   const baseMatch = text.match(/@base\s+<([^>]+)>\s*\./);
   const baseIri = baseMatch ? baseMatch[1] : null;
 
+  // A vocabulary may bind one namespace twice (the ODRL file declares both
+  // ":" and "odrl:"). Terms written with the default prefix are surfaced with
+  // the named prefix so returned identifiers stay self-describing.
+  const defaultNs = prefixes[''];
+  const defaultAlias = defaultNs
+    ? Object.keys(prefixes).find((p) => p && prefixes[p] === defaultNs)
+    : null;
+
+  function withDefaultAlias(term) {
+    if (!defaultAlias || !term.startsWith(':') || term.startsWith('::')) return term;
+    return defaultAlias + term;
+  }
+
   function resolve(term) {
     term = term.trim();
     if (term.startsWith('<') && term.endsWith('>')) return term.slice(1, -1);
     const colonIdx = term.indexOf(':');
-    if (colonIdx > 0) {
+    // colonIdx === 0 means a default-prefix term such as ":Action".
+    if (colonIdx >= 0) {
       const prefix = term.substring(0, colonIdx);
       const local = term.substring(colonIdx + 1);
       if (prefixes[prefix]) return prefixes[prefix] + local;
@@ -137,7 +154,7 @@ function parseTtl(text, memberIdentifier) {
     if (!stmt) continue;
     const subjMatch = stmt.match(/^(\S+)\s+([\s\S]*)/);
     if (!subjMatch) continue;
-    const subject = extractTerm(subjMatch[1], true);
+    const subject = withDefaultAlias(extractTerm(subjMatch[1], true));
     const rest = subjMatch[2].trim();
 
     const poPairs = [];
@@ -182,7 +199,7 @@ function parseTtl(text, memberIdentifier) {
       for (const o of objs) {
         if (!o) continue;
         const objValue = extractTerm(o);       // resolved — for type check & label/definition
-        const objRaw = extractTerm(o, true);   // raw CURIE — for property storage & filtering
+        const objRaw = withDefaultAlias(extractTerm(o, true));   // raw CURIE — for property storage & filtering
         const isLiteral = o.trim().startsWith('"');
 
         if (predResolved === RDF_TYPE && memberIris.has(objValue)) {
@@ -306,7 +323,9 @@ function membersToTtl(members, memberIdentifierResolved, prefixes) {
       return iri;
     }
     for (const [prefix, ns] of Object.entries(prefixes)) {
-      if (iri.startsWith(ns)) {
+      // The default prefix is skipped: a namespace bound twice is emitted with
+      // its named prefix, which keeps CURIEs readable.
+      if (prefix && iri.startsWith(ns)) {
         return `${prefix}:${iri.substring(ns.length)}`;
       }
     }
@@ -322,6 +341,7 @@ function membersToTtl(members, memberIdentifierResolved, prefixes) {
       if (prefixes[prefix]) usedPrefixes.add(prefix);
     }
     for (const [prefix, ns] of Object.entries(prefixes)) {
+      if (!prefix) continue;
       if (iri.startsWith(ns)) { usedPrefixes.add(prefix); break; }
     }
   }
@@ -344,14 +364,14 @@ function membersToTtl(members, memberIdentifierResolved, prefixes) {
 
   // Resolve the member type IRI to a CURIE if possible
   // A source may list several member types; the 'a' shorthand carries one.
-  let typeCurie = (memberIdentifierResolved || 'skos:Concept').split(',')[0].trim();
-  if (memberIdentifierResolved) {
-    for (const [prefix, ns] of Object.entries(prefixes)) {
-      if (memberIdentifierResolved.startsWith(ns)) {
-        typeCurie = `${prefix}:${memberIdentifierResolved.substring(ns.length)}`;
-        usedPrefixes.add(prefix);
-        break;
-      }
+  // Only the first listed type is emitted, since the 'a' shorthand carries one.
+  const firstMemberType = (memberIdentifierResolved || 'skos:Concept').split(',')[0].trim();
+  let typeCurie = firstMemberType;
+  for (const [prefix, ns] of Object.entries(prefixes)) {
+    if (prefix && firstMemberType.startsWith(ns)) {
+      typeCurie = `${prefix}:${firstMemberType.substring(ns.length)}`;
+      usedPrefixes.add(prefix);
+      break;
     }
   }
 
@@ -410,6 +430,9 @@ function toCompact(iri, prefixes) {
   // Already a CURIE — leave as is.
   if (!/^https?:\/\//.test(iri)) return iri;
   for (const [prefix, ns] of Object.entries(prefixes || {})) {
+    // An empty prefix is not a legal JSON-LD term, so the named prefix bound to
+    // the same namespace is used instead.
+    if (!prefix) continue;
     if (ns && iri.startsWith(ns)) return `${prefix}:${iri.substring(ns.length)}`;
   }
   return iri;
@@ -458,6 +481,7 @@ function membersToJsonLd(members, memberIdentifierResolved, prefixes) {
 
   const context = { rdf: JSONLD_RDF_NS, rdfs: JSONLD_RDFS_NS, skos: JSONLD_SKOS_NS };
   for (const [prefix, ns] of Object.entries(prefixes || {})) {
+    if (!prefix) continue;
     if (!context[prefix] && ns) context[prefix] = ns;
   }
 
