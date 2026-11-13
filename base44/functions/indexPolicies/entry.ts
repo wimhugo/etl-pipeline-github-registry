@@ -31,7 +31,7 @@ import { submitGithubPR } from '../../shared/submitGithubPR.ts';
  *                 (branch + PR), and returns the PR url plus the diff.
  */
 
-const INDEX_FILE = 'data/input/policy_index.json';
+const INDEX_FILE = '.configs/input/policy_index.json';
 
 interface LeafDiff {
   field: string;
@@ -122,7 +122,7 @@ export default async function indexPolicies(req: Request): Promise<Response> {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'OpenREL-App',
     };
-    const listUrl = `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(folderPath)}?ref=${branch}`;
+    const listUrl = `https://api.github.com/repos/${repo}/contents/${folderPath}?ref=${branch}`;
     const listRes = await fetch(listUrl, { headers: ghHeaders });
     if (!listRes.ok) {
       return Response.json({ error: `Failed to list policy folder (${listRes.status})` }, { status: 500 });

@@ -17,8 +17,8 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'GitHub credentials not configured' }, { status: 500 });
   }
 
-  const filePath = 'data/input/policy_index.json';
-  const url = `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(filePath)}?ref=${branch}`;
+  const filePath = '.configs/input/policy_index.json';
+  const url = `https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
