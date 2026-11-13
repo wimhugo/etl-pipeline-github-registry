@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OpenREL KB API — Standalone Demo</title>
+<!--
+  OpenREL KB API — standalone, offline distribution.
+
+  Every request is answered in the browser from the Turtle files in input/.
+  No server, no Base44 SDK, no build step. Serve the folder over HTTP
+  (python3 -m http.server 8080) and open index.html.
+-->
+<style>
+  :root {
+    --bg: #0b1120; --card: #131c31; --card-2: #0f1830; --border: #243049;
+    --fg: #e8eefc; --muted: #8aa0c4; --primary: #3b82f6; --accent: #2dd4bf;
+    --danger: #ef4444; --warn: #f59e0b; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.5; }
+  header { padding: 16px 24px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #0e1729, var(--bg)); display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 12.5px; }
+  header .grow { flex: 1; }
+  .badge { border: 1px solid var(--border); background: var(--card-2); color: var(--muted); border-radius: 999px; padding: 3px 10px; font-size: 11.5px; }
+  .wrap { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; padding: 16px 24px 40px; max-width: 1400px; margin: 0 auto; }
+  aside { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card-2); overflow: hidden; align-self: start; }
+  aside .search { padding: 10px; border-bottom: 1px solid var(--border); }
+  aside input { width: 100%; background: var(--card); border: 1px solid var(--border); color: var(--fg); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; font-family: inherit; }
+  .group { padding: 10px 12px 4px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .ep { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--fg); font-family: inherit; font-size: 12.5px; padding: 7px 12px; cursor: pointer; border-left: 2px solid transparent; }
+  .ep:hover { background: rgba(59,130,246,.08); }
+  .ep.active { background: rgba(59,130,246,.14); border-left-color: var(--primary); }
+  .ep .m { display: inline-block; min-width: 38px; font-size: 10px; font-weight: 700; color: var(--accent); letter-spacing: .04em; }
+  .ep .p { color: var(--muted); word-break: break-all; }
+  main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 16px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  .row { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+  select, .url { background: var(--card-2); border: 1px solid var(--border); color: var(--fg); border-radius: 8px; padding: 9px 11px; font-size: 13px; font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .url { flex: 1; min-width: 240px; }
+  .btn { background: var(--primary); color: #fff; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn:disabled { opacity: .6; cursor: default; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--fg); font-weight: 500; padding: 6px 11px; font-size: 12px; }
+  .btn.ghost.on { border-color: var(--primary); color: #9dc0ff; }
+  .meta { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 12px 0 10px; }
+  .pill { border-radius: 999px; padding: 2px 10px; font-weight: 700; font-size: 11.5px; }
+  .pill.ok { background: rgba(45,212,191,.14); color: var(--accent); }
+  .pill.bad { background: rgba(239,68,68,.14); color: #fca5a5; }
+  .pill.warn { background: rgba(245,158,11,.14); color: #fcd34d; }
+  pre { margin: 0; background: #0a1020; border: 1px solid var(--border); border-radius: 8px; padding: 14px; overflow: auto; max-height: 58vh; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; line-height: 1.55; color: #cfe0ff; white-space: pre-wrap; word-break: break-word; }
+  .hint { color: var(--muted); font-size: 12.5px; }
+  .fatal { max-width: 720px; margin: 60px auto; border: 1px solid rgba(239,68,68,.4); background: rgba(239,68,68,.06); border-radius: var(--radius); padding: 22px; }
+  .fatal code { background: #0a1020; border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>OpenREL KB API</h1>
+  <span class="sub">standalone demo — answered in the browser from input/</span>
+  <span class="grow"></span>
+  <span class="badge" id="genBadge">loading…</span>
+</header>
+
+<div class="wrap">
+  <aside>
+    <div class="search"><input id="search" type="text" placeholder="Filter endpoints…" /></div>
+    <div id="epList"></div>
+  </aside>
+  <main>
+    <div class="card">
+      <h2 id="epTitle">Request</h2>
+      <div class="row">
+        <select id="method">
+          <option>GET</option>
+          <option>POST</option>
+        </select>
+        <input id="url" class="url" type="text" spellcheck="false" />
+        <button id="send" class="btn">Send request</button>
+      </div>
+      <div class="row" style="margin-top:10px;align-items:center">
+        <span class="hint">Representation:</span>
+        <button class="btn ghost" data-format="ttl">ttl</button>
+        <button class="btn ghost" data-format="json">json</button>
+        <button class="btn ghost" data-format="json-ld">json-ld</button>
+        <span class="grow"></span>
+        <span class="hint" id="epHint"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Response</h2>
+      <div class="meta" id="respMeta"><span class="hint">No request sent yet.</span></div>
+      <pre id="respBody">—</pre>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { loadManifest, handleRequest } from './lib/mockApi.js';
+
+const state = { manifest: null, endpoints: [], selected: null };
+
+const el = (id) => document.getElementById(id);
+
+function showFatal(err) {
+  document.querySelector('.wrap').innerHTML = `
+    <div class="fatal" style="grid-column:1/-1">
+      <h2 style="margin-top:0">The demo data could not be loaded</h2>
+      <p class="hint">${String(err && err.message ? err.message : err)}</p>
+      <p class="hint">Browsers block reading local files from <code>file://</code>. Serve this folder over HTTP instead — from inside the unzipped folder:</p>
+      <pre style="max-height:none">python3 -m http.server 8080
+# then open http://localhost:8080</pre>
+    </div>`;
+}
+
+function sectionFor(endpoint) {
+  const name = endpoint.logic_config && endpoint.logic_config.section;
+  return name ? state.manifest.sections[name] : null;
+}
+
+function renderList() {
+  const query = el('search').value.trim().toLowerCase();
+  const groups = new Map();
+  for (const ep of state.endpoints) {
+    if (query && !(ep.path + ' ' + (ep.tag || '')).toLowerCase().includes(query)) continue;
+    const tag = ep.tag || 'default';
+    if (!groups.has(tag)) groups.set(tag, []);
+    groups.get(tag).push(ep);
+  }
+  const html = [...groups.entries()].map(([tag, eps]) => `
+    <div class="group">${tag}</div>
+    ${eps.map((ep) => `
+      <button class="ep ${state.selected && state.selected.path === ep.path && state.selected.method === ep.method ? 'active' : ''}" data-key="${ep.method}|${ep.path}">
+        <span class="m">${ep.method}</span><span class="p">${ep.path}</span>
+      </button>`).join('')}
+  `).join('');
+  el('epList').innerHTML = html || '<div class="group">no matches</div>';
+  el('epList').querySelectorAll('.ep').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const [method, path] = btn.dataset.key.split('|');
+      const ep = state.endpoints.find((e) => e.method === method && e.path === path);
+      if (ep) select(ep);
+    });
+  });
+}
+
+function select(ep) {
+  state.selected = ep;
+  el('epTitle').textContent = `${ep.method} /${ep.path}`;
+  el('method').value = ep.method;
+  el('url').value = '/' + ep.path;
+  const section = sectionFor(ep);
+  el('epHint').textContent = ep.endpoint_type === 'detail'
+    ? 'Detail endpoint — paste an id into the path, or list first to find ids.'
+    : (ep.description || ep.summary || '');
+  document.querySelectorAll('[data-format]').forEach((b) => {
+    b.style.display = section && section.data_format === 'ttl' ? '' : 'none';
+    b.classList.toggle('on', (el('url').value.includes('format=') ? new URLSearchParams(el('url').value.split('?')[1] || '').get('format') : 'ttl') === b.dataset.format);
+  });
+  renderList();
+}
+
+function statusClass(status) {
+  if (status >= 200 && status < 300) return 'ok';
+  if (status >= 500) return 'bad';
+  return 'warn';
+}
+
+function renderResponse(res, ms) {
+  el('respMeta').innerHTML = `
+    <span class="pill ${statusClass(res.status)}">${res.status}</span>
+    <span>${res.contentType}</span>
+    <span>${ms} ms</span>
+    <span>${new Blob([res.body || '']).size.toLocaleString()} bytes</span>
+    ${res.section ? `<span>section: ${res.section}</span>` : ''}`;
+
+  const body = res.body || '';
+  if (res.contentType === 'application/json') {
+    try { el('respBody').textContent = JSON.stringify(JSON.parse(body), null, 2); return; } catch (_) {}
+  }
+  el('respBody').textContent = body;
+}
+
+async function send() {
+  const url = el('url').value.trim();
+  if (!url) return;
+  const button = el('send');
+  button.disabled = true;
+  el('respBody').textContent = 'Loading…';
+  const started = performance.now();
+  try {
+    const res = await handleRequest(state.manifest, el('method').value, url);
+    renderResponse(res, Math.round(performance.now() - started));
+  } catch (err) {
+    renderResponse({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: String(err.message || err) }, null, 2) }, Math.round(performance.now() - started));
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function applyFormat(format) {
+  const url = el('url').value.trim();
+  const [path, query = ''] = url.split('?');
+  const params = new URLSearchParams(query);
+  params.set('format', format);
+  el('url').value = path + '?' + params.toString();
+  document.querySelectorAll('[data-format]').forEach((b) => b.classList.toggle('on', b.dataset.format === format));
+}
+
+async function init() {
+  state.manifest = await loadManifest();
+  state.endpoints = (state.manifest.endpoints || []).filter((ep) => ep.is_active !== false);
+  const generated = state.manifest.generated_at ? new Date(state.manifest.generated_at) : null;
+  el('genBadge').textContent = `${state.endpoints.length} endpoints · ${Object.keys(state.manifest.sections || {}).length} sections${generated ? ' · ' + generated.toLocaleDateString() : ''}`;
+
+  const first = state.endpoints.find((ep) => ep.endpoint_type !== 'detail') || state.endpoints[0];
+  if (first) select(first);
+  renderList();
+
+  el('search').addEventListener('input', renderList);
+  el('send').addEventListener('click', send);
+  el('url').addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+  document.querySelectorAll('[data-format]').forEach((b) => b.addEventListener('click', () => applyFormat(b.dataset.format)));
+}
+
+init().catch(showFatal);
+</script>
+</body>
+</html>

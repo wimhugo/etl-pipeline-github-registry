@@ -6,6 +6,7 @@ import { Eye, ExternalLink } from 'lucide-react';
 import { generateSwaggerSpec } from '@/lib/swaggerSpec';
 import SwaggerUiContainer from '@/components/kbapi/SwaggerUiContainer';
 import SpecExportButton from '@/components/kbapi/SpecExportButton';
+import StandaloneBundleButton from '@/components/kbapi/StandaloneBundleButton';
 import { createRequestInterceptor } from '@/lib/swaggerRequestInterceptor';
 
 // Display-only server URL shown in the Swagger spec (requests are
@@ -37,6 +38,7 @@ export default function KBApiPreview() {
             API Preview
           </h1>
           <div className="flex items-center gap-3">
+            <StandaloneBundleButton />
             <SpecExportButton endpoints={endpoints} serverUrl={DISPLAY_SERVER_URL} />
             <a
               href="/v0.4/kb-api/preview-standalone"
