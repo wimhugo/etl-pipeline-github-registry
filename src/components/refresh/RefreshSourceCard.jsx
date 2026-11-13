@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { Pencil, Trash2, RefreshCw } from 'lucide-react';
+import { Pencil, Trash2, RefreshCw, Copy } from 'lucide-react';
 import useRefreshSource from '@/hooks/useRefreshSource';
 import {
   STRATEGY_LABELS,
@@ -43,6 +43,31 @@ export default function RefreshSourceCard({ source, onEdit }) {
     },
   });
 
+  const cloneSource = useMutation({
+    mutationFn: () => base44.entities.RefreshSource.create({
+      name: `${source.name} (copy)`,
+      description: source.description || '',
+      category: source.category,
+      upstream_source: source.upstream_source || '',
+      cache_path: source.cache_path || '',
+      refresh_handler: source.refresh_handler,
+      refresh_strategy: source.refresh_strategy,
+      schedule_note: source.schedule_note || '',
+      depends_on: source.depends_on || [],
+      consumers: source.consumers || [],
+      notes: source.notes || '',
+      is_active: source.is_active !== false,
+      last_refresh_status: 'never',
+    }),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ['refreshSources'] });
+      toast({ title: 'Source cloned', description: `"${created.name}" was added — edit the copy to finish.` });
+    },
+    onError: (error) => {
+      toast({ title: 'Could not clone source', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const status = statusOf(source);
   const isAutomated = source.refresh_handler === 'mirror_upstream';
   const isRefreshing = refresh.isPending && refresh.variables?.id === source.id;
@@ -66,6 +91,16 @@ export default function RefreshSourceCard({ source, onEdit }) {
           <div className="flex items-center gap-1 shrink-0">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(source)} title="Edit">
               <Pencil className="w-3.5 h-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => cloneSource.mutate()}
+              disabled={cloneSource.isPending}
+              title="Clone"
+            >
+              <Copy className="w-3.5 h-3.5" />
             </Button>
             <Button
               variant="ghost"
