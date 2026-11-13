@@ -161,8 +161,18 @@ Deno.serve(async (req) => {
       sections,
     };
 
-    entries.push({ name: 'manifest.json', content: JSON.stringify(manifest, null, 2) });
+    const manifestJson = JSON.stringify(manifest, null, 2);
+    entries.push({ name: 'manifest.json', content: manifestJson });
     entries.push(...inputs);
+
+    // 4b. Inlined data so the demo page also works opened straight from disk
+    //     (browsers block fetch of local files).
+    const inlined: Record<string, string> = { 'manifest.json': manifestJson };
+    for (const input of inputs) inlined[input.name] = input.content;
+    entries.push({
+      name: 'data.js',
+      content: `/* Generated: bundled API data, read by lib/mockApi.js. */\nwindow.OPENREL_DATA = ${JSON.stringify(inlined)};\n`,
+    });
 
     // 5. ZIP
     const bytes = await buildZip(entries);

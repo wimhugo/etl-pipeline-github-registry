@@ -7,9 +7,9 @@
 <!--
   OpenREL KB API — standalone, offline distribution.
 
-  Every request is answered in the browser from the Turtle files in input/.
-  No server, no Base44 SDK, no build step. Serve the folder over HTTP
-  (python3 -m http.server 8080) and open index.html.
+  Every request is answered in the browser from the Turtle files bundled in
+  data.js. No server, no Base44 SDK, no build step: open index.html directly.
+  Serving the folder over HTTP works too.
 -->
 <style>
   :root {
@@ -97,8 +97,11 @@
   </main>
 </div>
 
-<script type="module">
-import { loadManifest, handleRequest } from './lib/mockApi.js';
+<script src="data.js"></script>
+<script src="lib/rdf.js"></script>
+<script src="lib/mockApi.js"></script>
+<script>
+const { loadManifest, handleRequest } = window.MockApi;
 
 const state = { manifest: null, endpoints: [], selected: null };
 
@@ -109,9 +112,7 @@ function showFatal(err) {
     <div class="fatal" style="grid-column:1/-1">
       <h2 style="margin-top:0">The demo data could not be loaded</h2>
       <p class="hint">${String(err && err.message ? err.message : err)}</p>
-      <p class="hint">Browsers block reading local files from <code>file://</code>. Serve this folder over HTTP instead — from inside the unzipped folder:</p>
-      <pre style="max-height:none">python3 -m http.server 8080
-# then open http://localhost:8080</pre>
+      <p class="hint">Keep <code>index.html</code>, <code>data.js</code> and the <code>lib/</code> folder together in the unzipped bundle.</p>
     </div>`;
 }
 
@@ -226,20 +227,6 @@ async function init() {
 }
 
 init().catch(showFatal);
-</script>
-<script>
-  // Modules and fetch are blocked on file://, so explain it instead of
-  // leaving an empty page.
-  if (window.location.protocol === 'file:') {
-    setTimeout(function () {
-      document.querySelector('.wrap').innerHTML =
-        '<div class="fatal" style="grid-column:1/-1">' +
-        '<h2 style="margin-top:0">Serve this folder over HTTP</h2>' +
-        '<p class="hint">Browsers block local files when a page is opened straight from disk. From inside the unzipped folder run:</p>' +
-        '<pre style="max-height:none">python3 -m http.server 8080\n# then open http://localhost:8080</pre>' +
-        '<p class="hint">or use <code>npx serve .</code></p></div>';
-    }, 400);
-  }
 </script>
 </body>
 </html>

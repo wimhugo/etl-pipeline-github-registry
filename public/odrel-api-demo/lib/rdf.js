@@ -14,8 +14,6 @@ const SKOS_PREF_LABEL = SKOS_NS + 'prefLabel';
 const RDFS_LABEL = RDFS_NS + 'label';
 const SKOS_DEFINITION = SKOS_NS + 'definition';
 
-export { RDF_TYPE };
-
 // Strip Turtle comments, leaving '#' alone inside an IRI (<...>) or literal ("...").
 function stripTurtleComments(text) {
   let out = '';
@@ -44,7 +42,7 @@ function stripTurtleComments(text) {
   return out;
 }
 
-export function resolveCurie(curie, prefixes) {
+function resolveCurie(curie, prefixes) {
   if (!curie) return null;
   curie = String(curie).trim();
   if (curie.startsWith('<') && curie.endsWith('>')) return curie.slice(1, -1);
@@ -62,7 +60,7 @@ export function resolveCurie(curie, prefixes) {
  * `memberIdentifier` may list several types (comma separated). When it is
  * null/empty every subject counts as a member (folder mode).
  */
-export function parseTurtle(text, memberIdentifier) {
+function parseTurtle(text, memberIdentifier) {
   const prefixes = {};
   const prefixRegex = /@prefix\s+([A-Za-z0-9_.-]*):\s*<([^>]+)>\s*\./g;
   let pmatch;
@@ -214,7 +212,7 @@ export function parseTurtle(text, memberIdentifier) {
   return { members: Object.values(members), memberIdentifierResolved: memberIri, prefixes, baseIri };
 }
 
-export function parseJsonMembers(text, memberIdentifier) {
+function parseJsonMembers(text, memberIdentifier) {
   const parsed = JSON.parse(text);
   let items = [];
 
@@ -258,7 +256,7 @@ function escapeTtlLiteral(str) {
     .replace(/\t/g, '\\t');
 }
 
-export function membersToTurtle(members, memberIdentifierResolved, prefixes) {
+function membersToTurtle(members, memberIdentifierResolved, prefixes) {
   prefixes = prefixes || {};
 
   function iriToCurie(iri) {
@@ -356,7 +354,7 @@ function toCompact(iri, prefixes) {
   return iri;
 }
 
-export function membersToJsonLd(members, memberIdentifierResolved, prefixes) {
+function membersToJsonLd(members, memberIdentifierResolved, prefixes) {
   const nodes = (members || []).map((m) => {
     const props = Array.isArray(m.properties) ? m.properties : [];
     const node = { '@id': m.iri };
@@ -410,10 +408,21 @@ export function membersToJsonLd(members, memberIdentifierResolved, prefixes) {
  * Folder mode helper: pick the subject that carries the configured title or
  * description field, otherwise the first subject in document order.
  */
-export function findPrimarySubject(parsed, titleFieldIri, descriptionFieldIri) {
+function findPrimarySubject(parsed, titleFieldIri, descriptionFieldIri) {
   const members = parsed.members || [];
   if (members.length === 0) return null;
   return members.find((m) =>
     (m.properties || []).some((p) => p.predicate === titleFieldIri || p.predicate === descriptionFieldIri)
   ) || members[0];
 }
+
+// Exposed on window so the demo runs as plain scripts, including from file://.
+window.RDF = {
+  RDF_TYPE,
+  resolveCurie,
+  parseTurtle,
+  parseJsonMembers,
+  membersToTurtle,
+  membersToJsonLd,
+  findPrimarySubject,
+};

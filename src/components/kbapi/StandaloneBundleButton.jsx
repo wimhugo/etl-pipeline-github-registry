@@ -42,7 +42,7 @@ export default function StandaloneBundleButton() {
 
       toast({
         title: 'Bundle downloaded',
-        description: `${data.file_count} files (${data.endpoint_count} endpoints). Unzip it and serve the folder — see README.`,
+        description: `${data.file_count} files (${data.endpoint_count} endpoints). Unzip it and open index.html — no server needed.`,
       });
     } catch (error) {
       toast({

@@ -6,14 +6,14 @@
  * browser, and responses are produced in Turtle, JSON or JSON-LD.
  */
 
-import {
+const {
   parseTurtle,
   parseJsonMembers,
   membersToTurtle,
   membersToJsonLd,
   resolveCurie,
   findPrimarySubject,
-} from './rdf.js';
+} = window.RDF;
 
 const SKOS_NS = 'http://www.w3.org/2004/02/skos/core#';
 const OPENREL_NS = 'http://www.w3.org/ns/openrel/0/';
@@ -35,7 +35,9 @@ const MAPPING_PREDICATES = new Set([
 
 const textCache = new Map();
 
-export async function loadManifest() {
+async function loadManifest() {
+  const inlined = window.OPENREL_DATA && window.OPENREL_DATA['manifest.json'];
+  if (typeof inlined === 'string') return JSON.parse(inlined);
   const res = await fetch('./manifest.json', { cache: 'no-store' });
   if (!res.ok) throw new Error(`Could not load manifest.json (${res.status})`);
   return res.json();
@@ -43,6 +45,11 @@ export async function loadManifest() {
 
 async function fetchText(localPath) {
   if (textCache.has(localPath)) return textCache.get(localPath);
+  const inlined = window.OPENREL_DATA && window.OPENREL_DATA[localPath];
+  if (typeof inlined === 'string') {
+    textCache.set(localPath, inlined);
+    return inlined;
+  }
   const res = await fetch('./' + localPath, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Missing bundled data file: ${localPath} (${res.status})`);
   const text = await res.text();
@@ -344,7 +351,7 @@ function matchEndpoint(manifest, method, pathname) {
  * Handle one request against the bundled data.
  * `url` is a path plus optional query string, e.g. "/openrel/api/v0.4/actions?format=json".
  */
-export async function handleRequest(manifest, method, url) {
+async function handleRequest(manifest, method, url) {
   const parsedUrl = new URL(url, window.location.href);
   const found = matchEndpoint(manifest, method, parsedUrl.pathname);
 
@@ -376,3 +383,6 @@ export async function handleRequest(manifest, method, url) {
     section,
   };
 }
+
+// Exposed on window so the demo runs as plain scripts, including from file://.
+window.MockApi = { loadManifest, handleRequest };

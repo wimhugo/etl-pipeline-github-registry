@@ -2,32 +2,40 @@
 
 A self-contained mock of the OpenREL KB API. No server, no database, no build
 step: the endpoints are answered in the browser from the Turtle files in
-`input/`.
+`input/`, which are also preloaded in `data.js`.
 
 ## Run it
 
-Browsers refuse to read local files when a page is opened straight from disk
-(`file://`). Serve the folder instead — pick whichever line works on your
-machine, from inside this folder:
+Unzip the bundle and open **`index.html`** — double-clicking works, in any
+browser. Nothing to install.
+
+Keep `index.html`, `data.js` and the `lib/` folder together; the page reads
+`data.js` (the bundled Turtle sources) and `lib/` (the parser and router).
+Serving the folder over HTTP also works, if you prefer:
 
 ```bash
 python3 -m http.server 8080     # then open http://localhost:8080
-npx serve .                     # or: npx http-server .
+npx serve .
 ```
 
-`index.html` opens with a list of endpoints on the left. Pick one, adjust the
-URL or the `format` value, and press **Send request**.
+Pick an endpoint on the left, adjust the URL or the `format` value, and press
+**Send request**.
 
 ## What is inside
 
 ```
 index.html                 the demo app
+data.js                    generated: every bundled source file, inlined
 manifest.json              generated: endpoints + which files back each section
-input/…                    the Turtle (and JSON) source files, at their
-                           original repository paths
+input/…                    the same Turtle (and JSON) sources, at their
+                           original repository paths — for reference and for
+                           serving over HTTP
 lib/rdf.js                 Turtle reader/writer (member parsing, TTL/JSON-LD output)
 lib/mockApi.js             request routing and response shaping
 ```
+
+Reads prefer `data.js`; if a file is not inlined, the page falls back to reading
+it from `input/` over HTTP.
 
 ## Same behaviour as the hosted API
 
